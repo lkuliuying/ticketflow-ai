@@ -1122,6 +1122,9 @@ buttons:
   changeHistory: Change history
 
 menus:
+  ticketflow: TicketFlow
+  ticketflowTickets: Tickets
+  ticketflowKnowledge: Ticket Knowledge Base
   searchData: Data search
   userOnline: Online users
   apiApp: API applications

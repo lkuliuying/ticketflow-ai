@@ -1122,6 +1122,9 @@ buttons:
   changeHistory: 变更历史
 
 menus:
+  ticketflow: TicketFlow
+  ticketflowTickets: 工单
+  ticketflowKnowledge: 工单知识库
   searchData: 数据查询
   userOnline: 在线用户
   apiApp: API 应用
