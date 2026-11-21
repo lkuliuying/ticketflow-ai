@@ -13,6 +13,8 @@ import argparse
 import subprocess
 from pathlib import Path
 
+from runlog import track
+
 ROOT = Path(__file__).resolve().parents[2]
 COLLAB = ROOT / "collab"
 REPORTS = COLLAB / "reports"
@@ -64,8 +66,12 @@ def main() -> None:
         command = ["codex", "exec", *common, "resume", "--last", args.resume]
     else:
         command = ["codex", "exec", *common, build_prompt(args.task, args.extra)]
-    with (REPORTS / f"{args.task}.log").open("a", encoding="utf-8") as log:
+    detail = args.resume or args.extra or "按任务书执行"
+    with track("codex", args.task, "task", detail) as record, (REPORTS / f"{args.task}.log").open(
+        "a", encoding="utf-8"
+    ) as log:
         code = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL).returncode
+        record["exit_code"] = code
     print(f"codex 退出码 {code}，日志 {REPORTS / (args.task + '.log')}")
 
 

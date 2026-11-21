@@ -91,6 +91,18 @@ python collab/bin/review.py BE-02 be/contract-gaps --repo ..\ticketflow-ai-be   
 - Antigravity：`agy` 以 plan 模式运行，评审材料由脚本拼好经 stdin 传入，**不授予任何文件或终端权限**。
   可用模型里没有 Gemini 4 Neon，当前使用 `gemini-3.8-flash-high`（在 `review.py` 的 `MODEL` 中修改）。
 
+## 代理指挥台（3D 可视化）
+
+```powershell
+python collab/dashboard/server.py --port 8765   # 打开 http://127.0.0.1:8765
+```
+
+- 页面用 Three.js 展示三个代理站台、8 个阶段的环形流水线、任务卡片、交接链路和 main 提交柱，
+  左侧是代理状态（Codex 最近命令、Gemini 最近结论），右侧是流水线 / 详情 / Git，底部是事件流。
+- 数据全部来自本机：`collab/README.md` 看板、任务书、`collab/reports/`（报告、Codex 日志、
+  `*.run-*.json` 调度记录、`claude.status.json`）、`collab/reviews/` 和 git，每 3 秒刷新，只监听 127.0.0.1。
+- `codex_task.py` 与 `review.py` 每次调度都会写运行记录；Claude 切换工作时更新 `claude.status.json`。
+
 ## 启动提示词（手动使用时）
 
 给 Codex：
