@@ -8,11 +8,14 @@
 分支：`fe/ticket-list`
 
 - `src/api/ticketflow/tickets.ts`：继承 `BaseApi`，补 `transition`、`assign`、`comments`、
-  `timeline`、`aiMetadata`、`dashboard`。`create` 每次提交生成 `Idempotency-Key`，
-  同一次弹窗内重试复用同一个键。
+  `timeline`、`aiMetadata`、`dashboard`。`create` 为每份待提交内容生成 `Idempotency-Key`：
+  未成功的同一份内容重试（含重开弹窗）复用同一个键，成功后释放，超过服务端 24 小时保留期作废。
+  键跟随内容而不是弹窗，因为改过内容再用旧键只会得到服务端 409。
 - 列表页走 RePlusPage + 后端元数据：状态、优先级用标签渲染，`sla_state` 高亮
-  （`DUE_SOON` 警告色、`OVERDUE` 危险色），筛选支持 `sla` 和 `q`。
-- 新建工单表单：标题、描述、分类、优先级；409 提示幂等冲突，429 提示稍后重试。
+  （`DUE_SOON` 警告色、`OVERDUE` 危险色）。筛选项来自后端 `search-fields`，由 `TicketFilter`
+  生成，已包含 `sla` 和 `q`，前端不需要重映射。
+- 新建工单表单：标题、描述、分类、优先级。409 / 429 由 http 拦截器展示服务端 `detail`
+  （429 走框架的限流策略），不另写文案。
 
 ## FE-02 工单详情（依赖 BE-02）
 

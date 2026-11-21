@@ -71,12 +71,19 @@ export type TicketComment = {
   created_time: string;
 };
 
+/** 服务端幂等记录保留 24 小时，客户端提前一小时放弃旧键 */
+const PENDING_KEY_TTL_MS = 23 * 60 * 60 * 1000;
+
 function newIdempotencyKey(): string {
-  const raw =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}${Math.random().toString(16).slice(2)}`;
-  return raw.replace(/-/g, "");
+  if (typeof crypto === "undefined") {
+    return `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  }
+  if (typeof crypto.randomUUID === "function")
+    return crypto.randomUUID().replace(/-/g, "");
+  // 非安全上下文没有 randomUUID，仍可用 getRandomValues 取 128 位随机数
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
 }
 
 /** 按字段名排序后的载荷指纹：同一份表单重试时取回同一个幂等键 */
@@ -91,20 +98,28 @@ function payloadFingerprint(data: object): string {
 
 class TicketApi extends BaseApi {
   /**
-   * 未成功的建单请求保留各自的幂等键。网络中断或超时后用户再次提交同一份
-   * 内容，服务端会返回首次创建的工单而不是再建一张；成功后释放该键，之后
-   * 内容相同的新提交视为新工单。
+   * 未成功的建单请求按内容保留各自的幂等键。网络中断或超时后再次提交同一份
+   * 内容（无论是否重开弹窗），服务端会返回首次创建的工单而不是再建一张；
+   * 成功后释放该键，之后内容相同的新提交视为新工单。
+   *
+   * 键跟随内容而不是弹窗：改过内容的提交是另一张工单，复用旧键只会被服务端
+   * 以 409 拒绝。旧键超过服务端保留期后作废。
    */
-  private pendingKeys = new Map<string, string>();
+  private pendingKeys = new Map<string, { key: string; createdAt: number }>();
 
-  idempotencyKeyFor = (data: object): string => {
-    const fingerprint = payloadFingerprint(data);
-    let key = this.pendingKeys.get(fingerprint);
-    if (!key) {
-      key = newIdempotencyKey();
-      this.pendingKeys.set(fingerprint, key);
+  idempotencyKeyFor = (data: object, now = Date.now()): string => {
+    for (const [fingerprint, entry] of this.pendingKeys) {
+      if (now - entry.createdAt > PENDING_KEY_TTL_MS) {
+        this.pendingKeys.delete(fingerprint);
+      }
     }
-    return key;
+    const fingerprint = payloadFingerprint(data);
+    let entry = this.pendingKeys.get(fingerprint);
+    if (!entry) {
+      entry = { key: newIdempotencyKey(), createdAt: now };
+      this.pendingKeys.set(fingerprint, entry);
+    }
+    return entry.key;
   };
 
   create = <T = TicketItem>(data?: object) => {
@@ -152,7 +167,7 @@ class TicketApi extends BaseApi {
     );
   };
 
-  comment = (
+  comments = (
     pk: string,
     data: { body: string; visibility: CommentVisibility }
   ) => {

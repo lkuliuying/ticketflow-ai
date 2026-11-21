@@ -72,6 +72,21 @@ describe("ticketApi 建单幂等键", () => {
   });
 });
 
+describe("ticketApi 幂等键保留期", () => {
+  it("未成功的键在服务端保留期内复用，超过后换新键", () => {
+    const content = { ...payload, title: "保留期用例" };
+    const start = 1_700_000_000_000;
+    const first = ticketApi.idempotencyKeyFor(content, start);
+
+    expect(ticketApi.idempotencyKeyFor(content, start + 60 * 60 * 1000)).toBe(
+      first
+    );
+    expect(
+      ticketApi.idempotencyKeyFor(content, start + 24 * 60 * 60 * 1000)
+    ).not.toBe(first);
+  });
+});
+
 describe("ticketApi 写操作路径", () => {
   beforeEach(() => {
     requestMock.mockReset();
@@ -82,7 +97,7 @@ describe("ticketApi 写操作路径", () => {
     const pk = "7f1c2d1e-0000-4000-8000-000000000001";
     ticketApi.transition(pk, { target_status: "IN_PROGRESS", version: 3 });
     ticketApi.assign(pk, { assignee_id: 9, version: 4 });
-    ticketApi.comment(pk, { body: "已处理", visibility: "INTERNAL" });
+    ticketApi.comments(pk, { body: "已处理", visibility: "INTERNAL" });
     ticketApi.timeline(pk, { page: 2, size: 20 });
     ticketApi.dashboard({ status: "OPEN" });
 
