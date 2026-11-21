@@ -20,8 +20,8 @@ ACTIVE_SECONDS = 120
 STAGES = ["待开始", "阻塞", "执行中", "待评审", "评审中", "需修改", "已通过", "已合并"]
 AGENTS = {
     "claude": {"name": "Claude", "role": "总指导 · 前端", "model": "claude-opus-5-5", "tool": "Claude Code"},
-    "codex": {"name": "Codex", "role": "后端 · 测试", "model": "gpt-6.1-sol", "tool": "codex exec"},
-    "gemini": {"name": "Gemini", "role": "代码评审", "model": "gemini-3.8-flash-high", "tool": "agy --mode plan"},
+    "codex": {"name": "Codex", "role": "后端 · 测试", "model": "gpt-6.2-sol", "tool": "codex exec"},
+    "gemini": {"name": "Gemini", "role": "代码评审", "model": "gemini-4-neon-high", "tool": "agy --mode plan"},
 }
 EXECUTOR = {"Claude": "claude", "Codex": "codex", "Gemini": "gemini"}
 
@@ -217,8 +217,10 @@ def _review(task: str) -> dict | None:
             if row[0] != "无":
                 issues.append({"level": row[0], "where": cells[0] if cells else "", "what": (cells[1] if len(cells) > 1 else "")[:220]})
         suggestions = re.findall(r"^- (.+)$", block.split("建议（不阻断）")[-1], re.M) if "建议（不阻断）" in block else []
+        reviewed = re.search(r"分支[:：]\s*\S+\s*@\s*([0-9a-f]{7,40})", block)
         rounds.append({
             "round": int(title.group(1)),
+            "sha": reviewed.group(1) if reviewed else None,
             "time": stamp.group(1) if stamp else None,
             "model": stamp.group(2) if stamp else None,
             "verdict": verdict.group(1) if verdict else None,
@@ -294,7 +296,11 @@ def _stage(task: dict, branch: dict | None, runs: list[dict], log: dict, done: s
         return "评审中"
     if executing:
         return "执行中"
-    if report and verdict and task["review"]["mtime"] >= report["mtime"]:
+    # 评审结论只对它评审的那个提交有效：分支没有新提交就沿用结论，有新提交则需要重新评审
+    reviewed_sha = rounds[-1].get("sha") if rounds else None
+    head = (branch or {}).get("sha") or ""
+    current = bool(reviewed_sha and head and (head.startswith(reviewed_sha) or reviewed_sha.startswith(head)))
+    if report and verdict and (current or (not reviewed_sha and task["review"]["mtime"] >= report["mtime"])):
         return "已通过" if verdict == "APPROVE" else "需修改"
     if report:
         return "待评审"
@@ -360,6 +366,8 @@ def _agents(tasks: list[dict], runs: dict, git: dict) -> dict:
     live = next((t for t in codex_tasks if t["log"].get("active") or any(r.get("alive") for r in t["runs"])), None)
     latest = live or max(codex_tasks, key=lambda t: t["log"].get("updated") or "", default=None)
     log = latest["log"] if latest else {}
+    if log.get("header", {}).get("model"):
+        agents["codex"]["model"] = f"{log['header']['model']} · {log['header'].get('reasoning_effort') or ''}".strip(" ·")
     agents["codex"].update(
         state="running" if live else ("error" if log.get("errors") and not log.get("messages") else "idle"),
         task=latest["id"] if latest else None,

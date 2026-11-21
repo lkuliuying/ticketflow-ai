@@ -21,7 +21,7 @@ from runlog import track
 ROOT = Path(__file__).resolve().parents[2]
 COLLAB = ROOT / "collab"
 DESIGN = ROOT / "backend-drf" / "docs" / "plans" / "ticketflow-phase-1.md"
-MODEL = "gemini-3.8-flash-high"
+MODEL = "gemini-4-neon-high"
 DIFF_LIMIT = 400_000
 
 

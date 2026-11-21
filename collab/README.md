@@ -63,14 +63,16 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
 | BE-01 | 测试环境与全量门禁基线 | Codex | — | 待开始 |
-| BE-02 | 前端所需的契约补口 | Codex | — | 待开始，**阻塞 FE-02 / FE-03** |
+| BE-02 | 前端所需的契约补口 | Codex | — | 已合并 |
 | BE-03 | Phase 2 测试补全 | Codex | BE-01 | 待开始 |
 | BE-04 | Phase 2 遗留问题修复 | Codex | BE-01 | 待开始 |
-| FE-01 | 工单 API 层与列表页 | Claude | — | 进行中 |
+| IT-01 | 联调环境（BE-02 + FE-01） | Codex | BE-02 | 已完成，环境常驻 :8896 |
+| FE-01 | 工单 API 层与列表页 | Claude | — | 已合并 |
 | FE-02 | 工单详情：流转、指派、回复、时间线 | Claude | BE-02 | 待开始 |
 | FE-03 | 知识库列表、详情、编辑与转存 | Claude | BE-02 | 待开始 |
 | FE-04 | 看板与异步导出入口 | Claude | FE-01 | 待开始 |
 | FE-05 | 词条、单测与 E2E 冒烟 | Claude | FE-01..04 | 待开始 |
+| FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 待开始 |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)。
 Phase 3（FastAPI）和 Phase 4b（AI 面板）在本迭代评审通过后再下发。
@@ -86,10 +88,11 @@ python collab/bin/review.py BE-02 be/contract-gaps --repo ..\ticketflow-ai-be   
 ```
 
 - Codex：`codex exec`，沿用用户 `~/.codex/config.toml`（workspace-write 沙箱、自动审批复核），
-  额外可写目录只有 `collab/reports/`。日志在 `collab/reports/<任务号>.log`。配置里的默认模型
-  `gpt-6.2-sol` 在 ChatGPT 账号的 CLI 下会报 `model_not_found`，脚本显式使用 `gpt-6.1-sol`。
-- Antigravity：`agy` 以 plan 模式运行，评审材料由脚本拼好经 stdin 传入，**不授予任何文件或终端权限**。
-  可用模型里没有 Gemini 4 Neon，当前使用 `gemini-3.8-flash-high`（在 `review.py` 的 `MODEL` 中修改）。
+  额外可写目录只有 `collab/reports/`。日志在 `collab/reports/<任务号>.log`。使用 `gpt-6.2-sol` + xhigh，
+  它要求 codex CLI 0.171 及以上（更旧的版本会报 `model_not_found`）。脚本优先用 PATH 上的 `codex`；
+  版本不够时改用 Codex 桌面应用自带的 `codex.exe`，再不行退回 `gpt-6.1-sol`。
+- Antigravity：`agy`（1.5.13）以 plan 模式运行，模型 `gemini-4-neon-high`，评审材料由脚本拼好经 stdin
+  传入，**不授予任何文件或终端权限**。模型在 `review.py` 的 `MODEL` 中修改，可选值见 `agy models`。
 
 ## 代理指挥台（3D 可视化）
 

@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["collab/dashboard/server.py", "--port", "8765"],
       "port": 8765
+    },
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "pnpm@11", "--dir", "frontend", "dev"],
+      "port": 8848
     }
   ]
 }

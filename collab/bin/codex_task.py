@@ -10,6 +10,8 @@ Codex 在 workspace-write 沙箱里工作，可写范围是 worktree 和 collab/
 """
 
 import argparse
+import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -18,8 +20,11 @@ from runlog import track
 ROOT = Path(__file__).resolve().parents[2]
 COLLAB = ROOT / "collab"
 REPORTS = COLLAB / "reports"
-# 用户配置里的默认模型在 ChatGPT 账号的 CLI 下不可用，这里显式指定
-MODEL = "gpt-6.1-sol"
+MODEL = "gpt-6.2-sol"
+EFFORT = "xhigh"
+# gpt-6.2-sol 需要 codex CLI 0.171 及以上；更旧的版本会被服务端以 model_not_found 拒绝。
+MIN_VERSION = (0, 171)
+FALLBACK_MODEL = "gpt-6.1-sol"
 DOCKER = r"C:\Program Files\Docker\Docker\resources\bin\docker.exe"
 
 ENVIRONMENT = f"""本机环境：
@@ -27,6 +32,42 @@ ENVIRONMENT = f"""本机环境：
 - 后端底座依赖 Linux 文件锁，集成测试优先在 WSL 或容器里跑；Windows 下可用于 ruff、mypy 和静态门禁。
 - 主检出的 Windows 虚拟环境在 `{ROOT / "backend-drf" / ".venv"}`，worktree 里没有 .venv，可自行 `uv sync --all-groups`。
 - 测试栈：在 `backend-drf/` 下 `docker compose -f compose.test.yml up -d --wait`（PG 55433 / Redis 56379）。"""
+
+
+def _version(binary: str) -> tuple[int, ...]:
+    try:
+        out = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=20).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ()
+    found = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+    return tuple(int(x) for x in found.groups()) if found else ()
+
+
+def _desktop_codex() -> str | None:
+    """Codex 桌面应用自带的 codex.exe；WindowsApps 不可列举，只能从运行中的进程取路径。"""
+    script = (
+        "Get-Process codex -ErrorAction SilentlyContinue | "
+        "Where-Object { $_.Path -like '*WindowsApps*OpenAI.Codex*' } | "
+        "Select-Object -ExpandProperty Path -Unique | ConvertTo-Json"
+    )
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", script],
+                             capture_output=True, text=True, timeout=20).stdout.strip()
+        paths = json.loads(out) if out else []
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return None
+    paths = [paths] if isinstance(paths, str) else paths
+    return sorted(paths)[-1] if paths else None
+
+
+def find_codex() -> tuple[str, str]:
+    """返回 (codex 可执行文件, 模型)：优先 PATH 上的 CLI，版本不够时用桌面应用自带的，再不行退回旧模型。"""
+    if _version("codex")[:2] >= MIN_VERSION:
+        return "codex", MODEL
+    desktop = _desktop_codex()
+    if desktop and _version(desktop)[:2] >= MIN_VERSION:
+        return desktop, MODEL
+    return "codex", FALLBACK_MODEL
 
 
 def build_prompt(task: str, extra: str) -> str:
@@ -56,16 +97,19 @@ def main() -> None:
     parser.add_argument("task")
     parser.add_argument("--worktree", type=Path, default=ROOT.parent / "ticketflow-ai-be")
     parser.add_argument("--extra", default="")
-    parser.add_argument("--model", default=MODEL)
+    parser.add_argument("--model", help="默认按所用 codex 版本自动选择")
     parser.add_argument("--resume", help="继续上一次 Codex 会话并发送这条指令")
     args = parser.parse_args()
 
     REPORTS.mkdir(parents=True, exist_ok=True)
-    common = ["-m", args.model, "-C", str(args.worktree), "--add-dir", str(REPORTS), "-o", str(REPORTS / f"{args.task}.last.md")]
+    binary, model = find_codex()
+    model = args.model or model
+    print(f"使用 {binary} · {model} · {EFFORT}")
+    common = ["-m", model, "-c", f"model_reasoning_effort={EFFORT}", "-C", str(args.worktree), "--add-dir", str(REPORTS), "-o", str(REPORTS / f"{args.task}.last.md")]
     if args.resume:
-        command = ["codex", "exec", *common, "resume", "--last", args.resume]
+        command = [binary, "exec", *common, "resume", "--last", args.resume]
     else:
-        command = ["codex", "exec", *common, build_prompt(args.task, args.extra)]
+        command = [binary, "exec", *common, build_prompt(args.task, args.extra)]
     detail = args.resume or args.extra or "按任务书执行"
     with track("codex", args.task, "task", detail) as record, (REPORTS / f"{args.task}.log").open(
         "a", encoding="utf-8"

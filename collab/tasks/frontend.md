@@ -40,3 +40,13 @@
 - zh / en 词条对称；API 层与格式函数补 vitest。
 - E2E 冒烟：建单 → 接单 → 提交验收 → 确认关闭 → 转存草稿。
 - 提交前跑 `frontend/AGENTS.md` 第六节的全部门禁。
+
+## FE-06 认证接口与后端 HEAD 对齐
+
+联调发现导入的 xadmin-client v5.0.2 落后于后端 HEAD。登录能力探测已在 FE-01 修复，剩余：
+
+- 登录验证码：前端 `ReImageVerify` 用 `GET /api/identity/auth/captcha`，后端已改为独立的 captcha 应用，
+  开启 `SECURITY_LOGIN_CAPTCHA_ENABLED` 后登录会失败。按后端 captcha 协议改造或从上游 xadmin-client 同步对应实现。
+- `registerAuth`（`GET /api/identity/register`）无组件调用，确认后删除。
+- 以后端 `openapi.json` 为准，对 `src/api` 再做一次全量比对（含 `BaseApi` 动态拼接的路径）。
+

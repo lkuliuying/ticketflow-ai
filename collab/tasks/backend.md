@@ -111,6 +111,38 @@ BE-01 可并行；BE-03、BE-04 在 BE-01 之后。
 5. **Renovate**：`renovate.json` 已随迁移进入子目录，根目录缺少配置。在根目录补一份覆盖
    `backend-drf/`（uv）和 `frontend/`（pnpm）的配置，保留原有分组和调度规则。
 
+6. **筛选项标签**（联调发现）：`TicketFilter.sla` 的选项是 `(state, state)`，前端下拉显示 `OVERDUE` 等英文原值。
+   给 `ON_TRACK` / `DUE_SOON` / `OVERDUE` / `MET` 配中文标签（正常 / 即将超时 / 已超时 / 按时完成），
+   并检查 `assignee_id`、`department_id` 筛选的 label 是否需要中文名。
+
 决定：**分类暂时保持 `TextChoices`**，不迁移到业务字典。在设计文档的已知限制里写一句即可。
 
 完成标准：每项都有对应测试或验证命令输出。
+
+---
+
+## IT-01 联调环境（BE-02 + FE-01）
+
+分支：`be/contract-gaps`。**本任务只起环境、造数据，不改业务代码**；发现缺陷先记进报告，只有阻塞联调时才在该分支修复并说明。
+
+Claude 会在主检出起前端 dev server（`:8848`），它把 `/api`、`/media`、`/api-docs` 代理到 `http://127.0.0.1:8896`，`/ws` 代理到 `ws://127.0.0.1:8896`。
+
+1. **后端开发栈**：在 `F:\Program\ticketflow-ai-be\backend-drf` 的代码上起一个可从宿主访问的后端，入口 `http://127.0.0.1:8896`，
+   HTTP 与 `/ws` 都要通。方式自选（`docker-compose.yml` 开发栈，或复用 BE-02 用过的 `nineaiyu/xadmin-server:5.0.2` 镜像挂载代码），
+   用一个**独立的开发库**，不要动测试栈的数据库，也不要依赖测试设置（`settings_real` 等）。容器以后台方式常驻，报告里写清楚如何停止与重启。
+   Celery worker / beat 能起就起；起不了要写明影响（异步导出、SLA 扫描不可用）。
+2. **初始化**：`migrate`、`load_init_json`，`config.yml` 的 `XADMIN_APPS` 包含 `tickets`、`knowledge`。
+3. **联调账号**（只用于本机开发库）：
+   - `tf_requester`：普通提交人；
+   - `tf_agent`：客服，属于默认支持部门，授予指派相关的两个权限点；
+   - `tf_agent_other`：客服，属于另一个部门，用于验证部门隔离；
+   - `tf_admin`：工单业务管理员（非超级用户）。
+   密码随机生成，只写进报告 `collab/reports/IT-01.md`（该目录不进 Git），不要写进代码、种子或提交。
+4. **样例数据**：约 12 张工单，覆盖 5 种状态、P0–P3、SLA 的 `ON_TRACK` / `DUE_SOON` / `OVERDUE` / `MET`，
+   分属两个部门，部分已指派；若干对外回复和内部备注；2 篇已发布文章、1 篇草稿；至少 1 张已关闭且未转存的工单。
+   造数据走服务层或 API，保证版本号、日志和 SLA 字段一致。
+5. **自检**：`/api/common/api/health` 返回正常；四个账号都能经 `/api/identity/login/basic` 登录（如登录需要验证码，写明联调时如何通过，
+   例如开发库关闭登录验证码的配置项）；用 `tf_agent` 请求一张工单详情，贴出 `viewer` 和 `available_transitions`。
+
+完成标准：报告给出访问地址、四个账号及其角色/部门、数据清单（每张工单的号、状态、优先级、SLA、部门、处理人）、
+启停命令、自检的实际输出，以及已知限制。
