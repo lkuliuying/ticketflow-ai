@@ -44,3 +44,7 @@ test-reports/
 
 # 内核分发包构建产物（scripts/release_kernel.py build / uv build --package xadmin-common）
 dist/
+
+# 多代理协作的本机交接文件（完成报告与评审结论，见 collab/README.md）
+collab/reports/
+collab/reviews/
