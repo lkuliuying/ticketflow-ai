@@ -292,6 +292,9 @@ def _stage(task: dict, branch: dict | None, runs: list[dict], log: dict, done: s
     executing = any(r.get("alive") and r.get("kind") == "task" for r in runs) or bool(log.get("active"))
     if verdict == "APPROVE" and branch is not None and branch["ahead"] == 0 and report:
         return "已合并"
+    # 只搭环境、不产出代码的任务不走评审，看板标为已完成即视为走完流水线
+    if task["board_status"].startswith(("已完成", "已合并")):
+        return "已合并"
     if review_running:
         return "评审中"
     if executing:
