@@ -50,3 +50,11 @@
 - `registerAuth`（`GET /api/identity/register`）无组件调用，确认后删除。
 - 以后端 `openapi.json` 为准，对 `src/api` 再做一次全量比对（含 `BaseApi` 动态拼接的路径）。
 
+## CI-02 CI 前端侧：assignees 消费与菜单词条
+
+分支：`fe/ci-green`。
+
+- `ticketApi.assignees(pk, q)` 对接 `GET /api/tickets/{id}/assignees`，消除 `check-menu-permissions` 报的无前端消费；补单测。
+- `locales` 增加 `menus.ticketflow`、`menus.ticketflowTickets`、`menus.ticketflowKnowledge`（zh / en 对称），
+  与 CI-01 改为 i18n key 的菜单标题配套。
+

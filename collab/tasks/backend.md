@@ -146,3 +146,31 @@ Claude 会在主检出起前端 dev server（`:8848`），它把 `/api`、`/medi
 
 完成标准：报告给出访问地址、四个账号及其角色/部门、数据清单（每张工单的号、状态、优先级、SLA、部门、处理人）、
 启停命令、自检的实际输出，以及已知限制。
+
+---
+
+## CI-01 让 GitHub CI 在 Monorepo 下转绿（后端）
+
+分支：`be/ci-green`（从最新 `main` 切出）。
+
+GitHub 上首次运行 `Unit Tests`（run 44876442261）结果为 **21 failed / 7890 passed**，失败清单原文在
+`F:\Program\ticketflow-ai\collab\reports\CI-01.ci-failures.txt`。没有功能缺陷，都是 Monorepo 迁移与新增
+`tickets` / `knowledge` 应用后，上游守护测试未同步：
+
+1. **工作流路径（8 项）**：`test_server_params`、`test_coverage_gate`、`test_dependency_manifest`、`test_kernel_release`
+   在 `backend-drf/.github/workflows/` 下找文件，实际已在仓库根目录 `.github/workflows/`。让这些测试按 Monorepo 布局解析
+   路径（后端根目录的上一级），单仓布局时仍能工作更好；不要复制工作流文件。
+2. **新应用登记（12 项）**：AI 工具审计未登记缺口（`api/tickets`、`api/knowledge/articles` 的读写端点需按既有分级登记）、
+   种子角色清单（`ticketflow_requester` / `ticketflow_agent` / `ticketflow_admin`）、字段权限种子角色引用、
+   各角色菜单规模快照、模块数量（21 → 23）、`generate_module` 发现逻辑、种子计划顺序与覆盖计数、`init_config` 脚本行数等。
+   **按各守护的设计意图正式登记或更新快照，不要放宽或删除守护本身**；每一项在报告里写清楚改的是登记、快照还是代码。
+3. **导航菜单标题（1 项）**：目录与页面菜单（`menu_type` 0 / 1）的 `title` 必须是 i18n key。统一为：
+   - `TicketFlow` → `menus.ticketflow`
+   - `TicketFlowTickets` → `menus.ticketflowTickets`
+   - `TicketFlowKnowledge` → `menus.ticketflowKnowledge`
+   前端词条由 Claude 在 CI-02 补齐（zh：TicketFlow / 工单 / 工单知识库）。按钮级权限点（`menu_type` 2）的标题保持中文。
+
+不在本任务范围：前端 `check-menu-permissions` 报的 `assignees:TicketFlowTickets` 无前端消费（CI-02 处理）。
+
+完成标准：在 Linux 容器里跑 `uv run pytest -n auto` 全量通过（或只剩与本次无关、且在上游同样失败的用例，逐条说明），
+`--cov-fail-under=85` 满足，第六节门禁通过；报告附上全量结果的统计行。

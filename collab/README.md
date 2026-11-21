@@ -67,6 +67,8 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 | BE-03 | Phase 2 测试补全 | Codex | BE-01 | 待开始 |
 | BE-04 | Phase 2 遗留问题修复 | Codex | BE-01 | 待开始 |
 | IT-01 | 联调环境（BE-02 + FE-01） | Codex | BE-02 | 已完成，环境常驻 :8896 |
+| CI-01 | GitHub CI 在 Monorepo 下转绿（后端） | Codex | — | 已合并 |
+| CI-02 | CI 前端侧：assignees 消费与菜单词条 | Claude | — | 已合并 |
 | FE-01 | 工单 API 层与列表页 | Claude | — | 已合并 |
 | FE-02 | 工单详情：流转、指派、回复、时间线 | Claude | BE-02 | 待开始 |
 | FE-03 | 知识库列表、详情、编辑与转存 | Claude | BE-02 | 待开始 |
