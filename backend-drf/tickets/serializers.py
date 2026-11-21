@@ -6,6 +6,13 @@ from tickets.models import Category, Priority, Status, Ticket, Visibility
 from tickets.services import SLA_WARNING
 
 
+class AssigneeSerializer(serializers.Serializer):
+    pk = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    nickname = serializers.CharField(read_only=True, allow_blank=True)
+    department_name = serializers.CharField(source="dept.name", read_only=True, allow_null=True)
+
+
 class TicketSerializer(BaseModelSerializer):
     serializer_choice_field = serializers.ChoiceField
     pk = serializers.UUIDField(read_only=True)

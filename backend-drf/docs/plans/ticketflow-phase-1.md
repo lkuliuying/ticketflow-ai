@@ -88,16 +88,17 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | --- | --- | --- |
 | `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`sla`、`q`、分页 | 200，工单分页，含 `version` 和 `sla_state` |
 | `POST /api/tickets` | `Idempotency-Key`，`{title, description, category, priority}` | 201，创建的工单。重放返回 200 和原工单 |
-| `GET /api/tickets/{id}` | 工单 ID | 200，工单、当前调用者可执行的动作、时间线第一页 |
+| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_comment_internal, can_archive}`、原有可执行流转、时间线第一页 |
 | `GET /api/tickets/{id}/timeline` | 分页 | 200，合并排序的流转记录与评论分页 |
 | `POST /api/tickets/{id}/transition` | `{target_status, version, note?}` | 200，更新后的工单 |
 | `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单 |
+| `GET /api/tickets/{id}/assignees` | `q` 按用户名或昵称搜索 | 200，最多 20 条 `{pk, username, nickname, department_name}`，非管理员限本部门，按用户名和主键排序 |
 | `POST /api/tickets/{id}/comments` | `{body, visibility}` | 201，新评论 |
 | `POST /api/tickets/{id}/ai-metadata` | `{version, summary, tags, category?, priority?}` | 200，采纳建议后的工单 |
 | `GET /api/tickets/dashboard` | 与列表共用筛选 | 200，按状态、优先级及 SLA 分组计数 |
 | `POST /api/tickets/export-async` | 列表筛选字段加 `type: "csv"` | 200，`{record_id, task_id}`，完成后通过 `/api/task/exports/{record_id}/download` 下载 |
-| `GET /api/knowledge/articles` | `q`、`category`、`tag`、`status`、分页 | 200，文章分页 |
-| `GET /api/knowledge/articles/{id}` | 文章 ID | 200，文章正文及浏览次数 |
+| `GET /api/knowledge/articles` | `q`、`category`、`tag`、`status`、分页 | 200，`data: {total, results, can_create_standalone}`，独立创建要求管理员及知识库创建权限 |
+| `GET /api/knowledge/articles/{id}` | 文章 ID | 200，文章正文、浏览次数及 `viewer: {can_edit, can_publish}` |
 | `POST /api/knowledge/articles` | `{title, body_markdown, category, tags, source_ticket_id?}` | 201，文章草稿 |
 | `PATCH /api/knowledge/articles/{id}` | 可编辑内容或状态 | 200，更新后的文章 |
 | `GET /api/tickets/{id}/ai-context` | 内网接口，转发用户 Bearer token | 200，授权工单字段及已发布知识 Top-K 片段。网关拒绝该路径 |

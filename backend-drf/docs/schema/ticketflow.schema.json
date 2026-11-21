@@ -6,6 +6,50 @@
     "priority": {"enum": ["P0", "P1", "P2", "P3"]},
     "status": {"enum": ["OPEN", "IN_PROGRESS", "PENDING_VERIFY", "CLOSED", "REOPENED"]},
     "visibility": {"enum": ["PUBLIC", "INTERNAL"]},
+    "ticketViewer": {
+      "type": "object",
+      "description": "GET /api/tickets/{id} 的 viewer；能力由服务端按当前用户、权限点及工单状态计算。",
+      "required": ["can_handle", "can_assign", "can_comment_internal", "can_archive"],
+      "additionalProperties": false,
+      "properties": {
+        "can_handle": {"type": "boolean"},
+        "can_assign": {"type": "boolean", "description": "可处理工单，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
+        "can_comment_internal": {"type": "boolean"},
+        "can_archive": {"type": "boolean", "description": "已关闭、可处理、有知识库创建权限且尚未转存。"}
+      }
+    },
+    "ticketAssignees": {
+      "type": "array",
+      "description": "GET /api/tickets/{id}/assignees?q= 的 data，按 username、pk 排序；q 匹配用户名或昵称，不分页。仅活跃客服、管理员或超级用户，非管理员仅本部门，未分配部门时返回空数组。",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["pk", "username", "nickname", "department_name"],
+        "additionalProperties": false,
+        "properties": {
+          "pk": {"type": "integer"},
+          "username": {"type": "string"},
+          "nickname": {"type": "string"},
+          "department_name": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "articleViewer": {
+      "type": "object",
+      "description": "知识库文章详情、创建及更新响应的 viewer；can_edit 要求更新权限，且为管理员或本人草稿；can_publish 要求管理员身份及更新权限。",
+      "required": ["can_edit", "can_publish"],
+      "additionalProperties": false,
+      "properties": {
+        "can_edit": {"type": "boolean"},
+        "can_publish": {"type": "boolean"}
+      }
+    },
+    "articleListCapabilities": {
+      "type": "object",
+      "description": "GET /api/knowledge/articles 的 data 为 {total, results, can_create_standalone}，即使 results 为空也提供能力。独立创建要求管理员身份及知识库创建权限。",
+      "required": ["can_create_standalone"],
+      "properties": {"can_create_standalone": {"type": "boolean"}}
+    },
     "ticketCreate": {
       "type": "object",
       "required": ["title", "description", "category", "priority"],

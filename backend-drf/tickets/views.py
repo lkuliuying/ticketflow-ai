@@ -1,6 +1,7 @@
 from typing import Any, cast
 from uuid import UUID
 
+from django.apps import apps
 from django.core.cache import cache
 from django.db.models import Count, Q, QuerySet
 from django.http import Http404
@@ -8,7 +9,7 @@ from django.urls.converters import UUIDConverter
 from django.utils.functional import cached_property
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.request import Request
 from rest_framework.viewsets import GenericViewSet
 
@@ -20,6 +21,7 @@ from common.core.response import ApiResponse
 from identity.models import UserInfo
 from tickets import services
 from tickets.api_schema import (
+    assignees_result,
     comment_result,
     dashboard_result,
     ticket_detail_result,
@@ -29,9 +31,10 @@ from tickets.api_schema import (
 )
 from tickets.cache import check_rate, dashboard_key
 from tickets.filters import TicketFilter
-from tickets.models import Ticket
-from tickets.policy import TicketAccess
+from tickets.models import Status, Ticket
+from tickets.policy import TicketAccess, assignment_candidates, has_permission
 from tickets.serializers import (
+    AssigneeSerializer,
     AssignmentSerializer,
     CommentSerializer,
     SuggestionSerializer,
@@ -113,9 +116,36 @@ class TicketViewSet(
         """工单详情"""
         ticket = self.get_object()
         data = self.get_serializer(ticket).data
+        can_handle = self.access.can_handle(ticket)
+        data["viewer"] = {
+            "can_handle": can_handle,
+            "can_assign": can_handle
+            and has_permission(self.actor, "assign:TicketFlowTickets", "assignees:TicketFlowTickets"),
+            "can_comment_internal": can_handle,
+            "can_archive": (
+                can_handle
+                and ticket.status == Status.CLOSED
+                and apps.is_installed("knowledge")
+                and has_permission(self.actor, "create:TicketFlowKnowledge")
+                and not Ticket.objects.filter(pk=ticket.pk, knowledge_article__isnull=False).exists()
+            ),
+        }
         data["available_transitions"] = self.access.targets(ticket)
         data["timeline"] = first_page(ticket, self.access.can_handle(ticket))
         return ApiResponse(data=data)
+
+    @extend_schema(parameters=[OpenApiParameter("q", str)], responses=assignees_result)
+    @action(detail=True, methods=["get"], filterset_class=None)
+    def assignees(self, request: Request, pk: UUID) -> ApiResponse:
+        """工单指派候选人"""
+        ticket = self.get_object()
+        if not self.access.can_handle(ticket) or not has_permission(self.actor, "assign:TicketFlowTickets"):
+            raise PermissionDenied("无权指派此工单")
+        queryset = assignment_candidates(self.access)
+        query = request.query_params.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(Q(username__icontains=query) | Q(nickname__icontains=query))
+        return ApiResponse(data=AssigneeSerializer(queryset[:20], many=True).data)
 
     @extend_schema(responses=timeline_result)
     @action(detail=True, methods=["get"])

@@ -26,7 +26,7 @@ from knowledge.serializers import (
 from knowledge.services import article_key, count_article_view, create_article, references_for
 from tickets.cache import check_rate
 from tickets.models import Category
-from tickets.policy import TicketAccess
+from tickets.policy import TicketAccess, has_permission
 from tickets.serializers import TicketSerializer
 from tickets.views import TicketViewSet
 
@@ -84,7 +84,21 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
 
     def _response(self, article: KnowledgeArticle, status: int = 200) -> ApiResponse:
         data = ArticleSerializer(article, context=self.get_serializer_context()).data
+        can_update = has_permission(self.actor, "partialUpdate:TicketFlowKnowledge")
+        data["viewer"] = {
+            "can_edit": can_update
+            and (self.access.admin or (article.status == ArticleStatus.DRAFT and article.creator_id == self.actor.pk)),
+            "can_publish": can_update and self.access.admin,
+        }
         return ApiResponse(data=data, status=status)
+
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> ApiResponse:
+        """知识库文章列表"""
+        response = super().list(request, *args, **kwargs)
+        response.data["data"]["can_create_standalone"] = self.access.admin and has_permission(
+            self.actor, "create:TicketFlowKnowledge"
+        )
+        return response
 
     @extend_schema(responses=article_result)
     def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> ApiResponse:
