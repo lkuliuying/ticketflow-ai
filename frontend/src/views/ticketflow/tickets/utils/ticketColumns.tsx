@@ -13,6 +13,7 @@ import type {
 import type { useI18n } from "vue-i18n";
 
 type TFunction = ReturnType<typeof useI18n>["t"];
+type TeFunction = ReturnType<typeof useI18n>["te"];
 type TagType = "primary" | "success" | "info" | "warning" | "danger";
 
 export const STATUS_TONE: Record<TicketStatus, TagType> = {
@@ -49,7 +50,7 @@ function renderTag(type: TagType | undefined, text: string) {
  * 工单列表列渲染：状态、优先级、SLA 状态显示为语义色标签；
  * 即将超时与已超时的 SLA 用醒目的实心标签，便于在列表里一眼找出。
  */
-export function useTicketColumns({ t }: { t: TFunction }) {
+export function useTicketColumns({ t, te }: { t: TFunction; te: TeFunction }) {
   const listColumnsFormat = (columns: PageTableColumn[]) =>
     formatPageColumns(columns, {
       status: column => {
@@ -59,6 +60,13 @@ export function useTicketColumns({ t }: { t: TFunction }) {
             STATUS_TONE[status],
             t(`ticketflow.statusValue.${status}`)
           );
+        };
+      },
+      category: column => {
+        column["cellRenderer"] = ({ row }) => {
+          const category = (row as TicketItem).category;
+          const key = `ticketflow.categoryValue.${category}`;
+          return h("span", te(key) ? t(key) : category);
         };
       },
       priority: column => {
@@ -78,7 +86,7 @@ export function useTicketColumns({ t }: { t: TFunction }) {
               type: SLA_TONE[state] ?? "info",
               effect: urgent ? "dark" : "plain"
             },
-            () => t(`ticketflow.sla.${state}`)
+            () => t(`ticketflow.slaValue.${state}`)
           );
         };
       },

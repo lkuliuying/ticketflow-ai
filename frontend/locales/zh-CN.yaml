@@ -4423,6 +4423,13 @@ ticketflow:
   sla_due_at: SLA 截止
   sla_state: SLA 状态
   created_time: 创建时间
+  updated_time: 更新时间
+  submitter_id: 提交人 ID
+  first_response_at: 首次响应时间
+  resolved_at: 解决时间
+  ai_summary: AI 摘要
+  ai_tags: AI 标签
+  version: 版本
   unassigned: 未指派
   statusValue:
     OPEN: 待处理
@@ -4430,8 +4437,18 @@ ticketflow:
     PENDING_VERIFY: 待验收
     CLOSED: 已关闭
     REOPENED: 已重开
-  sla:
+  sla: SLA 状态
+  q: 关键字
+  assignee_id: 处理人 ID
+  department_id: 部门 ID
+  slaValue:
     ON_TRACK: 正常
     DUE_SOON: 即将超时
     OVERDUE: 已超时
     MET: 按时完成
+  categoryValue:
+    ACCOUNT: 账户
+    ACCESS: 权限
+    NETWORK: 网络
+    SERVICE: 服务
+    OTHER: 其他

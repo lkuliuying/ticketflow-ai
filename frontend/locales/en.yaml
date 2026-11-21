@@ -4425,6 +4425,13 @@ ticketflow:
   sla_due_at: SLA Due
   sla_state: SLA State
   created_time: Created At
+  updated_time: Updated At
+  submitter_id: Submitter ID
+  first_response_at: First Response At
+  resolved_at: Resolved At
+  ai_summary: AI Summary
+  ai_tags: AI Tags
+  version: Version
   unassigned: Unassigned
   statusValue:
     OPEN: Open
@@ -4432,8 +4439,18 @@ ticketflow:
     PENDING_VERIFY: Pending Verification
     CLOSED: Closed
     REOPENED: Reopened
-  sla:
+  sla: SLA State
+  q: Keyword
+  assignee_id: Assignee ID
+  department_id: Department ID
+  slaValue:
     ON_TRACK: On Track
     DUE_SOON: Due Soon
     OVERDUE: Overdue
     MET: Met
+  categoryValue:
+    ACCOUNT: Account
+    ACCESS: Access
+    NETWORK: Network
+    SERVICE: Service
+    OTHER: Other

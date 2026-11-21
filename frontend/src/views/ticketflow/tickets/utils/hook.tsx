@@ -12,11 +12,11 @@ import { useTicketColumns } from "./ticketColumns";
  * 状态变化统一经详情里的流转动作完成。
  */
 export function useTickets() {
-  const { t } = useI18n();
+  const { t, te } = useI18n();
   const api = reactive(ticketApi);
   const auth = usePageAuth("TicketFlowTickets");
 
-  const { listColumnsFormat } = useTicketColumns({ t });
+  const { listColumnsFormat } = useTicketColumns({ t, te });
 
   return { api, auth, listColumnsFormat };
 }
