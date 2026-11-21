@@ -300,8 +300,8 @@ def seeded_module(django_db_setup, django_db_blocker):
     静默。这里在一个外层事务里装载一次：用例自身的 ``django_db`` 事务以 savepoint
     回滚，互不污染；模块结束回滚外层事务，种子数据不会泄漏给后续模块。
 
-    只适用于「只读种子」的模块；需要验证重复装载语义（幂等、覆盖入库数据）的用例
-    必须保持 function 级装载，不能请求本 fixture。
+    用例可在自己的保存点内修改种子数据。需要验证重复装载语义（幂等、覆盖入库数据）
+    的用例应自行装载种子。需要提交事务或从其它连接访问种子数据的用例不能使用本 fixture。
     """
 
     from django.core.management import call_command
@@ -311,7 +311,10 @@ def seeded_module(django_db_setup, django_db_blocker):
         with transaction.atomic():
             # 种子里的 creator/modifier 硬编码为 pk=1（新装环境的首个超管）
             if not UserInfo.objects.filter(pk=1).exists():
-                UserInfo.objects.create(pk=1, username="init-admin", password="!")
+                # 先消费自增序列，避免新库的首个用例再拿到 pk=1。
+                creator = UserInfo.objects.create(username="init-admin", password="!")
+                if creator.pk != 1:
+                    UserInfo.objects.filter(pk=creator.pk).update(id=1)
             call_command("load_init_json", verbosity=0)
             yield
             transaction.set_rollback(True)

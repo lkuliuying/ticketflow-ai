@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from django.core.management import call_command
+from django.urls import resolve
 from django.utils import timezone
 from jsonschema import Draft202012Validator
 
@@ -25,8 +25,7 @@ def validate(data: object, definition: str) -> None:
 
 
 @pytest.fixture
-def users(seed_creator_user: None) -> dict[str, UserInfo]:
-    call_command("load_init_json", verbosity=0)
+def users(seeded_module: None) -> dict[str, UserInfo]:
     support = DeptInfo.objects.get(code="ticketflow_support")
     result = {}
     for name, role in (("requester", REQUESTER_ROLE), ("agent", AGENT_ROLE), ("admin", ADMIN_ROLE)):
@@ -111,8 +110,11 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
 def test_ticket_viewer_cannot_archive_without_knowledge_app(users, ticket, settings):
     ticket.status = Status.CLOSED
     ticket.save(update_fields=["status"])
+    resource = f"/api/tickets/{ticket.pk}"
+    # 初始化路由后再临时移除应用，避免后续用例沿用缺失知识库路由的 URLConf。
+    resolve(resource)
     settings.INSTALLED_APPS = [app for app in settings.INSTALLED_APPS if app != "knowledge"]
-    response = authenticated(users["admin"]).get(f"/api/tickets/{ticket.pk}")
+    response = authenticated(users["admin"]).get(resource)
     assert response.status_code == 200, response.data
     assert response.data["data"]["viewer"]["can_archive"] is False
 
