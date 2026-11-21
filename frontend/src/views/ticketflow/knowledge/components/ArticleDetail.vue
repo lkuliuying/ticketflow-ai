@@ -24,13 +24,20 @@ const article = ref<ArticleDetail | null>(null);
 const loading = ref(false);
 const notFound = ref(false);
 
+const busy = ref(false);
+
+/** 只有 404（不存在或不可见）显示“不存在”；网络异常与 5xx 保留已加载内容，提示由拦截器展示 */
 async function load() {
   loading.value = true;
   try {
     const res = await knowledgeApi.retrieve<ArticleDetail>(props.pk);
-    if (isSuccess(res)) article.value = res.data;
-  } catch {
-    notFound.value = true;
+    if (isSuccess(res)) {
+      article.value = res.data;
+      notFound.value = false;
+    }
+  } catch (error) {
+    if ((error as { code?: number } | null)?.code === 404)
+      notFound.value = true;
   } finally {
     loading.value = false;
   }
@@ -48,14 +55,17 @@ function categoryLabel(value: string) {
   return te(key) ? t(key) : value;
 }
 
+/** 状态变更直接采用 PATCH 返回的文章，不再重新拉详情（详情读取会累加浏览数） */
 async function changeStatus(status: ArticleStatus) {
-  if (!article.value) return;
+  if (!article.value || busy.value) return;
+  busy.value = true;
   const res = await knowledgeApi
     .updateArticle(article.value.pk, { status })
     .catch(() => null);
+  busy.value = false;
   if (res && isSuccess(res)) {
     message(t(`ticketflow.kb.statusChanged.${status}`), { type: "success" });
-    await load();
+    article.value = res.data;
     props.onChanged?.();
   }
 }
@@ -68,8 +78,8 @@ function edit() {
     savedText: t("ticketflow.kb.saved"),
     pk: current.pk,
     initial: current,
-    onSaved: async () => {
-      await load();
+    onSaved: saved => {
+      article.value = saved;
       props.onChanged?.();
     }
   });
@@ -124,6 +134,7 @@ function edit() {
           v-for="status in transitions"
           :key="status"
           :type="status === 'PUBLISHED' ? 'success' : 'warning'"
+          :loading="busy"
           @click="changeStatus(status)"
         >
           {{ t(`ticketflow.kb.toStatus.${status}`) }}

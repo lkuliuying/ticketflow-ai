@@ -53,7 +53,7 @@ export function useArticles(tableRef: PageRef) {
           h(
             "span",
             { class: "flex flex-wrap gap-1" },
-            (row as ArticleItem).tags.map(tag =>
+            ((row as ArticleItem).tags ?? []).map(tag =>
               h(
                 ElTag,
                 { size: "small", type: "info", effect: "plain" },
