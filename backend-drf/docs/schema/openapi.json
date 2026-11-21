@@ -1651,6 +1651,7 @@
             "type": "string"
           },
           "view_count": {
+            "description": "仅访问已发布文章的详情时累计。",
             "readOnly": true,
             "title": "浏览次数",
             "type": "integer"
@@ -1754,6 +1755,7 @@
             "type": "string"
           },
           "view_count": {
+            "description": "仅访问已发布文章的详情时累计。",
             "readOnly": true,
             "title": "浏览次数",
             "type": "integer"
@@ -1774,9 +1776,11 @@
       "ArticleViewer": {
         "properties": {
           "can_edit": {
+            "description": "持有更新权限的工单管理员、知识维护人员或草稿作者可编辑。",
             "type": "boolean"
           },
           "can_publish": {
+            "description": "持有更新权限的工单管理员或知识维护人员可发布或归档。",
             "type": "boolean"
           }
         },
@@ -96960,6 +96964,7 @@
         "operationId": "api_tickets_list",
         "parameters": [
           {
+            "description": "处理人",
             "in": "query",
             "name": "assignee_id",
             "schema": {
@@ -96983,6 +96988,7 @@
             }
           },
           {
+            "description": "所属部门",
             "in": "query",
             "name": "department_id",
             "schema": {
@@ -97024,6 +97030,7 @@
             }
           },
           {
+            "description": "关键字",
             "in": "query",
             "name": "q",
             "schema": {
@@ -97040,7 +97047,7 @@
             }
           },
           {
-            "description": "* `ON_TRACK` - ON_TRACK\n* `DUE_SOON` - DUE_SOON\n* `OVERDUE` - OVERDUE\n* `MET` - MET",
+            "description": "SLA 状态\n\n* `ON_TRACK` - 正常\n* `DUE_SOON` - 即将超时\n* `OVERDUE` - 已超时\n* `MET` - 按时完成",
             "in": "query",
             "name": "sla",
             "schema": {

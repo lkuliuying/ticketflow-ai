@@ -45,7 +45,7 @@ pytestmark = pytest.mark.django_db
 #  2026-10 读写共码收口：admin 补验证码风险规则 PUT 独立码 updateRules，301 → 302
 #  2026-10 种子授权补全（授权种子补全）：admin 补通讯录/我的管辖/标签/数据字典/模块管理
 #  5 页与对应权限点 + 部门管理员任命/我的管辖视角动作，302 → 338
-#  工单与知识库：默认角色增加 12 项；三个业务角色使用独立的菜单授权。
+#  工单与知识库：默认角色增加 12 项；业务角色使用独立的菜单授权。
 EXPECTED_ROLE_MENUS = {
     "admin": 338,
     "test": 87,
@@ -54,6 +54,7 @@ EXPECTED_ROLE_MENUS = {
     "ticketflow_requester": 12,
     "ticketflow_agent": 16,
     "ticketflow_admin": 24,
+    "ticketflow_kb_editor": 5,
 }
 
 

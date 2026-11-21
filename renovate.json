@@ -1,0 +1,130 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Asia/Shanghai",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "separateMajorMinor": true,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "behind-base-branch",
+  "automergeSchedule": [
+    "at any time"
+  ],
+  "postUpdateOptions": ["pnpmDedupe"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "dependencies",
+      "security"
+    ]
+  },
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on the first day of the month"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "后端依赖锁定版本，忽略自建基础镜像",
+      "matchFileNames": ["backend-drf/**"],
+      "rangeStrategy": "pin",
+      "ignoreDeps": [
+        "registry.cn-beijing.aliyuncs.com/nineaiyu/nginx",
+        "registry.cn-beijing.aliyuncs.com/nineaiyu/redis",
+        "registry.cn-beijing.aliyuncs.com/nineaiyu/python",
+        "registry.cn-beijing.aliyuncs.com/nineaiyu/pgvector"
+      ]
+    },
+    {
+      "description": "补丁版本自动合并（门禁全绿为前提）",
+      "matchFileNames": ["backend-drf/**"],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Django 大版本升级不自动升，走 backend-drf/docs/adr 评估流程",
+      "matchFileNames": ["backend-drf/**"],
+      "matchPackageNames": [
+        "django"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "adr-required"
+      ]
+    },
+    {
+      "description": "openpyxl 仅允许稳定版（历史曾固定 beta）",
+      "matchFileNames": ["backend-drf/**"],
+      "matchPackageNames": [
+        "openpyxl"
+      ],
+      "ignoreUnstable": true
+    },
+    {
+      "description": "GitHub Actions 汇总为一个 PR，降低噪声",
+      "matchFileNames": ["backend-drf/**"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github-actions",
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "补丁版本自动合并（门禁全绿为前提）",
+      "matchFileNames": ["frontend/**"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "vite / vue / element-plus 等大版本单独评审，走独立分支 + 全量门禁",
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": ["vite", "vue", "element-plus", "typescript", "vitest"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "adr-required"]
+    },
+    {
+      "description": "vue-tsc 锁 3.x：其 peer 上界为 typescript <6.1，TS 7 切换（ADR-014）前不接受主版本升级提单",
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": ["vue-tsc"],
+      "allowedVersions": "<4",
+      "automerge": false,
+      "labels": ["dependencies", "adr-required"]
+    },
+    {
+      "description": "GitHub Actions 汇总为一个 PR，降低噪声",
+      "matchFileNames": ["frontend/**"],
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    }
+  ]
+}

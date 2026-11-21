@@ -28,6 +28,7 @@ class ArticleSerializer(BaseModelSerializer):
         )
         read_only_fields: tuple[str, ...] = fields
         table_fields = ("title", "category", "tags", "status", "view_count", "updated_time")
+        extra_kwargs = {"view_count": {"help_text": "仅访问已发布文章的详情时累计。"}}
 
     def get_source_ticket_id(self, article: KnowledgeArticle) -> str | None:
         access = self.context.get("ticket_access")

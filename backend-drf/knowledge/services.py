@@ -20,15 +20,19 @@ def article_key(article: KnowledgeArticle) -> str:
     return f"{ARTICLE_CACHE_KEY_PREFIX}{article.pk}:{article.updated_time}"
 
 
-def count_article_view(article: KnowledgeArticle) -> None:
+def load_article_detail(article: KnowledgeArticle) -> None:
     cache_key = article_key(article)
     body = cache.get(cache_key)
     if body is None:
         body = article.body_markdown
         cache.set(cache_key, body, 300)
     article.body_markdown = body
-    KnowledgeArticle.objects.filter(pk=article.pk).update(view_count=F("view_count") + 1)
-    article.refresh_from_db(fields=["view_count"])
+    if article.status == ArticleStatus.PUBLISHED:
+        updated = KnowledgeArticle.objects.filter(pk=article.pk, status=ArticleStatus.PUBLISHED).update(
+            view_count=F("view_count") + 1
+        )
+        if updated:
+            article.refresh_from_db(fields=["view_count"])
 
 
 @transaction.atomic
@@ -66,15 +70,13 @@ def references_for(ticket: Ticket, limit: int = 5) -> list[dict[str, object]]:
         query |= SearchQuery(term, config="simple")
         matches |= Q(title__icontains=term) | Q(body_markdown__icontains=term)
     ranked = (
-        KnowledgeArticle.objects.filter(status=ArticleStatus.PUBLISHED)
+        KnowledgeArticle.objects.filter(matches, status=ArticleStatus.PUBLISHED)
         .annotate(
-            vector=vector,
             rank=SearchRank(vector, query),
             same_category=Case(
                 When(category=ticket.category, then=Value(1)), default=Value(0), output_field=IntegerField()
             ),
         )
-        .filter(matches | Q(vector=query))
         .order_by("-same_category", "-rank", "-updated_time", "id")
         .values_list("id", "title", "body_markdown")[:limit]
     )

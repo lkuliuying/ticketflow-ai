@@ -42,6 +42,7 @@ EXCLUDED_DIRS = {
     ".ruff_cache",
     "dist",
     "build",
+    "tmp",
     "docs",
     "tests",
     "migrations",
@@ -59,10 +60,9 @@ def title_limit() -> int:
 
 def iter_python_files() -> list[Path]:
     files = []
-    for path in REPO_ROOT.rglob("*.py"):
-        if any(part in EXCLUDED_DIRS for part in path.relative_to(REPO_ROOT).parts):
-            continue
-        files.append(path)
+    for directory, subdirectories, filenames in REPO_ROOT.walk():
+        subdirectories[:] = sorted(name for name in subdirectories if name not in EXCLUDED_DIRS)
+        files.extend(directory / name for name in sorted(filenames) if name.endswith(".py"))
     return files
 
 

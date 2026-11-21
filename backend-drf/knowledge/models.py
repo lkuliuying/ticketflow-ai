@@ -1,4 +1,6 @@
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
+from django.db.models.functions import Upper
 
 from common.core.models import DbAuditModel, DbUuidModel
 
@@ -23,7 +25,11 @@ class KnowledgeArticle(DbAuditModel, DbUuidModel):
     class Meta:
         verbose_name = "知识库文章"
         ordering = ("-updated_time", "-id")
-        indexes = [models.Index(fields=["status", "category", "-updated_time"], name="tf_kb_status_category_idx")]
+        indexes = [
+            models.Index(fields=["status", "category", "-updated_time"], name="tf_kb_status_category_idx"),
+            GinIndex(OpClass(Upper("title"), name="gin_trgm_ops"), name="tf_kb_title_trgm_idx"),
+            GinIndex(OpClass(Upper("body_markdown"), name="gin_trgm_ops"), name="tf_kb_body_trgm_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.title

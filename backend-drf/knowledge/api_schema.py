@@ -6,8 +6,8 @@ from tickets.api_schema import envelope
 
 
 class ArticleViewerSerializer(serializers.Serializer):
-    can_edit = serializers.BooleanField()
-    can_publish = serializers.BooleanField()
+    can_edit = serializers.BooleanField(help_text="持有更新权限的工单管理员、知识维护人员或草稿作者可编辑。")
+    can_publish = serializers.BooleanField(help_text="持有更新权限的工单管理员或知识维护人员可发布或归档。")
 
 
 @extend_schema_serializer(component_name="Article")

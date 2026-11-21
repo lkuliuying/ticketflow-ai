@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from django.core.management import call_command
+from django.urls import resolve
 from django.utils import timezone
 from jsonschema import Draft202012Validator
 
@@ -25,8 +25,7 @@ def validate(data: object, definition: str) -> None:
 
 
 @pytest.fixture
-def users(seed_creator_user: None) -> dict[str, UserInfo]:
-    call_command("load_init_json", verbosity=0)
+def users(db: None, seeded_module: None) -> dict[str, UserInfo]:
     support = DeptInfo.objects.get(code="ticketflow_support")
     result = {}
     for name, role in (("requester", REQUESTER_ROLE), ("agent", AGENT_ROLE), ("admin", ADMIN_ROLE)):
@@ -111,8 +110,11 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
 def test_ticket_viewer_cannot_archive_without_knowledge_app(users, ticket, settings):
     ticket.status = Status.CLOSED
     ticket.save(update_fields=["status"])
+    resource = f"/api/tickets/{ticket.pk}"
+    # 初始化路由后再临时移除应用，避免后续用例沿用缺失知识库路由的 URLConf。
+    resolve(resource)
     settings.INSTALLED_APPS = [app for app in settings.INSTALLED_APPS if app != "knowledge"]
-    response = authenticated(users["admin"]).get(f"/api/tickets/{ticket.pk}")
+    response = authenticated(users["admin"]).get(resource)
     assert response.status_code == 200, response.data
     assert response.data["data"]["viewer"]["can_archive"] is False
 
@@ -242,6 +244,68 @@ def test_article_capabilities_respect_missing_action_grants(users):
     response = api.get(f"{ARTICLES}/{article.pk}")
     assert response.data["data"]["viewer"] == {"can_edit": False, "can_publish": False}
     assert api.get(ARTICLES).data["data"]["can_create_standalone"] is False
+
+
+@pytest.mark.parametrize("department_role", [False, True])
+def test_knowledge_editor_reviews_other_authors_without_ticket_privileges(users, ticket, api_client, department_role):
+    role = UserRole.objects.get(code="ticketflow_kb_editor")
+    editor = UserInfo.objects.create_user(username="knowledge-editor", dept=users["agent"].dept)
+    (editor.dept if department_role else editor).roles.add(role)
+    api_client.force_authenticate(user=editor)
+    article = KnowledgeArticle.objects.create(
+        title="待审阅草稿", creator=users["agent"], category=Category.NETWORK, source_ticket=ticket
+    )
+    resource = f"{ARTICLES}/{article.pk}"
+    page = api_client.get(ARTICLES)
+    assert page.status_code == 200, page.data
+    assert page.data["data"]["results"][0]["pk"] == str(article.pk)
+    assert page.data["data"]["can_create_standalone"] is False
+    draft = api_client.get(resource)
+    assert draft.status_code == 200, draft.data
+    assert draft.data["data"]["viewer"] == {"can_edit": True, "can_publish": True}
+    assert draft.data["data"]["source_ticket_id"] is None
+    for status in (ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED):
+        response = api_client.patch(resource, {"status": status, "title": "维护后的标题"}, format="json")
+        assert response.status_code == 200, response.data
+        assert response.data["data"]["status"] == status
+        assert response.data["data"]["title"] == "维护后的标题"
+    assert api_client.get(resource).status_code == 200
+    assert api_client.get(f"/api/tickets/{ticket.pk}").status_code == 403
+    assert api_client.post(ARTICLES, {}, format="json").status_code == 403
+
+
+def test_only_published_article_detail_counts_views(users, api_client):
+    api_client.force_authenticate(user=users["admin"])
+    article = KnowledgeArticle.objects.create(title="知识", creator=users["agent"], view_count=4)
+    resource = f"{ARTICLES}/{article.pk}"
+    assert api_client.get(resource).data["data"]["view_count"] == 4
+    assert (
+        api_client.patch(resource, {"status": ArticleStatus.PUBLISHED}, format="json").data["data"]["view_count"] == 4
+    )
+    assert api_client.get(ARTICLES).data["data"]["results"][0]["view_count"] == 4
+    assert api_client.get(resource).data["data"]["view_count"] == 5
+    assert api_client.get(resource).data["data"]["view_count"] == 6
+    assert api_client.patch(resource, {"status": ArticleStatus.ARCHIVED}, format="json").data["data"]["view_count"] == 6
+    assert api_client.get(resource).data["data"]["view_count"] == 6
+    article.refresh_from_db()
+    assert article.view_count == 6
+
+
+def test_ticket_search_fields_use_localized_labels_and_sla_choices(users, api_client):
+    api_client.force_authenticate(user=users["admin"])
+    response = api_client.get("/api/tickets/search-fields")
+    assert response.status_code == 200, response.data
+    fields = {field["key"]: field for field in response.data["data"]}
+    assert fields["assignee_id"]["label"] == "处理人"
+    assert fields["department_id"]["label"] == "所属部门"
+    assert fields["sla"]["label"] == "SLA 状态"
+    assert fields["q"]["label"] == "关键字"
+    assert {choice["value"]: choice["label"] for choice in fields["sla"]["choices"] if choice["value"]} == {
+        "ON_TRACK": "正常",
+        "DUE_SOON": "即将超时",
+        "OVERDUE": "已超时",
+        "MET": "按时完成",
+    }
 
 
 def test_ticketflow_directory_contains_visible_pages_in_order(users):
