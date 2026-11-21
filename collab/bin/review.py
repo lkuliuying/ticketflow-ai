@@ -44,10 +44,10 @@ def task_brief(task: str) -> str:
     return match.group(0) if match else text
 
 
-def build_prompt(task: str, branch: str, repo: Path, round_no: int, previous: str) -> str:
-    commits = git(repo, "log", "--oneline", f"main..{branch}")
-    stat = git(repo, "diff", "--stat", f"main...{branch}")
-    diff = git(repo, "diff", f"main...{branch}")
+def build_prompt(task: str, branch: str, repo: Path, round_no: int, previous: str, base: str = "main") -> str:
+    commits = git(repo, "log", "--oneline", f"{base}..{branch}")
+    stat = git(repo, "diff", "--stat", f"{base}...{branch}")
+    diff = git(repo, "diff", f"{base}...{branch}")
     if len(diff) > DIFF_LIMIT:
         diff = diff[:DIFF_LIMIT] + "\n…（diff 过长已截断，请在结论中注明未覆盖部分）"
     head = git(repo, "rev-parse", "--short", branch).strip()
@@ -62,7 +62,7 @@ def build_prompt(task: str, branch: str, repo: Path, round_no: int, previous: st
             ("# 之前轮次的评审\n" + previous) if previous else "",
             "# 设计文档（契约基线）\n" + read(DESIGN),
             f"# 分支提交\n{commits}\n# 改动统计\n{stat}",
-            f"# 完整 diff（main...{branch}）\n```diff\n{diff}\n```",
+            f"# 完整 diff（{base}...{branch}，只评审本任务在基线之上的改动）\n```diff\n{diff}\n```",
         ]
     )
 
@@ -108,13 +108,14 @@ def main() -> None:
     parser.add_argument("task")
     parser.add_argument("branch")
     parser.add_argument("--repo", type=Path, default=ROOT)
+    parser.add_argument("--base", default="main", help="叠加分支时传上游任务分支，只评审本任务的增量")
     args = parser.parse_args()
 
     target = COLLAB / "reviews" / f"{args.task}.md"
     previous = target.read_text(encoding="utf-8") if target.exists() else ""
     round_no = previous.count("评审 · 第") + 1
     with track("gemini", args.task, "review", f"{args.branch} 第 {round_no} 轮") as record:
-        response = run_agy(build_prompt(args.task, args.branch, args.repo, round_no, previous))
+        response = run_agy(build_prompt(args.task, args.branch, args.repo, round_no, previous, args.base))
         record["exit_code"] = 0
 
     target.parent.mkdir(parents=True, exist_ok=True)

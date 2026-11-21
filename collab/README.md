@@ -64,15 +64,16 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 | --- | --- | --- | --- | --- |
 | BE-01 | 测试环境与全量门禁基线 | Codex | — | 待开始 |
 | BE-02 | 前端所需的契约补口 | Codex | — | 已合并 |
-| BE-03 | Phase 2 测试补全 | Codex | BE-01 | 待开始 |
-| BE-04 | Phase 2 遗留问题修复 | Codex | BE-01 | 待开始 |
+| BE-03 | Phase 2 测试补全 | Codex | BE-04 | 进行中 |
+| BE-04 | Phase 2 遗留问题修复 | Codex | — | 评审通过 |
 | IT-01 | 联调环境（BE-02 + FE-01） | Codex | BE-02 | 已完成，环境常驻 :8896 |
 | CI-01 | GitHub CI 在 Monorepo 下转绿（后端） | Codex | — | 已合并 |
 | CI-02 | CI 前端侧：assignees 消费与菜单词条 | Claude | — | 已合并 |
+| CI-03 | 修复 CI 中 Unit Tests 卡死（关闭 BE-01） | Codex | BE-04 | 评审通过 |
 | FE-01 | 工单 API 层与列表页 | Claude | — | 已合并 |
-| FE-02 | 工单详情：流转、指派、回复、时间线 | Claude | BE-02 | 待开始 |
-| FE-03 | 知识库列表、详情、编辑与转存 | Claude | BE-02 | 待开始 |
-| FE-04 | 看板与异步导出入口 | Claude | FE-01 | 待开始 |
+| FE-02 | 工单详情：流转、指派、回复、时间线 | Claude | BE-02 | 评审通过 |
+| FE-03 | 知识库列表、详情、编辑与转存 | Claude | BE-02 | 评审通过 |
+| FE-04 | 看板与异步导出入口 | Claude | FE-01 | 评审通过 |
 | FE-05 | 词条、单测与 E2E 冒烟 | Claude | FE-01..04 | 待开始 |
 | FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 待开始 |
 

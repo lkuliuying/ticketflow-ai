@@ -75,9 +75,9 @@ BE-01 可并行；BE-03、BE-04 在 BE-01 之后。
 
 ## BE-03 Phase 2 测试补全
 
-分支：`be/phase2-tests`
+分支：`be/phase2-tests`（从 `be/ci-hang` 切出，已包含 BE-04、CI-03 的改动与共享夹具 `seeded_module`）。
 
-目前只有 6 个集成用例。按下面补齐，优先覆盖权限和并发：
+先盘点 BE-02 / BE-04 / CI-03 已补的用例，只补仍然缺失的场景，避免重复。按下面补齐，优先覆盖权限和并发：
 
 - **知识库权限组合**：requester / agent / admin 分别对 DRAFT、PUBLISHED、ARCHIVED 的列表、
   详情、PATCH；非创建者、非管理员拿不到 `source_ticket_id`；客服只能从可处理的 CLOSED 工单转存，
@@ -174,3 +174,40 @@ GitHub 上首次运行 `Unit Tests`（run 44876442261）结果为 **21 failed / 
 
 完成标准：在 Linux 容器里跑 `uv run pytest -n auto` 全量通过（或只剩与本次无关、且在上游同样失败的用例，逐条说明），
 `--cov-fail-under=85` 满足，第六节门禁通过；报告附上全量结果的统计行。
+
+---
+
+## CI-03 修复 CI 中 Unit Tests 卡死（关闭 BE-01）
+
+分支：`be/ci-hang`（从 `be/phase2-fixes` 切出，因为 BE-04 也改了 `test_viewer_contract.py`，避免合并冲突）。
+
+GitHub `Unit Tests`（run 44880995609）在全量约 48% 处卡住：两次尝试都触发 faulthandler 600s 转储后 Abort，第三次整体超时。
+栈与上下文在 `F:\Program\ticketflow-ai\collab\reports\CI-03.ci-hang.txt`。卡点：
+
+```
+tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_command("load_init_json")
+  → identity/builtin.py:135 sync_builtin_roles → :150 _fill_builtin_role_fields
+  → system/services/permission_sync/apply.py:303 fill_field_permissions
+  → system/services/permission_sync/audit.py:64 audit_field_permissions   ← psycopg 等待查询返回
+```
+
+同一进程里还有 psycopg_pool 的 worker 线程。初步判断：`load_init_json` 的某段查询走了与测试事务不同的连接，
+等待测试事务尚未提交的行锁，形成同进程自锁；本地四 worker 没有复现卡死，但出现过 `Cannot release a lock that's no longer owned`。
+
+要求：
+
+1. 先在 Linux 容器里按 CI 口径复现（`tests/settings_real.py`、xdist、真实 PG + Redis），确认根因（连接池、跨连接查询、锁等待），
+   不要只靠加超时或跳过用例。
+2. 修复方向优先改测试夹具（例如改为会话级只装载一次种子、或不在事务内调用整条 `load_init_json`，只建所需角色与授权），
+   若根因在 `load_init_json` / 权限同步对连接的使用方式，说明影响面后再改。
+3. 全量 `uv run pytest -n auto`（CI 同口径）通过，且 `tests/integration/tickets` 在 `-n 4` 下连续跑 3 次不再卡住。
+4. 报告附根因分析与复现、修复前后的关键输出。
+
+### BE-04 第 1 轮评审跟进（CI-03 完成后在同一分支处理）
+
+1. `knowledge/migrations/0003_article_trigram_indexes.py`：回滚时先检查索引是否存在（或 `DROP INDEX IF EXISTS`），
+   覆盖“无 `pg_trgm` 权限时正向迁移跳过建索引”的环境。
+2. 根目录 `renovate.json`：并入 `frontend/renovate.json` 的 4 条 `packageRules`（用 `matchFileNames: ["frontend/**"]` 限定）
+   与 `postUpdateOptions`，后端规则限定到 `backend-drf/**`；删除 `backend-drf/renovate.json`。`frontend/renovate.json` 由 Claude 删除。
+   Django 规则说明里的 `docs/adr` 改为 `backend-drf/docs/adr`。
+3. `TicketFilter.sla` 补 `label="SLA 状态"`，`q` 补 `label="关键字"`。
