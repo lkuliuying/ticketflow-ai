@@ -174,11 +174,12 @@ class TicketApi extends BaseApi {
     );
   };
 
-  /** 指派候选人：可见且可处理该工单、并持有指派权限时可用；最多 20 条，按用户名排序 */
+  /** 指派候选人：可见且可处理该工单、并持有指派权限时可用；最多 20 条，按用户名与主键排序 */
   assignees = (pk: string, q?: string) => {
+    const keyword = q?.trim();
     return this.request<DetailResult<TicketAssignee[]>>(
       "get",
-      q ? { q } : {},
+      keyword ? { q: keyword } : {},
       undefined,
       `${this.baseApi}/${pk}/assignees`
     );

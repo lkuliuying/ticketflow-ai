@@ -120,3 +120,23 @@ describe("ticketApi 写操作路径", () => {
     });
   });
 });
+
+describe("ticketApi 指派候选人", () => {
+  beforeEach(() => {
+    requestMock.mockReset();
+    requestMock.mockResolvedValue({ code: 1000, data: [] });
+  });
+
+  it("关键字为空或只有空白时不带 q，否则去掉首尾空白", () => {
+    const pk = "7f1c2d1e-0000-4000-8000-000000000002";
+    ticketApi.assignees(pk);
+    ticketApi.assignees(pk, "   ");
+    ticketApi.assignees(pk, "  tf_agent ");
+
+    expect(requestMock.mock.calls.map(call => call[2].params)).toEqual([
+      {},
+      {},
+      { q: "tf_agent" }
+    ]);
+  });
+});
