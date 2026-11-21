@@ -34,6 +34,8 @@ export function openArticleEditor(options: {
     width: deviceDetection() ? "100%" : dialogSize("lg"),
     draggable: true,
     closeOnClickModal: false,
+    // 确认按钮提交中显示 loading 并阻止重复点击，避免重复新建或重复转存
+    sureBtnLoading: true,
     contentRenderer: () =>
       h(ArticleEditor, { ref: editorRef, initial: options.initial }),
     beforeSure: async (done, { closeLoading }) => {

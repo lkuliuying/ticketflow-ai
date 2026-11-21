@@ -27,17 +27,29 @@ const form = reactive<ArticlePayload>({
 
 const rules: FormRules = {
   title: [
-    { required: true, message: t("ticketflow.kb.titleRequired") },
+    {
+      required: true,
+      whitespace: true,
+      message: t("ticketflow.kb.titleRequired")
+    },
     { max: 200, message: t("ticketflow.kb.titleTooLong") }
   ],
   category: [{ required: true, message: t("ticketflow.kb.categoryRequired") }],
-  body_markdown: [{ required: true, message: t("ticketflow.kb.bodyRequired") }],
+  body_markdown: [
+    {
+      required: true,
+      whitespace: true,
+      message: t("ticketflow.kb.bodyRequired")
+    }
+  ],
   tags: [
     {
-      validator: (_rule, value: string[], callback) =>
-        value.length > 12 || value.some(tag => tag.length > 64)
+      validator: (_rule, value: string[], callback) => {
+        const tags = value.map(tag => tag.trim()).filter(Boolean);
+        return tags.length > 12 || tags.some(tag => tag.length > 64)
           ? callback(new Error(t("ticketflow.kb.tagsInvalid")))
-          : callback()
+          : callback();
+      }
     }
   ]
 };
