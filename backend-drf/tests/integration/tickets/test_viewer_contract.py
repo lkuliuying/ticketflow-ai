@@ -11,7 +11,7 @@ from knowledge.models import ArticleStatus, KnowledgeArticle
 from system.models import Menu
 from tests.integration.tickets.test_ticket_api import authenticated
 from tickets.models import Category, Priority, Status, Ticket
-from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE
+from tickets.policy import ADMIN_ROLE, AGENT_ROLE
 
 pytestmark = pytest.mark.django_db
 ARTICLES = "/api/knowledge/articles"
@@ -22,16 +22,6 @@ SCHEMA = json.loads(
 
 def validate(data: object, definition: str) -> None:
     Draft202012Validator({**SCHEMA, "$ref": f"#/$defs/{definition}"}).validate(data)
-
-
-@pytest.fixture
-def users(db: None, seeded_module: None) -> dict[str, UserInfo]:
-    support = DeptInfo.objects.get(code="ticketflow_support")
-    result = {}
-    for name, role in (("requester", REQUESTER_ROLE), ("agent", AGENT_ROLE), ("admin", ADMIN_ROLE)):
-        result[name] = UserInfo.objects.create_user(username=f"viewer-{name}", dept=support)
-        result[name].roles.add(UserRole.objects.get(code=role))
-    return result
 
 
 @pytest.fixture
@@ -213,27 +203,97 @@ def test_assignees_permission_does_not_grant_assignment(users, ticket):
     assert response.status_code == 403
 
 
-@pytest.mark.parametrize("role", ["requester", "agent", "admin"])
-@pytest.mark.parametrize("status", [ArticleStatus.DRAFT, ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED])
-def test_article_viewer_and_standalone_capability(users, role, status):
-    article = KnowledgeArticle.objects.create(title="知识", creator=users[role], status=status)
-    api = authenticated(users[role])
-    response = api.get(f"{ARTICLES}/{article.pk}")
-    if status == ArticleStatus.ARCHIVED and role != "admin":
-        assert response.status_code == 404
-    else:
-        assert response.status_code == 200, response.data
-        viewer = response.data["data"]["viewer"]
-        assert viewer == {
-            "can_edit": role == "admin" or (role == "agent" and status == ArticleStatus.DRAFT),
-            "can_publish": role == "admin",
-        }
-        validate(viewer, "articleViewer")
-    page = api.get(ARTICLES).data["data"]
-    assert page["can_create_standalone"] == (role == "admin")
+@pytest.mark.parametrize(
+    ("role", "status", "detail_statuses", "patch_statuses"),
+    [
+        ("requester", ArticleStatus.DRAFT, (200, 404), (403, 403)),
+        ("requester", ArticleStatus.PUBLISHED, (200, 200), (403, 403)),
+        ("requester", ArticleStatus.ARCHIVED, (404, 404), (403, 403)),
+        ("agent", ArticleStatus.DRAFT, (200, 404), (200, 404)),
+        ("agent", ArticleStatus.PUBLISHED, (200, 200), (403, 403)),
+        ("agent", ArticleStatus.ARCHIVED, (404, 404), (404, 404)),
+        ("admin", ArticleStatus.DRAFT, (200, 200), (200, 200)),
+        ("admin", ArticleStatus.PUBLISHED, (200, 200), (200, 200)),
+        ("admin", ArticleStatus.ARCHIVED, (200, 200), (200, 200)),
+    ],
+)
+def test_article_permissions_by_status(users, ticket, client_for, role, status, detail_statuses, patch_statuses):
+    own = KnowledgeArticle.objects.create(title="本人文章", creator=users[role], status=status)
+    other = KnowledgeArticle.objects.create(
+        title="他人文章",
+        creator=users["requester" if role == "agent" else "agent"],
+        status=status,
+        source_ticket=ticket,
+    )
+    api = client_for(users[role])
+    admin = role == "admin"
+    visible = {
+        str(article.pk)
+        for article, detail_status in zip((own, other), detail_statuses, strict=True)
+        if detail_status == 200
+    }
+
+    response = api.get(ARTICLES, {"status": status})
+    assert response.status_code == 200, response.data
+    page = response.data["data"]
+    assert page["total"] == len(visible)
+    assert {row["pk"] for row in page["results"]} == visible
+    assert all("source_ticket_id" not in row for row in page["results"])
+    assert page["can_create_standalone"] is admin
     validate(page, "articleListCapabilities")
     empty = api.get(ARTICLES, {"q": "does-not-exist"}).data["data"]
-    assert empty["results"] == [] and empty["can_create_standalone"] == (role == "admin")
+    assert empty["results"] == [] and empty["can_create_standalone"] is admin
+
+    for article, detail_status, patch_status in zip((own, other), detail_statuses, patch_statuses, strict=True):
+        resource = f"{ARTICLES}/{article.pk}"
+        detail = api.get(resource)
+        assert detail.status_code == detail_status, detail.data
+        if detail_status == 200:
+            data = detail.data["data"]
+            assert data["viewer"] == {"can_edit": patch_status == 200, "can_publish": admin}
+            validate(data["viewer"], "articleViewer")
+            assert data["source_ticket_id"] == (str(ticket.pk) if admin and article == other else None)
+
+        original_title = article.title
+        updated = api.patch(resource, {"title": "修改后的标题"}, format="json")
+        assert updated.status_code == patch_status, updated.data
+        if patch_status == 200:
+            assert updated.data["data"]["title"] == "修改后的标题"
+        article.refresh_from_db()
+        assert article.title == ("修改后的标题" if patch_status == 200 else original_title)
+
+
+def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, make_ticket, client_for, details):
+    api = client_for(users["agent"])
+    foreign_dept = DeptInfo.objects.create(code="other-support", name="其他部门")
+    invisible = make_ticket(department=foreign_dept, status=Status.CLOSED)
+    submitter_only = make_ticket(users["agent"], department=foreign_dept, status=Status.CLOSED)
+    opened = make_ticket()
+    closed = make_ticket(status=Status.CLOSED)
+    values = {"title": "VPN 连接失败处理", "body_markdown": "先检查 VPN 连接状态", "category": details["category"]}
+
+    for ticket, expected in ((invisible, 404), (submitter_only, 403), (opened, 409)):
+        denied = api.post(ARTICLES, {**values, "source_ticket_id": str(ticket.pk)}, format="json")
+        assert denied.status_code == expected, denied.data
+    assert not KnowledgeArticle.objects.exists()
+
+    payload = {**values, "source_ticket_id": str(closed.pk)}
+    created = api.post(ARTICLES, payload, format="json")
+    assert created.status_code == 201, created.data
+    article = created.data["data"]
+    assert article["status"] == ArticleStatus.DRAFT
+    assert article["source_ticket_id"] == str(closed.pk)
+    duplicate = api.post(ARTICLES, payload, format="json")
+    assert duplicate.status_code == 409, duplicate.data
+    assert KnowledgeArticle.objects.filter(source_ticket=closed).count() == 1
+
+    resource = f"{ARTICLES}/{article['pk']}"
+    assert api.get(resource).data["data"]["source_ticket_id"] == str(closed.pk)
+    publish = {"status": ArticleStatus.PUBLISHED}
+    assert api.patch(resource, publish, format="json").status_code == 403
+    admin = client_for(users["admin"])
+    assert admin.patch(resource, publish, format="json").status_code == 200
+    assert api.get(resource).data["data"]["source_ticket_id"] == str(closed.pk)
 
 
 def test_article_capabilities_respect_missing_action_grants(users):

@@ -1,8 +1,13 @@
+from datetime import timedelta
+from uuid import uuid4
+
 import pytest
+from django.utils import timezone
+from rest_framework.test import APIClient
 
 from identity.models import DeptInfo, UserInfo, UserRole
-from tickets.models import Category, Priority
-from tickets.policy import AGENT_ROLE
+from tickets.models import Category, Priority, Ticket
+from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE
 from tickets.services import NewTicket
 
 
@@ -32,3 +37,39 @@ def details() -> NewTicket:
         "category": Category.NETWORK,
         "priority": Priority.P1,
     }
+
+
+@pytest.fixture
+def users(seeded_module, db) -> dict[str, UserInfo]:
+    support_dept = DeptInfo.objects.get(code="ticketflow_support")
+    result = {}
+    for name, role in (("requester", REQUESTER_ROLE), ("agent", AGENT_ROLE), ("admin", ADMIN_ROLE)):
+        user = UserInfo.objects.create_user(username=f"viewer-{name}", dept=support_dept)
+        user.roles.add(UserRole.objects.get(code=role))
+        result[name] = user
+    return result
+
+
+@pytest.fixture
+def client_for():
+    def authenticate(user: UserInfo) -> APIClient:
+        client = APIClient(HTTP_USER_AGENT="pytest-agent")
+        client.force_authenticate(user=user)
+        return client
+
+    return authenticate
+
+
+@pytest.fixture
+def make_ticket(users, details):
+    def create(submitter=None, **overrides):
+        data = {
+            **details,
+            "number": f"TF-{uuid4().hex.upper()}",
+            "submitter": submitter or users["requester"],
+            "department": users["agent"].dept,
+            "sla_due_at": timezone.now() + timedelta(hours=8),
+        }
+        return Ticket.objects.create(**(data | overrides))
+
+    return create
