@@ -4,6 +4,7 @@ from uuid import UUID
 
 from django.db.models import Q, QuerySet
 
+from common.core.permission import get_user_permission_codes
 from identity.models import UserInfo
 from tickets.models import Status, Ticket
 
@@ -22,6 +23,25 @@ TRANSITIONS = cast(
     },
 )
 VERIFY_STATES = (Status.PENDING_VERIFY, Status.CLOSED)
+
+
+def has_permission(user: UserInfo, code: str) -> bool:
+    return user.is_superuser or code in get_user_permission_codes(user)
+
+
+def assignment_candidates(access: "TicketAccess") -> QuerySet[UserInfo]:
+    roles = (AGENT_ROLE, ADMIN_ROLE)
+    eligible = (
+        Q(is_superuser=True)
+        | Q(roles__code__in=roles, roles__is_active=True)
+        | Q(dept__roles__code__in=roles, dept__roles__is_active=True)
+    )
+    queryset = UserInfo.objects.filter(eligible, is_active=True)
+    if not access.admin:
+        if access.department_id is None:
+            return queryset.none()
+        queryset = queryset.filter(dept_id=access.department_id)
+    return queryset.select_related("dept").distinct().order_by("username", "pk")
 
 
 @dataclass(frozen=True)

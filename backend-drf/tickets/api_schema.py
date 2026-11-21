@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema_serializer, inline_serializer
 from rest_framework import serializers
 
-from tickets.serializers import TicketSerializer
+from tickets.serializers import AssigneeSerializer, TicketSerializer
 
 
 def envelope(name: str, data: serializers.Field) -> serializers.Serializer:
@@ -36,15 +36,24 @@ class TimelineEntrySerializer(serializers.Serializer):
     visibility = serializers.CharField(allow_blank=True)
 
 
+class TicketViewerSerializer(serializers.Serializer):
+    can_handle = serializers.BooleanField()
+    can_assign = serializers.BooleanField()
+    can_comment_internal = serializers.BooleanField()
+    can_archive = serializers.BooleanField()
+
+
 class TicketDetailSerializer(TicketSerializer):
+    viewer = TicketViewerSerializer(read_only=True)
     available_transitions = serializers.ListField(child=serializers.CharField(), read_only=True)
     timeline = page("TicketTimelinePage", TimelineEntrySerializer(many=True))
 
     class Meta(TicketSerializer.Meta):
-        fields = (*TicketSerializer.Meta.fields, "available_transitions", "timeline")
+        fields = (*TicketSerializer.Meta.fields, "viewer", "available_transitions", "timeline")
 
 
 ticket_result = envelope("TicketResult", TicketSerializer())
+assignees_result = envelope("TicketAssigneesResult", AssigneeSerializer(many=True))
 ticket_detail_result = envelope("TicketDetailResult", TicketDetailSerializer())
 ticket_list_result = envelope("TicketListResult", page("TicketPage", TicketSerializer(many=True)))
 timeline_result = envelope("TicketTimelineResult", page("TicketTimelinePage", TimelineEntrySerializer(many=True)))

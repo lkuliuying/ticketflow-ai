@@ -7,12 +7,13 @@
       "path": "/ticketflow/tickets/index",
       "component": "ticketflow/tickets/index",
       "menu_type": 1,
-      "rank": 30,
+      "rank": 1,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000011",
       "method": "",
       "model": [
         "d2431bc0-217a-49eb-a6fa-000000000012"
-      ]
+      ],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
     }
   },
   {
@@ -206,6 +207,20 @@
       "path": "api/tickets/export-data$",
       "method": "GET",
       "meta": "d2431bc0-217a-49eb-a6fa-000000000058",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000092",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "assignees:TicketFlowTickets",
+      "rank": 13,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/assignees$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000093",
       "model": []
     }
   }

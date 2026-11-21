@@ -1654,6 +1654,14 @@
             "readOnly": true,
             "title": "浏览次数",
             "type": "integer"
+          },
+          "viewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ArticleViewer"
+              }
+            ],
+            "readOnly": true
           }
         },
         "required": [
@@ -1666,7 +1674,8 @@
           "tags",
           "title",
           "updated_time",
-          "view_count"
+          "view_count",
+          "viewer"
         ],
         "type": "object"
       },
@@ -1759,6 +1768,49 @@
           "title",
           "updated_time",
           "view_count"
+        ],
+        "type": "object"
+      },
+      "ArticleViewer": {
+        "properties": {
+          "can_edit": {
+            "type": "boolean"
+          },
+          "can_publish": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "can_edit",
+          "can_publish"
+        ],
+        "type": "object"
+      },
+      "Assignee": {
+        "properties": {
+          "department_name": {
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "nickname": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "pk": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "username": {
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "department_name",
+          "nickname",
+          "pk",
+          "username"
         ],
         "type": "object"
       },
@@ -5593,6 +5645,9 @@
       },
       "KnowledgeArticlePage": {
         "properties": {
+          "can_create_standalone": {
+            "type": "boolean"
+          },
           "results": {
             "items": {
               "$ref": "#/components/schemas/ArticleList"
@@ -5604,6 +5659,7 @@
           }
         },
         "required": [
+          "can_create_standalone",
           "results",
           "total"
         ],
@@ -18217,6 +18273,36 @@
         ],
         "type": "object"
       },
+      "TicketAssigneesResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Assignee"
+            },
+            "type": "array"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
       "TicketCommentResult": {
         "properties": {
           "code": {
@@ -18483,6 +18569,14 @@
           "version": {
             "readOnly": true,
             "type": "integer"
+          },
+          "viewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TicketViewer"
+              }
+            ],
+            "readOnly": true
           }
         },
         "required": [
@@ -18509,7 +18603,8 @@
           "timeline",
           "title",
           "updated_time",
-          "version"
+          "version",
+          "viewer"
         ],
         "type": "object"
       },
@@ -18665,6 +18760,29 @@
           "detail",
           "requestId",
           "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketViewer": {
+        "properties": {
+          "can_archive": {
+            "type": "boolean"
+          },
+          "can_assign": {
+            "type": "boolean"
+          },
+          "can_comment_internal": {
+            "type": "boolean"
+          },
+          "can_handle": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "can_archive",
+          "can_assign",
+          "can_comment_internal",
+          "can_handle"
         ],
         "type": "object"
       },
@@ -65110,7 +65228,7 @@
     },
     "/api/knowledge/articles": {
       "get": {
-        "description": "获取{cls}的列表",
+        "description": "知识库文章列表",
         "operationId": "api_knowledge_articles_list",
         "parameters": [
           {
@@ -97599,6 +97717,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/assignees": {
+      "get": {
+        "description": "工单指派候选人",
+        "operationId": "api_tickets_assignees_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAssigneesResult"
                 }
               }
             },

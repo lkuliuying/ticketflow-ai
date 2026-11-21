@@ -7,12 +7,13 @@
       "path": "/ticketflow/knowledge/index",
       "component": "ticketflow/knowledge/index",
       "menu_type": 1,
-      "rank": 30,
+      "rank": 2,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000061",
       "method": "",
       "model": [
         "d2431bc0-217a-49eb-a6fa-000000000062"
-      ]
+      ],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
     }
   },
   {

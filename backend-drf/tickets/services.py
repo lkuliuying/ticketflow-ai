@@ -14,7 +14,7 @@ from rest_framework.exceptions import APIException, NotFound, PermissionDenied, 
 from identity.models import DeptInfo, UserInfo
 from tickets.cache import IDEMPOTENCY_TTL, invalidate_dashboard, request_key, reserve_create
 from tickets.models import Priority, Status, Ticket, TicketComment, TicketCreateRequest, TicketLog, Visibility
-from tickets.policy import TRANSITIONS, TicketAccess
+from tickets.policy import TRANSITIONS, TicketAccess, assignment_candidates
 
 SLA_HOURS = {str(Priority.P0): 2, str(Priority.P1): 8, str(Priority.P2): 24, str(Priority.P3): 72}
 SLA_WARNING = timedelta(minutes=30)
@@ -178,12 +178,9 @@ def assign(
     if not access.can_handle(ticket):
         raise PermissionDenied("无权指派此工单")
     if assignee_id is not None:
-        assignee = UserInfo.objects.filter(pk=assignee_id, is_active=True).first()
+        assignee = assignment_candidates(access).filter(pk=assignee_id).first()
         if assignee is None:
-            raise ValidationError({"assignee_id": "处理人不存在或已停用"})
-        assignee_access = TicketAccess.for_user(assignee)
-        if not (assignee_access.agent or assignee_access.admin):
-            raise ValidationError({"assignee_id": "处理人需要工单客服或管理员角色"})
+            raise ValidationError({"assignee_id": "处理人不在可指派范围内"})
     ticket.assignee_id = assignee_id
     return _record_change(ticket, user, "ASSIGN", ticket.status, ["assignee"])
 
