@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "app": "tickets",
+  "depends": [
+    "system",
+    "identity"
+  ],
+  "url_prefixes": [
+    "api/tickets/"
+  ],
+  "config_keys": [],
+  "dict_codes": [
+    "ticketflow_category"
+  ],
+  "files": [
+    {
+      "name": "menumeta.json",
+      "model": "system.menumeta",
+      "kind": "contract",
+      "order": 10
+    },
+    {
+      "name": "menu.json",
+      "model": "system.menu",
+      "kind": "contract",
+      "order": 20
+    },
+    {
+      "name": "modellabelfield.json",
+      "model": "system.modellabelfield",
+      "kind": "generated",
+      "order": 30
+    },
+    {
+      "name": "fieldpermission.json",
+      "model": "system.fieldpermission",
+      "kind": "contract",
+      "order": 60
+    },
+    {
+      "name": "userrole.json",
+      "model": "identity.userrole",
+      "kind": "contract",
+      "order": 35
+    },
+    {
+      "name": "deptinfo.json",
+      "model": "identity.deptinfo",
+      "kind": "contract",
+      "order": 35
+    },
+    {
+      "name": "datadict.json",
+      "model": "system.datadict",
+      "kind": "contract",
+      "order": 40
+    }
+  ],
+  "grants": "grants.json"
+}

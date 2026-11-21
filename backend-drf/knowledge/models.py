@@ -1,0 +1,29 @@
+from django.db import models
+
+from common.core.models import DbAuditModel, DbUuidModel
+
+
+class ArticleStatus(models.TextChoices):
+    DRAFT = "DRAFT", "草稿"
+    PUBLISHED = "PUBLISHED", "已发布"
+    ARCHIVED = "ARCHIVED", "已归档"
+
+
+class KnowledgeArticle(DbAuditModel, DbUuidModel):
+    title = models.CharField("标题", max_length=200)
+    body_markdown = models.TextField("正文")
+    category = models.CharField("分类", max_length=12)
+    tags = models.JSONField("标签", default=list, blank=True)
+    status = models.CharField("状态", max_length=10, choices=ArticleStatus.choices, default=ArticleStatus.DRAFT)
+    view_count = models.PositiveBigIntegerField("浏览次数", default=0)
+    source_ticket = models.OneToOneField(
+        "tickets.Ticket", on_delete=models.SET_NULL, related_name="knowledge_article", null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "知识库文章"
+        ordering = ("-updated_time", "-id")
+        indexes = [models.Index(fields=["status", "category", "-updated_time"], name="tf_kb_status_category_idx")]
+
+    def __str__(self) -> str:
+        return self.title

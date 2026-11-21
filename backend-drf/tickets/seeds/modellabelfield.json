@@ -1,0 +1,231 @@
+[
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000012",
+    "fields": {
+      "field_type": 0,
+      "name": "tickets.ticket",
+      "label": "工单"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000013",
+    "fields": {
+      "field_type": 0,
+      "name": "pk",
+      "label": "编号",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000014",
+    "fields": {
+      "field_type": 0,
+      "name": "number",
+      "label": "工单号",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000015",
+    "fields": {
+      "field_type": 0,
+      "name": "title",
+      "label": "标题",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000016",
+    "fields": {
+      "field_type": 0,
+      "name": "description",
+      "label": "描述",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000017",
+    "fields": {
+      "field_type": 0,
+      "name": "category",
+      "label": "分类",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000018",
+    "fields": {
+      "field_type": 0,
+      "name": "priority",
+      "label": "优先级",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000019",
+    "fields": {
+      "field_type": 0,
+      "name": "status",
+      "label": "状态",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000020",
+    "fields": {
+      "field_type": 0,
+      "name": "submitter_id",
+      "label": "提交人",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000021",
+    "fields": {
+      "field_type": 0,
+      "name": "submitter_name",
+      "label": "提交人名称",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000022",
+    "fields": {
+      "field_type": 0,
+      "name": "assignee_id",
+      "label": "处理人",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000023",
+    "fields": {
+      "field_type": 0,
+      "name": "assignee_name",
+      "label": "处理人名称",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000024",
+    "fields": {
+      "field_type": 0,
+      "name": "department_id",
+      "label": "处理部门",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000025",
+    "fields": {
+      "field_type": 0,
+      "name": "department_name",
+      "label": "部门名称",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000026",
+    "fields": {
+      "field_type": 0,
+      "name": "sla_due_at",
+      "label": "SLA 截止时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000027",
+    "fields": {
+      "field_type": 0,
+      "name": "sla_state",
+      "label": "SLA 状态",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000028",
+    "fields": {
+      "field_type": 0,
+      "name": "first_response_at",
+      "label": "首次响应时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000029",
+    "fields": {
+      "field_type": 0,
+      "name": "resolved_at",
+      "label": "解决时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000030",
+    "fields": {
+      "field_type": 0,
+      "name": "created_time",
+      "label": "创建时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000031",
+    "fields": {
+      "field_type": 0,
+      "name": "updated_time",
+      "label": "更新时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000032",
+    "fields": {
+      "field_type": 0,
+      "name": "version",
+      "label": "版本",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000033",
+    "fields": {
+      "field_type": 0,
+      "name": "ai_summary",
+      "label": "AI 摘要",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000034",
+    "fields": {
+      "field_type": 0,
+      "name": "ai_tags",
+      "label": "AI 标签",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  }
+]

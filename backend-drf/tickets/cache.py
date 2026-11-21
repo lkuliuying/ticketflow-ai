@@ -1,0 +1,85 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+from hashlib import sha256
+from uuid import uuid4
+
+from django.core.cache import cache
+from django_redis import get_redis_connection
+from redis.exceptions import RedisError
+from rest_framework.exceptions import APIException, Throttled
+
+TICKET_CACHE_KEY_PREFIX = "ticketflow:ticket:"
+IDEMPOTENCY_TTL = 86400
+WINDOW_SECONDS = 60
+RELEASE = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+end
+return 0
+"""
+SLIDING_WINDOW = """
+local clock = redis.call('TIME')
+local now = tonumber(clock[1]) * 1000 + math.floor(tonumber(clock[2]) / 1000)
+local period = tonumber(ARGV[1])
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now - period)
+if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[2]) then
+    local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+    return math.ceil((tonumber(oldest[2]) + period - now) / 1000)
+end
+redis.call('ZADD', KEYS[1], now, ARGV[3])
+redis.call('PEXPIRE', KEYS[1], period)
+return 0
+"""
+
+
+class RateLimitUnavailable(APIException):
+    status_code = 503
+    default_detail = "限流服务暂时不可用，请稍后重试"
+
+
+def check_rate(user_id: int, action: str, limit: int) -> None:
+    key = cache.make_key(f"{TICKET_CACHE_KEY_PREFIX}rate:{action}:{user_id}")
+    try:
+        wait = int(get_redis_connection().eval(SLIDING_WINDOW, 1, key, WINDOW_SECONDS * 1000, limit, uuid4().hex))
+    except RedisError as exc:
+        raise RateLimitUnavailable() from exc
+    if wait:
+        raise Throttled(wait=wait)
+
+
+@contextmanager
+def reserve_create(key: str) -> Iterator[None]:
+    lock_key = cache.make_key(f"{key}:lock")
+    owner = uuid4().hex
+    redis = get_redis_connection()
+    try:
+        acquired = redis.set(lock_key, owner, nx=True, ex=15)
+    except RedisError:
+        acquired = False
+    try:
+        yield
+    finally:
+        if acquired:
+            try:
+                redis.eval(RELEASE, 1, lock_key, owner)
+            except RedisError:
+                # 短 TTL 回收未释放的占位，数据库唯一约束仍然生效。
+                pass
+
+
+def request_key(user_id: int, key_hash: str) -> str:
+    return f"{TICKET_CACHE_KEY_PREFIX}create:{user_id}:{key_hash}"
+
+
+def invalidate_dashboard() -> None:
+    cache.set(f"{TICKET_CACHE_KEY_PREFIX}dashboard:revision", uuid4().hex, timeout=None)
+
+
+def dashboard_key(user_id: int, sql: str, params: tuple[object, ...]) -> str:
+    revision_key = f"{TICKET_CACHE_KEY_PREFIX}dashboard:revision"
+    revision = cache.get(revision_key)
+    if revision is None:
+        cache.add(revision_key, uuid4().hex, timeout=None)
+        revision = cache.get(revision_key)
+    digest = sha256(repr((sql, params)).encode()).hexdigest()
+    return f"{TICKET_CACHE_KEY_PREFIX}dashboard:{user_id}:{revision}:{digest}"

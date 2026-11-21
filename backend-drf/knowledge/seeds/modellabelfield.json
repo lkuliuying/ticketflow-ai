@@ -1,0 +1,111 @@
+[
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000062",
+    "fields": {
+      "field_type": 0,
+      "name": "knowledge.knowledgearticle",
+      "label": "工单知识库"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000063",
+    "fields": {
+      "field_type": 0,
+      "name": "pk",
+      "label": "编号",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000064",
+    "fields": {
+      "field_type": 0,
+      "name": "title",
+      "label": "标题",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000065",
+    "fields": {
+      "field_type": 0,
+      "name": "body_markdown",
+      "label": "正文",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000066",
+    "fields": {
+      "field_type": 0,
+      "name": "category",
+      "label": "分类",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000067",
+    "fields": {
+      "field_type": 0,
+      "name": "tags",
+      "label": "标签",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000068",
+    "fields": {
+      "field_type": 0,
+      "name": "status",
+      "label": "状态",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000069",
+    "fields": {
+      "field_type": 0,
+      "name": "view_count",
+      "label": "浏览次数",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000070",
+    "fields": {
+      "field_type": 0,
+      "name": "source_ticket_id",
+      "label": "来源工单",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000071",
+    "fields": {
+      "field_type": 0,
+      "name": "created_time",
+      "label": "创建时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000072",
+    "fields": {
+      "field_type": 0,
+      "name": "updated_time",
+      "label": "更新时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000062"
+    }
+  }
+]

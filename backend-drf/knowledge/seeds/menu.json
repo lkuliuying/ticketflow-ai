@@ -1,0 +1,86 @@
+[
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000060",
+    "fields": {
+      "name": "TicketFlowKnowledge",
+      "path": "/ticketflow/knowledge/index",
+      "component": "ticketflow/knowledge/index",
+      "menu_type": 1,
+      "rank": 30,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000061",
+      "method": "",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000062"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000073",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000060",
+      "menu_type": 2,
+      "name": "list:TicketFlowKnowledge",
+      "rank": 1,
+      "path": "api/knowledge/articles$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000074",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000062",
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000075",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000060",
+      "menu_type": 2,
+      "name": "retrieve:TicketFlowKnowledge",
+      "rank": 2,
+      "path": "api/knowledge/articles/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000076",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000062",
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000077",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000060",
+      "menu_type": 2,
+      "name": "create:TicketFlowKnowledge",
+      "rank": 3,
+      "path": "api/knowledge/articles$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000078",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000062",
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000079",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000060",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowKnowledge",
+      "rank": 4,
+      "path": "api/knowledge/articles/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000080",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000062",
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  }
+]

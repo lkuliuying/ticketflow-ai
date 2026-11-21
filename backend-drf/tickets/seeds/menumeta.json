@@ -1,0 +1,95 @@
+[
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000011",
+    "fields": {
+      "title": "工单",
+      "icon": "ep:tickets",
+      "is_show_menu": false
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000036",
+    "fields": {
+      "title": "工单列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000038",
+    "fields": {
+      "title": "创建工单"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000040",
+    "fields": {
+      "title": "工单详情"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000042",
+    "fields": {
+      "title": "工单时间线"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000044",
+    "fields": {
+      "title": "工单流转"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000046",
+    "fields": {
+      "title": "指派工单"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000048",
+    "fields": {
+      "title": "工单回复"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000050",
+    "fields": {
+      "title": "采纳工单建议"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000052",
+    "fields": {
+      "title": "读取工单 AI 上下文"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000054",
+    "fields": {
+      "title": "工单看板"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000056",
+    "fields": {
+      "title": "异步导出工单"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000058",
+    "fields": {
+      "title": "导出工单"
+    }
+  }
+]

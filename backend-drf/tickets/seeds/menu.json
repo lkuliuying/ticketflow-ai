@@ -1,0 +1,212 @@
+[
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000010",
+    "fields": {
+      "name": "TicketFlowTickets",
+      "path": "/ticketflow/tickets/index",
+      "component": "ticketflow/tickets/index",
+      "menu_type": 1,
+      "rank": 30,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000011",
+      "method": "",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000035",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "list:TicketFlowTickets",
+      "rank": 1,
+      "path": "api/tickets$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000036",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012",
+        "14071ee3-6725-4fcc-962d-ad7898efa284",
+        "6a242e6a-abde-4e56-93e1-da841cbab5bf"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000037",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "create:TicketFlowTickets",
+      "rank": 2,
+      "path": "api/tickets$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000038",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012",
+        "14071ee3-6725-4fcc-962d-ad7898efa284",
+        "6a242e6a-abde-4e56-93e1-da841cbab5bf"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000039",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "retrieve:TicketFlowTickets",
+      "rank": 3,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000040",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012",
+        "14071ee3-6725-4fcc-962d-ad7898efa284",
+        "6a242e6a-abde-4e56-93e1-da841cbab5bf"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000041",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "timeline:TicketFlowTickets",
+      "rank": 4,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/timeline$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000042",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000043",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "transition:TicketFlowTickets",
+      "rank": 5,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/transition$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000044",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000045",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "assign:TicketFlowTickets",
+      "rank": 6,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/assign$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000046",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000047",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "comments:TicketFlowTickets",
+      "rank": 7,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/comments$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000048",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000049",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "aiMetadata:TicketFlowTickets",
+      "rank": 8,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/ai-metadata$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000050",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000051",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "context:TicketFlowTickets",
+      "rank": 9,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/ai-context$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000052",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000053",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "dashboard:TicketFlowTickets",
+      "rank": 10,
+      "path": "api/tickets/dashboard$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000054",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000055",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "exportAsync:TicketFlowTickets",
+      "rank": 11,
+      "path": "api/tickets/export-async$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000056",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000057",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "exportData:TicketFlowTickets",
+      "rank": 12,
+      "path": "api/tickets/export-data$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000058",
+      "model": []
+    }
+  }
+]

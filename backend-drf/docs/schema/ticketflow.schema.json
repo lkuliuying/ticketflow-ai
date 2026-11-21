@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TicketFlow DRF contract",
+  "$defs": {
+    "category": {"enum": ["ACCOUNT", "ACCESS", "NETWORK", "SERVICE", "OTHER"]},
+    "priority": {"enum": ["P0", "P1", "P2", "P3"]},
+    "status": {"enum": ["OPEN", "IN_PROGRESS", "PENDING_VERIFY", "CLOSED", "REOPENED"]},
+    "visibility": {"enum": ["PUBLIC", "INTERNAL"]},
+    "ticketCreate": {
+      "type": "object",
+      "required": ["title", "description", "category", "priority"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 200},
+        "description": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "category": {"$ref": "#/$defs/category"},
+        "priority": {"$ref": "#/$defs/priority"}
+      }
+    },
+    "ticketTransition": {
+      "type": "object",
+      "required": ["target_status", "version"],
+      "properties": {
+        "target_status": {"$ref": "#/$defs/status"},
+        "version": {"type": "integer", "minimum": 1},
+        "note": {"type": "string", "maxLength": 4000}
+      }
+    },
+    "knowledgeReference": {
+      "type": "object",
+      "required": ["article_id", "title", "excerpt"],
+      "properties": {
+        "article_id": {"type": "string", "format": "uuid"},
+        "title": {"type": "string", "maxLength": 200},
+        "excerpt": {"type": "string", "maxLength": 800}
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "model": "identity.deptinfo",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000059",
+    "fields": {
+      "code": "ticketflow_support",
+      "name": "工单支持",
+      "is_active": true
+    }
+  }
+]

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "roles": {
+    "default": [
+      "TicketFlowTickets",
+      "list:TicketFlowTickets",
+      "create:TicketFlowTickets",
+      "retrieve:TicketFlowTickets",
+      "timeline:TicketFlowTickets",
+      "transition:TicketFlowTickets",
+      "comments:TicketFlowTickets",
+      "dashboard:TicketFlowTickets"
+    ],
+    "ticketflow_requester": [
+      "TicketFlowTickets",
+      "list:TicketFlowTickets",
+      "create:TicketFlowTickets",
+      "retrieve:TicketFlowTickets",
+      "timeline:TicketFlowTickets",
+      "transition:TicketFlowTickets",
+      "comments:TicketFlowTickets",
+      "dashboard:TicketFlowTickets"
+    ],
+    "ticketflow_agent": [
+      "TicketFlowTickets",
+      "list:TicketFlowTickets",
+      "create:TicketFlowTickets",
+      "retrieve:TicketFlowTickets",
+      "timeline:TicketFlowTickets",
+      "transition:TicketFlowTickets",
+      "comments:TicketFlowTickets",
+      "aiMetadata:TicketFlowTickets",
+      "context:TicketFlowTickets",
+      "dashboard:TicketFlowTickets"
+    ],
+    "ticketflow_admin": [
+      "TicketFlowTickets",
+      "list:TicketFlowTickets",
+      "create:TicketFlowTickets",
+      "retrieve:TicketFlowTickets",
+      "timeline:TicketFlowTickets",
+      "transition:TicketFlowTickets",
+      "assign:TicketFlowTickets",
+      "comments:TicketFlowTickets",
+      "aiMetadata:TicketFlowTickets",
+      "context:TicketFlowTickets",
+      "dashboard:TicketFlowTickets",
+      "exportAsync:TicketFlowTickets",
+      "exportData:TicketFlowTickets",
+      "SystemExportRecord",
+      "list:SystemExportRecord",
+      "retrieve:SystemExportRecord",
+      "download:SystemExportRecord"
+    ]
+  }
+}

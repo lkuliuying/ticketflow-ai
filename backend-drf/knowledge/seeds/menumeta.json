@@ -1,0 +1,39 @@
+[
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000061",
+    "fields": {
+      "title": "工单知识库",
+      "icon": "ep:reading",
+      "is_show_menu": false
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000074",
+    "fields": {
+      "title": "知识库文章列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000076",
+    "fields": {
+      "title": "知识库文章详情"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000078",
+    "fields": {
+      "title": "创建知识库草稿"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000080",
+    "fields": {
+      "title": "更新知识库文章"
+    }
+  }
+]

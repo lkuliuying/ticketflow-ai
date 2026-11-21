@@ -1,0 +1,78 @@
+[
+  {
+    "model": "system.datadict",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000004",
+    "fields": {
+      "code": "ticketflow_category",
+      "label": "工单分类",
+      "label_en": "Ticket category",
+      "is_active": true,
+      "is_locked": true
+    }
+  },
+  {
+    "model": "system.datadict",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000005",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000004",
+      "value": "ACCOUNT",
+      "code": "ACCOUNT",
+      "label": "账户",
+      "label_en": "Account",
+      "is_active": true,
+      "sort": 0
+    }
+  },
+  {
+    "model": "system.datadict",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000006",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000004",
+      "value": "ACCESS",
+      "code": "ACCESS",
+      "label": "权限",
+      "label_en": "Access",
+      "is_active": true,
+      "sort": 1
+    }
+  },
+  {
+    "model": "system.datadict",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000007",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000004",
+      "value": "NETWORK",
+      "code": "NETWORK",
+      "label": "网络",
+      "label_en": "Network",
+      "is_active": true,
+      "sort": 2
+    }
+  },
+  {
+    "model": "system.datadict",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000008",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000004",
+      "value": "SERVICE",
+      "code": "SERVICE",
+      "label": "服务",
+      "label_en": "Service",
+      "is_active": true,
+      "sort": 3
+    }
+  },
+  {
+    "model": "system.datadict",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000009",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000004",
+      "value": "OTHER",
+      "code": "OTHER",
+      "label": "其他",
+      "label_en": "Other",
+      "is_active": true,
+      "sort": 4
+    }
+  }
+]
