@@ -148,6 +148,43 @@ export type AuthInfoResult = {
   };
 };
 
+type LoginWay = { enabled?: boolean; email?: boolean; sms?: boolean };
+
+/** `GET /api/identity/auth/capabilities` 的登录页能力清单 */
+export type LoginCapabilitiesResult = {
+  code: number;
+  detail: string;
+  data?: {
+    access?: boolean;
+    lifetime?: number;
+    basic?: LoginWay & {
+      captcha?: boolean;
+      token?: boolean;
+      encrypted?: boolean;
+    };
+    code?: LoginWay;
+    register?: LoginWay;
+    reset?: LoginWay;
+  };
+};
+
+/** 把按登录方式分组的能力清单折算成登录页使用的平铺结构 */
+export function toAuthInfo(
+  caps: LoginCapabilitiesResult["data"]
+): AuthInfoResult["data"] {
+  return {
+    access: Boolean(caps?.access),
+    lifetime: caps?.lifetime,
+    basic: Boolean(caps?.basic?.enabled),
+    captcha: Boolean(caps?.basic?.captcha),
+    token: Boolean(caps?.basic?.token),
+    encrypted: Boolean(caps?.basic?.encrypted),
+    reset: Boolean(caps?.reset?.enabled),
+    email: Boolean(caps?.code?.enabled && caps.code.email),
+    sms: Boolean(caps?.code?.enabled && caps.code.sms)
+  };
+}
+
 /** 邀请令牌预检：`state` = pending / accepted / invalid，不消费令牌；
  * `encrypted` 为传输加密开关（开启时激活提交的 password 须为密文） */
 export type InviteValidateResult = {
@@ -184,14 +221,19 @@ class AuthApi extends BaseApi {
     );
   };
 
-  /** 登录方式能力探测（data 仅在显式传入时作为请求体） */
-  loginAuth = (data?: object) => {
-    return this.request<AuthInfoResult>(
+  /**
+   * 登录方式能力探测。
+   *
+   * 后端已把登录页能力统一到 `GET /api/identity/auth/capabilities`（按登录方式分组），
+   * `GET /api/identity/login/basic` 不再提供；这里取新端点并折算成登录页沿用的平铺结构。
+   */
+  loginAuth = () => {
+    return this.request<LoginCapabilitiesResult>(
       "get",
       {},
-      data,
-      "/api/identity/login/basic"
-    );
+      undefined,
+      "/api/identity/auth/capabilities"
+    ).then(res => ({ ...res, data: toAuthInfo(res.data) }));
   };
 
   /** 短时效临时令牌（登录页与验证码重发等敏感步骤的前置凭据） */
@@ -305,7 +347,7 @@ export const loginBasicApi = (data?: object) => authApi.loginBasic(data);
 export const loginVerifyCodeApi = (data?: object) =>
   authApi.loginVerifyCode(data);
 
-export const loginAuthApi = (data?: object) => authApi.loginAuth(data);
+export const loginAuthApi = () => authApi.loginAuth();
 
 export const getTempTokenApi = () => authApi.tempToken();
 export const getCaptchaApi = () => authApi.captcha();
