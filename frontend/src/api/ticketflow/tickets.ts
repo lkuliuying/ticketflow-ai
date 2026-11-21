@@ -1,0 +1,195 @@
+import { BaseApi } from "@/api/base";
+import { isSuccess } from "@/api/types";
+import type { DetailResult, ListResult } from "@/api/types";
+
+export type TicketStatus =
+  "OPEN" | "IN_PROGRESS" | "PENDING_VERIFY" | "CLOSED" | "REOPENED";
+export type TicketPriority = "P0" | "P1" | "P2" | "P3";
+export type TicketSlaState = "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "MET";
+export type CommentVisibility = "PUBLIC" | "INTERNAL";
+
+export type TicketItem = {
+  pk: string;
+  number: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  submitter_id: number;
+  submitter_name: string;
+  assignee_id: number | null;
+  assignee_name: string | null;
+  department_id: string;
+  department_name: string;
+  sla_due_at: string;
+  sla_state: TicketSlaState;
+  first_response_at: string | null;
+  resolved_at: string | null;
+  ai_summary: string;
+  ai_tags: string[];
+  version: number;
+  created_time: string;
+  updated_time: string;
+};
+
+export type TimelineEntry = {
+  id: string;
+  created_time: string;
+  kind: "log" | "comment";
+  actor: string;
+  body: string;
+  action: string;
+  from_status: TicketStatus | null;
+  to_status: TicketStatus | null;
+  visibility: CommentVisibility | "";
+};
+
+export type TicketDetail = TicketItem & {
+  available_transitions: TicketStatus[];
+  timeline: { total: number; results: TimelineEntry[] };
+};
+
+export type TicketCreatePayload = {
+  title: string;
+  description: string;
+  category: string;
+  priority: TicketPriority;
+};
+
+export type TicketDashboard = {
+  status: Partial<Record<TicketStatus, number>>;
+  priority: Partial<Record<TicketPriority, number>>;
+  sla: Record<TicketSlaState, number>;
+};
+
+export type TicketComment = {
+  id: string;
+  body: string;
+  visibility: CommentVisibility;
+  author_id: number;
+  created_time: string;
+};
+
+function newIdempotencyKey(): string {
+  const raw =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}${Math.random().toString(16).slice(2)}`;
+  return raw.replace(/-/g, "");
+}
+
+/** 按字段名排序后的载荷指纹：同一份表单重试时取回同一个幂等键 */
+function payloadFingerprint(data: object): string {
+  const source = data as Record<string, unknown>;
+  return JSON.stringify(
+    Object.keys(source)
+      .sort()
+      .map(key => [key, source[key]])
+  );
+}
+
+class TicketApi extends BaseApi {
+  /**
+   * 未成功的建单请求保留各自的幂等键。网络中断或超时后用户再次提交同一份
+   * 内容，服务端会返回首次创建的工单而不是再建一张；成功后释放该键，之后
+   * 内容相同的新提交视为新工单。
+   */
+  private pendingKeys = new Map<string, string>();
+
+  idempotencyKeyFor = (data: object): string => {
+    const fingerprint = payloadFingerprint(data);
+    let key = this.pendingKeys.get(fingerprint);
+    if (!key) {
+      key = newIdempotencyKey();
+      this.pendingKeys.set(fingerprint, key);
+    }
+    return key;
+  };
+
+  create = <T = TicketItem>(data?: object) => {
+    const payload = data ?? {};
+    const fingerprint = payloadFingerprint(payload);
+    const key = this.idempotencyKeyFor(payload);
+    return this.request<DetailResult<T>>("post", {}, payload, undefined, {
+      headers: { "Idempotency-Key": key }
+    }).then(res => {
+      if (isSuccess(res)) this.pendingKeys.delete(fingerprint);
+      return res;
+    });
+  };
+
+  timeline = (pk: string, params?: { page?: number; size?: number }) => {
+    return this.request<ListResult<TimelineEntry>>(
+      "get",
+      params,
+      {},
+      `${this.baseApi}/${pk}/timeline`
+    );
+  };
+
+  transition = (
+    pk: string,
+    data: { target_status: TicketStatus; version: number; note?: string }
+  ) => {
+    return this.request<DetailResult<TicketItem>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/transition`
+    );
+  };
+
+  assign = (
+    pk: string,
+    data: { assignee_id: number | null; version: number }
+  ) => {
+    return this.request<DetailResult<TicketItem>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/assign`
+    );
+  };
+
+  comment = (
+    pk: string,
+    data: { body: string; visibility: CommentVisibility }
+  ) => {
+    return this.request<DetailResult<TicketComment>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/comments`
+    );
+  };
+
+  aiMetadata = (
+    pk: string,
+    data: {
+      version: number;
+      summary: string;
+      tags: string[];
+      category?: string;
+      priority?: TicketPriority;
+    }
+  ) => {
+    return this.request<DetailResult<TicketItem>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/ai-metadata`
+    );
+  };
+
+  dashboard = (params?: object) => {
+    return this.request<DetailResult<TicketDashboard>>(
+      "get",
+      params,
+      {},
+      `${this.baseApi}/dashboard`
+    );
+  };
+}
+
+export const ticketApi = new TicketApi("/api/tickets");

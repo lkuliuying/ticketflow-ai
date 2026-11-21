@@ -4410,3 +4410,28 @@ codegen:
   planDeleteFailed: 删除失败
   planImported: 方案已导入
   planImportFailed: 导入失败
+ticketflow:
+  number: 工单号
+  title: 标题
+  description: 描述
+  category: 分类
+  priority: 优先级
+  status: 状态
+  assignee_name: 处理人
+  submitter_name: 提交人
+  department_name: 部门
+  sla_due_at: SLA 截止
+  sla_state: SLA 状态
+  created_time: 创建时间
+  unassigned: 未指派
+  statusValue:
+    OPEN: 待处理
+    IN_PROGRESS: 处理中
+    PENDING_VERIFY: 待验收
+    CLOSED: 已关闭
+    REOPENED: 已重开
+  sla:
+    ON_TRACK: 正常
+    DUE_SOON: 即将超时
+    OVERDUE: 已超时
+    MET: 按时完成

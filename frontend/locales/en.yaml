@@ -4412,3 +4412,28 @@ codegen:
   planDeleteFailed: Delete failed
   planImported: Plans imported
   planImportFailed: Import failed
+ticketflow:
+  number: Ticket No.
+  title: Title
+  description: Description
+  category: Category
+  priority: Priority
+  status: Status
+  assignee_name: Assignee
+  submitter_name: Submitter
+  department_name: Department
+  sla_due_at: SLA Due
+  sla_state: SLA State
+  created_time: Created At
+  unassigned: Unassigned
+  statusValue:
+    OPEN: Open
+    IN_PROGRESS: In Progress
+    PENDING_VERIFY: Pending Verification
+    CLOSED: Closed
+    REOPENED: Reopened
+  sla:
+    ON_TRACK: On Track
+    DUE_SOON: Due Soon
+    OVERDUE: Overdue
+    MET: Met
