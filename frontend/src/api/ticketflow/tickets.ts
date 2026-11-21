@@ -45,7 +45,16 @@ export type TimelineEntry = {
   visibility: CommentVisibility | "";
 };
 
+/** 当前调用者对该工单的能力，前端据此显示操作，不自行推断权限 */
+export type TicketViewer = {
+  can_handle: boolean;
+  can_assign: boolean;
+  can_comment_internal: boolean;
+  can_archive: boolean;
+};
+
 export type TicketDetail = TicketItem & {
+  viewer: TicketViewer;
   available_transitions: TicketStatus[];
   timeline: { total: number; results: TimelineEntry[] };
 };

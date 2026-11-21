@@ -4414,6 +4414,86 @@ codegen:
   planImported: 方案已导入
   planImportFailed: 导入失败
 ticketflow:
+  kb:
+    title: 标题
+    category: 分类
+    tags: 标签
+    status: 状态
+    view_count: 浏览
+    updated_time: 更新时间
+    created_time: 创建时间
+    body: 正文
+    q: 关键字
+    tag: 标签
+    open: 文章详情
+    notFound: 文章不存在或无权查看
+    create: 新建文章
+    createTitle: 新建知识库文章
+    created: 草稿已创建
+    editTitle: 编辑文章
+    edit: 编辑
+    preview: 预览
+    saved: 文章已保存
+    archiveTitle: 从工单转存知识库草稿
+    archived: 已转存为知识库草稿，等待知识维护人员审阅发布
+    problem: 问题描述
+    solution: 解决方案
+    views: 浏览 {count} 次
+    fromTicket: 来源工单 {id}
+    titleRequired: 请填写标题
+    titleTooLong: 标题最多 200 个字符
+    categoryRequired: 请选择分类
+    bodyRequired: 请填写正文
+    tagsInvalid: 最多 12 个标签，每个不超过 64 个字符
+    tagsPlaceholder: 输入后回车添加标签
+    bodyPlaceholder: 支持 Markdown
+    statusValue:
+      DRAFT: 草稿
+      PUBLISHED: 已发布
+      ARCHIVED: 已归档
+    toStatus:
+      DRAFT: 退回草稿
+      PUBLISHED: 发布
+      ARCHIVED: 归档
+    statusChanged:
+      DRAFT: 已退回草稿
+      PUBLISHED: 已发布
+      ARCHIVED: 已归档
+  visibility:
+    PUBLIC: 对外回复
+    INTERNAL: 内部备注
+  action:
+    accept: 接单
+    resume: 恢复处理
+    reject: 验收退回
+    submitVerify: 提交验收
+    close: 确认解决
+    reopen: 重新打开
+  log:
+    CREATE: 创建工单
+    ASSIGN: 指派
+    TRANSITION: 状态流转
+    AI_METADATA: 采纳 AI 建议
+    OTHER: 操作
+  detail:
+    open: 工单详情
+    notFound: 工单不存在或无权查看
+    actions: 操作
+    noTransition: 当前状态下你没有可执行的流转
+    notePrompt: 备注（可选），会记录在时间线中
+    noteOptional: 可选
+    transitioned: 已{action}
+    assigneePlaceholder: 搜索并选择处理人
+    assign: 指派
+    assigned: 已指派
+    reply: 回复
+    replyPlaceholder: 输入回复内容
+    send: 发送
+    replied: 回复已发送
+    timeline: 时间线
+    noTimeline: 暂无记录
+    loadMore: 加载更多（剩余 {rest} 条）
+    archive: 转存为知识库草稿
   number: 工单号
   title: 标题
   description: 描述
