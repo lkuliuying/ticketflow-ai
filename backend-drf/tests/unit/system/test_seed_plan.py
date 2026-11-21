@@ -59,7 +59,7 @@ class TestPlatformPlan:
         assert len(plan.model_labels()) == len(expected)
 
     def test_layer_internal_order_follows_legacy(self):
-        """每层内部的模型顺序必须遵循历史拓扑序（menumeta → menu → … → modellabelfield）。"""
+        """每层内部须遵循历史模型序；字段白名单与字段树的多对多关系在装载后写入。"""
 
         plan = build_plan(discover())
         legacy = [model._meta.label_lower for model in LoadInitJsonCommand.model_names]
@@ -286,10 +286,11 @@ class TestValidate:
         # 2026-10 AI「测试连接」下沉 celery：新增 testResult 结果回读权限点（菜单 +1）
         # 2026-10 数据集元数据端点统一走父级 list 权限：移除运行期不命中的 meta 权限点（菜单 -1、权限点 -1）
         # 2026-10 知识块向量列收敛为 pgvector 单存储：字段树移除历史二进制列（字段 -1）
-        assert summary.totals["menu"] == 747
-        assert summary.totals["field"] == 2162
-        assert summary.totals["grant"] == 250
-        assert summary.permission_total == 668
+        # 工单与知识库：20 个菜单（含 17 个权限点）、34 个字段节点、47 条字段白名单。
+        assert summary.totals["menu"] == 767
+        assert summary.totals["field"] == 2196
+        assert summary.totals["grant"] == 297
+        assert summary.permission_total == 685
 
 
 class TestRows:

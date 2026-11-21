@@ -454,7 +454,7 @@
   "model": "system.menumeta",
   "pk": "d2431bc0-217a-49eb-a6fa-000000000091",
   "fields": {
-   "title": "TicketFlow",
+   "title": "menus.ticketflow",
    "icon": "ep:tickets",
    "is_show_menu": true
   }

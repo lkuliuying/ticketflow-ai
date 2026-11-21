@@ -25,15 +25,15 @@
       "order": 20
     },
     {
-      "name": "modellabelfield.json",
-      "model": "system.modellabelfield",
-      "kind": "generated",
-      "order": 30
-    },
-    {
       "name": "fieldpermission.json",
       "model": "system.fieldpermission",
       "kind": "contract",
+      "order": 50
+    },
+    {
+      "name": "modellabelfield.json",
+      "model": "system.modellabelfield",
+      "kind": "generated",
       "order": 60
     }
   ],

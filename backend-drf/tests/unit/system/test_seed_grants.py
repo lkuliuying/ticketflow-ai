@@ -27,6 +27,7 @@ from system.services.seeding import (
     discover,
     load_grants,
     merge_grants,
+    read_model_rows,
     validate_grants,
 )
 from system.services.seeding.grants import apply_grants
@@ -44,7 +45,16 @@ pytestmark = pytest.mark.django_db
 #  2026-10 读写共码收口：admin 补验证码风险规则 PUT 独立码 updateRules，301 → 302
 #  2026-10 种子授权补全（授权种子补全）：admin 补通讯录/我的管辖/标签/数据字典/模块管理
 #  5 页与对应权限点 + 部门管理员任命/我的管辖视角动作，302 → 338
-EXPECTED_ROLE_MENUS = {"admin": 338, "test": 87, "default": 33, "demo": 67}
+#  工单与知识库：默认角色增加 12 项；三个业务角色使用独立的菜单授权。
+EXPECTED_ROLE_MENUS = {
+    "admin": 338,
+    "test": 87,
+    "default": 45,
+    "demo": 67,
+    "ticketflow_requester": 12,
+    "ticketflow_agent": 16,
+    "ticketflow_admin": 24,
+}
 
 
 def _plan_grants():
@@ -56,21 +66,16 @@ def _plan_grants():
 
 class TestDeclarationIntegrity:
     def test_every_seed_role_keeps_its_menu_scale(self):
-        """拆分前后每个种子角色的菜单规模必须一致（一次性迁移的验收基线）。"""
+        """每个种子角色的授权并集必须符合已确认的菜单规模。"""
 
         merged = merge_grants(_plan_grants())
         assert {code: len(items) for code, items in merged.items()} == EXPECTED_ROLE_MENUS
 
     def test_declared_menus_all_exist(self):
         declarations = _plan_grants()
-        plan = build_plan(discover())
-        menu_names = set()
-        for spec in plan.all_specs():
-            if spec.model == "system.menu":
-                import json
-
-                menu_names.update(row["fields"]["name"] for row in json.loads(spec.path.read_text(encoding="utf-8")))
-        role_codes = set(EXPECTED_ROLE_MENUS)
+        menu_names = {row["fields"]["name"] for row in read_model_rows("system.menu")}
+        role_codes = {row["fields"]["code"] for row in read_model_rows("identity.userrole")}
+        assert role_codes == set(EXPECTED_ROLE_MENUS)
         assert validate_grants(declarations, menu_names=menu_names, role_codes=role_codes) == []
 
     def test_userrole_seed_no_longer_carries_m2m_menus(self):
@@ -81,11 +86,7 @@ class TestDeclarationIntegrity:
         （装配层已统一剥离 m2m），此处仅锁定源文件口径。
         """
 
-        import json
-
-        from system.services.seeding import platform_file
-
-        rows = json.loads(platform_file("userrole.json").read_text(encoding="utf-8"))
+        rows = read_model_rows("identity.userrole")
         assert rows
         assert all(not row["fields"].get("menu") for row in rows)
 
@@ -244,7 +245,7 @@ class TestApply:
 
 class TestEndToEnd:
     def test_load_init_json_restores_every_role_menu_set(self, seed_creator_user):
-        """端到端：装载内置种子后，4 个种子角色的菜单规模与改造前一致。
+        """端到端：装载内置种子后，各种子角色的菜单规模与快照一致。
 
         这是「授权从覆盖式 m2m 改为声明式并集」的最终验收——用户 role 行不再携带
         m2m，规模只能来自 grants 并集。

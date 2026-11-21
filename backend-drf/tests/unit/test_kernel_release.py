@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.paths import WORKFLOW_DIR
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MEMBER_DIR = REPO_ROOT / "packages" / "xadmin-common"
 INIT_FILE = MEMBER_DIR / "common" / "__init__.py"
@@ -32,9 +34,9 @@ PYPROJECT = MEMBER_DIR / "pyproject.toml"
 KERNEL_DOC = REPO_ROOT / "docs" / "architecture" / "kernel-package.md"
 RELEASE_DOC = REPO_ROOT / "docs" / "ops" / "kernel-release.md"
 RELEASE_SCRIPT = REPO_ROOT / "scripts" / "release_kernel.py"
-LINT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "lint.yml"
-PUBLISH_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "publish-kernel.yml"
-BUILD_IMAGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build-image.yml"
+LINT_WORKFLOW = WORKFLOW_DIR / "lint.yml"
+PUBLISH_WORKFLOW = WORKFLOW_DIR / "publish-kernel.yml"
+BUILD_IMAGE_WORKFLOW = WORKFLOW_DIR / "build-image.yml"
 CLIENT_BUILD_IMAGE_WORKFLOW = REPO_ROOT.parent / "xadmin-client" / ".github" / "workflows" / "build-image.yml"
 
 _VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.MULTILINE)
