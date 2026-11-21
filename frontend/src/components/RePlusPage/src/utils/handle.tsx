@@ -1,0 +1,289 @@
+import { isSuccess } from "@/api/types";
+import type { CSSProperties, Ref } from "vue";
+import { message } from "@/utils/message";
+import { invalidateMetaCache } from "@/utils/metaCache";
+import type { RecordType } from "plus-pro-components";
+import { useConfirm } from "@/hooks/useConfirm";
+import type { TableColumnRenderer } from "@pureadmin/table";
+import type { ApiResult, DetailResult } from "@/api/types";
+
+interface operationOptions {
+  t: (arg0: string, arg1?: object) => string;
+  /** 标准接口请求（`create`/`update` 返回 `DetailResult`，其余写操作返回 `BaseResult`，读取仅依赖 `code`/`detail`） */
+  apiReq?: Promise<ApiResult>;
+  showSuccessMsg?: boolean;
+  showFailedMsg?: boolean;
+  success?: (res?: DetailResult) => void;
+  failed?: (res?: DetailResult) => void;
+  exception?: (res?: DetailResult) => void;
+  requestEnd?: (options?: operationOptions) => void;
+}
+
+/**
+ * 单元格渲染作用域是否处于只读场景（回收站抽屉以 `readonly: true` 调用）。
+ *
+ * 回收站里的行已软删除，除操作列「恢复」外不应再提供任何可变更/可交互入口：
+ * 框架内建开关渲染器据此置灰，业务自定义交互单元格（下载链接 / 预览按钮 /
+ * 明细入口等）应在只读场景下降级为纯展示。该标记由 ReRecycleBin 附加，
+ * `@pureadmin/table` 的 TableColumnRenderer 未声明该位，故从 unknown 收窄读取。
+ */
+const isReadonlyCell = (scope: unknown) =>
+  (scope as { readonly?: boolean } | undefined)?.readonly === true;
+
+/**
+ * 请求接口封装
+ * @param options
+ */
+const handleOperation = (options: operationOptions) => {
+  const {
+    t,
+    apiReq = undefined,
+    showSuccessMsg = true,
+    showFailedMsg = true,
+    success,
+    failed,
+    exception,
+    requestEnd
+  } = options;
+
+  apiReq
+    ?.then((res: ApiResult) => {
+      if (isSuccess(res)) {
+        // 写操作成功即失效共享元数据缓存（菜单等全量列表）：避免「刚保存的改动
+        // 在其它页面的树/下拉里看不到」。命中缓存的下次读取会重新拉取。
+        invalidateMetaCache();
+        if (showSuccessMsg) {
+          message(res.detail ?? t("results.success"), { type: "success" });
+        }
+        if (success) {
+          success(res as DetailResult);
+        }
+      } else {
+        if (showFailedMsg) {
+          message(`${t("results.failed")}，${res.detail}`, { type: "error" });
+        }
+        if (failed) {
+          failed(res as DetailResult);
+        }
+      }
+    })
+    .catch(err => {
+      if (exception) {
+        exception(err);
+      }
+    })
+    .finally(() => {
+      if (requestEnd) {
+        requestEnd(options);
+      }
+    });
+};
+
+interface changeOptions {
+  t: (arg0: string, arg1?: object) => string;
+  updateApi: (pk: string | number, data: object) => Promise<ApiResult>; // 更新方法
+  switchLoadMap: Ref;
+  index: number; // 更新行索引
+  row: {
+    pk?: string | number;
+    id?: string | number;
+    [key: string]: unknown;
+  }; // 更新的表单数据
+  field: string; // 更新的字段
+  actionMsg: string;
+  msg?: string;
+  success?: (res?: DetailResult) => void;
+  failed?: (res?: DetailResult) => void;
+  requestEnd?: (options?: operationOptions) => void;
+}
+
+/** 确认弹窗走 dangerouslyUseHTMLString，插值（含服务端列名/文案）必须转义防注入 */
+const escapeHtml = (value: unknown): string =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    char =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[char] as string
+  );
+
+const onSwitchChange = (changeOptions: changeOptions) => {
+  const {
+    t,
+    updateApi,
+    switchLoadMap,
+    index,
+    row,
+    field,
+    actionMsg,
+    msg = "",
+    success,
+    failed,
+    requestEnd
+  } = changeOptions;
+  const confirm = useConfirm();
+  confirm(
+    `${t("buttons.operateConfirm", {
+      action: `<strong>${escapeHtml(actionMsg)}</strong>`,
+      message: `<strong style="color:var(--el-color-primary)">${escapeHtml(msg)}</strong>`
+    })}`,
+    {
+      dangerouslyUseHTMLString: true,
+      draggable: true
+    }
+  ).then(ok => {
+    if (!ok) {
+      // 取消/关闭：回滚开关（与请求异常同口径）
+      row[field] = row[field] === false;
+      return;
+    }
+    switchLoadMap.value[index] = Object.assign({}, switchLoadMap.value[index], {
+      loading: true
+    });
+    const updateData: Record<string, unknown> = {};
+    updateData[field] = row[field];
+    handleOperation({
+      t,
+      apiReq: updateApi((row?.pk ?? row?.id) as string | number, updateData),
+      requestEnd(options) {
+        switchLoadMap.value[index] = Object.assign(
+          {},
+          switchLoadMap.value[index],
+          {
+            loading: false
+          }
+        );
+        if (requestEnd) {
+          requestEnd(options);
+        }
+      },
+      success,
+      failed,
+      exception() {
+        row[field] = row[field] === false;
+      }
+    });
+  });
+};
+
+interface switchOptions {
+  t: (arg0: string, arg1?: object) => string;
+  updateApi: (pk: string | number, data: object) => Promise<ApiResult>; // 更新方法
+  switchLoadMap: Ref;
+  switchStyle: Ref<CSSProperties>;
+  field: string; // 更新的字段
+  actionMap?: object; // msg映射 {true:'发布',false:'未发布'}
+  activeMap?: object; // active映射 {true:'发布',false:'未发布'}
+  msg?: string;
+  actionMsg?: string;
+  disabled?: (row?: RecordType) => boolean;
+  success?: (res?: DetailResult) => void;
+  failed?: (res?: DetailResult) => void;
+  requestEnd?: (options?: operationOptions) => void;
+}
+
+const renderSwitch = (switchOptions: switchOptions) => {
+  const {
+    t,
+    switchLoadMap,
+    switchStyle,
+    updateApi,
+    field,
+    actionMap,
+    activeMap,
+    success,
+    failed,
+    requestEnd,
+    msg = undefined,
+    actionMsg = undefined,
+    disabled
+  } = switchOptions;
+
+  const defaultActionMap: Record<string, string> = {
+    true: t("labels.enable"),
+    false: t("labels.disable"),
+    ...(actionMap ?? {})
+  };
+
+  const defaultActiveMap: Record<string, boolean> = {
+    true: true,
+    false: false,
+    ...(activeMap ?? {})
+  };
+  return (scope: TableColumnRenderer) => (
+    <el-switch
+      size={scope.props.size === "small" ? "small" : "default"}
+      loading={switchLoadMap.value[scope.index]?.loading}
+      v-model={scope.row[field]}
+      active-value={defaultActiveMap["true"]}
+      inactive-value={defaultActiveMap["false"]}
+      active-text={defaultActionMap["true"]}
+      inactive-text={defaultActionMap["false"]}
+      inline-prompt
+      aria-label={String(scope.column?.label ?? t("labels.enable"))}
+      disabled={isReadonlyCell(scope) || Boolean(disabled?.(scope.row))}
+      style={switchStyle.value}
+      onChange={() => {
+        onSwitchChange({
+          t,
+          msg: msg ?? scope.column?.label,
+          field,
+          updateApi,
+          switchLoadMap,
+          row: scope.row,
+          index: scope.index,
+          actionMsg:
+            actionMsg ??
+            defaultActionMap[String(defaultActiveMap[scope.row[field]])],
+          success,
+          failed,
+          requestEnd
+        });
+      }}
+    />
+  );
+};
+
+interface booleanTagOptions {
+  t: (arg0: string, arg1?: object) => string;
+  tagStyle: Ref<(status: boolean) => CSSProperties>;
+  field: string; // 字段
+  actionMap?: object; // msg映射 {true:'发布',false:'未发布'}
+  disabled?: boolean;
+}
+
+const renderBooleanTag = (booleanTagOptions: booleanTagOptions) => {
+  const { t, tagStyle, field, actionMap } = booleanTagOptions;
+  const defaultActionMap: Record<string, string> = {
+    true: t("labels.enable"),
+    false: t("labels.disable"),
+    ...actionMap
+  };
+  return (scope: TableColumnRenderer) => (
+    <el-tag size={scope.props.size} style={tagStyle.value(scope.row[field])}>
+      {defaultActionMap[scope.row[field]]}
+    </el-tag>
+  );
+};
+
+// 弹层（openDialogDrawer）与导入导出（handleExportData/handleImportData）已按职责
+// 拆分至 handle-dialog / handle-record，此处仅 re-export 保持既有导入路径不变
+export { openDialogDrawer } from "./handle-dialog";
+export { handleExportData, handleImportData } from "./handle-record";
+export type {
+  formDialogDrawerOptions,
+  DialogFormInstance
+} from "./handle-dialog";
+export type { exportDataOptions, importDataOptions } from "./handle-record";
+export {
+  renderSwitch,
+  onSwitchChange,
+  handleOperation,
+  renderBooleanTag,
+  isReadonlyCell
+};
+export type { changeOptions, switchOptions, operationOptions };

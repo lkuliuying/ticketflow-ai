@@ -1,0 +1,50 @@
+.idea/
+**/__pycache__/*
+*.mo
+__pycache__/*
+data/*
+!data/logs/
+data/logs/*
+!data/logs/task/
+data/logs/task/*
+!data/logs/task/.gitkeep
+!data/upload/
+data/upload/*
+!data/upload/.gitkeep
+tmp/*
+!tmp/.gitkeep
+static/*
+upload/*
+packages/xadmin-common/common/utils/ip/geoip/GeoLite2-City.mmdb
+packages/xadmin-common/common/utils/ip/ipip/ipipfree.ipdb
+config.yml
+# 部署凭据载体（compose 强制注入，见 .env.example 与 ops/dev_up.sh）
+.env
+.env.*
+!.env.example
+# AI 辅助开发过程产物（探针脚本/调试截图），不入库
+_delete/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.DS_Store
+
+# k6 压测结果（T3.1 性能基线，不入库）
+loadtest/results/
+loadtest/k6/results
+
+# 监控栈运行期产物（指标令牌 + TSDB/面板数据卷，见 ops/monitoring/）
+ops/monitoring/metrics_token
+monitoring-data/
+
+# mypy 增量缓存
+.mypy_cache/
+
+# 测试报告产物（junit.xml 等，CI 上传 artifact，不入库）
+test-reports/
+
+# 内核分发包构建产物（scripts/release_kernel.py build / uv build --package xadmin-common）
+dist/

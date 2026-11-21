@@ -1,0 +1,43 @@
+@use "tokens/breakpoints" as bp;
+@use "tokens/primitives";
+@use "tokens/semantic";
+@use "tokens/presets";
+@use "transition";
+@use "element-plus";
+@use "sidebar";
+@use "header";
+@use "dark";
+
+/* 窄屏收紧内容留白：移动端视口小，24px 留白会把内容压成窄条 */
+@include bp.below("md") {
+  :root {
+    --content-gap: var(--space-3);
+    --panel-pad-y: var(--space-4);
+    --panel-pad-x: var(--space-3);
+  }
+}
+
+/* 灰色模式 */
+.html-grey {
+  filter: grayscale(100%);
+}
+
+/* 色弱模式 */
+.html-weakness {
+  filter: invert(80%);
+}
+
+/* 轻微缩小，再恢复原状的平滑缩放动画 */
+@keyframes pure-scale-bounce {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(0.9);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

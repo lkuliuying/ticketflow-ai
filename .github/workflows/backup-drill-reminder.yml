@@ -39,7 +39,7 @@ jobs:
             const body = [
               `## 季度备份恢复演练（${year} ${quarter}）`,
               "",
-              "按 [docs/ops/deployment.md §3.1](../blob/main/docs/ops/deployment.md) 执行：",
+              "按 [docs/ops/deployment.md §3.1](../blob/main/backend-drf/docs/ops/deployment.md) 执行：",
               "",
               "- [ ] db-backup 容器 healthy 且 xadmin-db-backups/ 有当日 .sql.gz（6h 一备）",
               "- [ ] BACKUP_REMOTE_TYPE/TARGET 已配置，异地目标位于独立故障域",

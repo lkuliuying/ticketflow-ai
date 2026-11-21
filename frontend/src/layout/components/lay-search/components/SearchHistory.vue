@@ -1,0 +1,204 @@
+<script lang="ts" setup>
+import SearchHistoryItem from "./SearchHistoryItem.vue";
+import type { dragItem, optionsItem, Props } from "../types";
+import { useEpThemeStoreHook } from "@/store/modules/epTheme";
+import { delay, isArray, useResizeObserver } from "@pureadmin/utils";
+import { computed, getCurrentInstance, nextTick, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useSortable } from "@/hooks/useSortable";
+
+const historyRef = ref();
+const innerHeight = ref();
+/** 判断是否停止鼠标移入事件处理 */
+const stopMouseEvent = ref(false);
+const { t } = useI18n();
+const emit = defineEmits<{
+  enter: [];
+  drag: [val: dragItem];
+  delete: [val: optionsItem];
+  collect: [val: optionsItem];
+  "update:value": [val: string];
+}>();
+const instance = getCurrentInstance()!;
+const props = withDefaults(defineProps<Props>(), {});
+
+const itemStyle = computed(() => {
+  return (item: optionsItem) => {
+    return {
+      background:
+        item?.path === active.value ? useEpThemeStoreHook().epThemeColor : "",
+      color: item.path === active.value ? "var(--el-color-white)" : "",
+      fontSize: item.path === active.value ? "16px" : "14px"
+    };
+  };
+});
+
+const titleStyle = computed(() => {
+  return {
+    color: useEpThemeStoreHook().epThemeColor,
+    fontWeight: 500
+  };
+});
+
+const active = computed({
+  get() {
+    return props.value;
+  },
+  set(val: string) {
+    emit("update:value", val);
+  }
+});
+
+watch(
+  () => props.value,
+  newValue => {
+    if (newValue) {
+      if (stopMouseEvent.value) {
+        delay(100).then(() => (stopMouseEvent.value = false));
+      }
+    }
+  }
+);
+
+const historyList = computed(() => {
+  return props.options.filter(item => item.type === "history");
+});
+
+const collectList = computed(() => {
+  return props.options.filter((item: optionsItem) => item.type === "collect");
+});
+
+function handleCollect(item: optionsItem) {
+  emit("collect", item);
+}
+
+function handleDelete(item: optionsItem) {
+  stopMouseEvent.value = true;
+  emit("delete", item);
+}
+
+/** 鼠标移入 */
+async function handleMouse(item: optionsItem) {
+  if (!stopMouseEvent.value) active.value = item.path;
+}
+
+function handleTo() {
+  emit("enter");
+}
+
+function resizeResult() {
+  // el-scrollbar max-height="calc(90vh - 140px)"
+  innerHeight.value = window.innerHeight - window.innerHeight / 10 - 140;
+}
+
+useResizeObserver(historyRef, resizeResult);
+
+function handleScroll(index: number) {
+  const curInstance = instance?.proxy?.$refs[`historyItemRef${index}`];
+  if (!curInstance) return 0;
+  const curRef = isArray(curInstance)
+    ? (curInstance[0] as ElRef)
+    : (curInstance as ElRef);
+  const scrollTop = (curRef?.offsetTop ?? 0) + 128; // 128 两个history-item（56px+56px=112px）高度加上下margin（8px+8px=16px）
+  return scrollTop > innerHeight.value ? scrollTop - innerHeight.value : 0;
+}
+
+const handleChangeIndex = (evt: {
+  oldIndex?: number;
+  newIndex?: number;
+}): void => {
+  emit("drag", {
+    oldIndex: evt.oldIndex ?? 0,
+    newIndex: evt.newIndex ?? 0
+  });
+};
+
+const { init: initCollectSortable } = useSortable(
+  () => document.querySelector(".collect-container") as HTMLElement | null,
+  {
+    animation: 160,
+    onStart: ({ evt }) => {
+      evt.item.style.cursor = "move";
+    },
+    onEnd: ({ evt }) => {
+      evt.item.style.cursor = "pointer";
+    },
+    onUpdate: ({ oldIndex, newIndex }) =>
+      handleChangeIndex({ oldIndex, newIndex })
+  }
+);
+
+watch(
+  collectList,
+  val => {
+    if (val.length > 1) {
+      nextTick(() => {
+        initCollectSortable();
+        resizeResult();
+      });
+    }
+  },
+  { deep: true, immediate: true }
+);
+defineExpose({ handleScroll });
+</script>
+
+<template>
+  <div ref="historyRef" class="history">
+    <template v-if="historyList.length">
+      <div :style="titleStyle">{{ t("layout.searchHistory") }}</div>
+      <div
+        v-for="(item, index) in historyList"
+        :key="item.path"
+        :ref="'historyItemRef' + index"
+        :style="itemStyle(item)"
+        class="history-item dark:bg-fill-subtle"
+        @click="handleTo"
+        @mouseenter="handleMouse(item)"
+      >
+        <SearchHistoryItem
+          :item="item"
+          @delete-item="handleDelete"
+          @collect-item="handleCollect"
+        />
+      </div>
+    </template>
+    <template v-if="collectList.length">
+      <div :style="titleStyle">
+        {{ t("layout.favorite")
+        }}{{ collectList.length > 1 ? t("layout.dragSort") : "" }}
+      </div>
+      <div class="collect-container">
+        <div
+          v-for="(item, index) in collectList"
+          :key="item.path"
+          :ref="'historyItemRef' + (index + historyList.length)"
+          :style="itemStyle(item)"
+          class="history-item dark:bg-fill-subtle"
+          @click="handleTo"
+          @mouseenter="handleMouse(item)"
+        >
+          <SearchHistoryItem :item="item" @delete-item="handleDelete" />
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
+<style lang="scss" scoped>
+.history {
+  padding-bottom: 12px;
+
+  &-item {
+    display: flex;
+    align-items: center;
+    height: 56px;
+    padding: 14px;
+    margin: 8px auto 10px;
+    cursor: pointer;
+    border: 0.1px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
+    transition: font-size var(--duration-fast) var(--ease-standard);
+  }
+}
+</style>

@@ -1,0 +1,104 @@
+import { useI18n } from "vue-i18n";
+import { loginLogApi } from "@/api/audit/logs/login";
+import { useRouter } from "vue-router";
+import { usePageAuth } from "@/router/utils";
+import { reactive, shallowRef, type Ref } from "vue";
+import { goUserDetail, usePublicHooks } from "@/views/system/hooks";
+import {
+  type PageTableColumn,
+  type OperationProps,
+  renderBooleanTag,
+  handleOperation,
+  formatPageColumns
+} from "@/components/RePlusPage";
+import { useRenderIcon } from "@/components/ReIcon/src/hooks";
+import Logout from "~icons/ri/logout-circle-r-line";
+
+export function useLoginLog(tableRef: Ref) {
+  const { t } = useI18n();
+  const api = reactive(loginLogApi);
+
+  const auth = usePageAuth(["logout"]);
+
+  const router = useRouter();
+  const { tagStyle } = usePublicHooks();
+
+  const operationButtonsProps = shallowRef<OperationProps>({
+    width: 180,
+    buttons: [
+      {
+        text: t("systemUser.logout"),
+        code: "logout",
+        props: (row, button) => {
+          const disabled = row?.online !== true;
+          return {
+            ...(button?._?.props ?? {
+              icon: useRenderIcon(Logout),
+              plain: true,
+              link: true
+            }), // button?._ 这个表示之前老的按钮信息
+            ...{ disabled, type: disabled ? "default" : "danger" }
+          };
+        },
+        onClick: ({ row }) => {
+          handleOperation({
+            t,
+            apiReq: api.logout(row.pk, {}),
+            success() {
+              tableRef.value.handleGetData();
+            }
+          });
+        },
+        show: auth.logout
+      }
+    ]
+  });
+  const listColumnsFormat = (columns: PageTableColumn[]) =>
+    formatPageColumns(columns, {
+      creator: column => {
+        column["cellRenderer"] = ({ row }) => (
+          <el-link onClick={() => onGoDetail(row)}>
+            {row.creator?.username ? row.creator?.username : "/"}
+          </el-link>
+        );
+      },
+      status: column => {
+        column["cellRenderer"] = renderBooleanTag({
+          t,
+          tagStyle,
+          field: column.prop as string,
+          actionMap: { true: t("labels.success"), false: t("labels.failed") }
+        });
+      },
+      online: column => {
+        column["cellRenderer"] = renderBooleanTag({
+          t,
+          tagStyle,
+          field: column.prop as string,
+          // 三元语义与后端 UserLoginLogSerializer.get_online 对齐：
+          // -1 = 不适用（非 WS 登录或无 creator），True/False = WS 会话是否在线
+          actionMap: {
+            true: t("labels.online"),
+            false: t("labels.offline"),
+            "-1": "/"
+          }
+        });
+      }
+    });
+
+  /** 行内 `creator` 嵌套字段（点击跳转 SystemUser 详情） */
+  type CreatorRow = {
+    creator?: { username?: string; pk?: number | string };
+  };
+
+  function onGoDetail(row: CreatorRow) {
+    goUserDetail(router, row?.creator?.pk);
+  }
+
+  return {
+    api,
+    auth,
+    listColumnsFormat,
+    operationButtonsProps
+  };
+}

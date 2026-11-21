@@ -6,13 +6,17 @@ on:
       - 'main'
       - 'dev'
     paths:
-      - 'uv.lock'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - 'Dockerfile-base'
+      - 'backend-drf/uv.lock'
+      - 'backend-drf/pyproject.toml'
+      - 'backend-drf/requirements.txt'
+      - 'backend-drf/Dockerfile-base'
       # 工作流自身变更也触发一次，验证构建与回写逻辑
       - '.github/workflows/build-base-image.yml'
   workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: backend-drf
 
 jobs:
   build-and-push-base-image:
@@ -50,7 +54,8 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          file: Dockerfile-base
+          context: backend-drf
+          file: backend-drf/Dockerfile-base
           tags: nineaiyu/${{ env.REPO }}-base:${{ env.IMAGE_TAG }}
 
       - name: Update Dockerfile

@@ -66,4 +66,4 @@ jobs:
             echo "首次发布（无前置 tag），跳过变更同步"
             exit 0
           fi
-          python3 scripts/sync_release_notes.py "$PREV_TAG" "$TAG"
+          python3 backend-drf/scripts/sync_release_notes.py "$PREV_TAG" "$TAG"

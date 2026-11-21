@@ -20,15 +20,6 @@ jobs:
     steps:
       - name: Checkout server（本仓，含校验脚本与真源）
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          path: xadmin-server
-
-      - name: Checkout client
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          repository: nineaiyu/xadmin-client
-          ref: dev
-          path: xadmin-client
 
       - name: Checkout docs
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -62,16 +53,19 @@ jobs:
       - name: Install client dependencies
         # 快档其余检查只用 python / node / bash 内置能力；i18n 词条门禁的
         # check-i18n-keys.mjs 依赖 yaml 解析器，需先装前端依赖。
-        working-directory: xadmin-client
+        working-directory: frontend
         run: pnpm install --frozen-lockfile
 
       - name: Run workspace health (fast tier)
         # 该步骤只报告不阻断：其退出码写入 summary，健康漂移由 issue 跟踪。
         id: health
         continue-on-error: true
+        env:
+          XADMIN_SERVER_DIR: ${{ github.workspace }}/backend-drf
+          XADMIN_CLIENT_DIR: ${{ github.workspace }}/frontend
         run: |
           set +e
-          python xadmin-server/scripts/workspace_health.py \
+          python backend-drf/scripts/workspace_health.py \
             --workspace-root "$GITHUB_WORKSPACE" \
             --tier fast \
             --allow-missing xadmin-web \

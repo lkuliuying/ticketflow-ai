@@ -25,6 +25,10 @@ concurrency:
   group: perf-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: backend-drf
+
 jobs:
   perf:
     runs-on: ubuntu-latest
@@ -78,6 +82,8 @@ jobs:
         # 版本由 pyproject.toml 的 [tool.uv].required-version 决定；缓存按 uv.lock 命中
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
+          working-directory: backend-drf
+          cache-dependency-glob: backend-drf/uv.lock
           enable-cache: true
 
       - name: Install dependencies
@@ -115,7 +121,7 @@ jobs:
           exit 1
 
       - name: Run k6 suites
-        working-directory: loadtest/k6
+        working-directory: backend-drf/loadtest/k6
         run: |
           # init_data 建的超管是 xadmin（不是 admin）：压测账号必须与种子对齐，
           # 否则登录全量 401、http_req_failed 阈值必然击穿
@@ -142,6 +148,6 @@ jobs:
         with:
           name: perf-results
           path: |
-            loadtest/k6/results/
-            perf-report.md
+            backend-drf/loadtest/k6/results/
+            backend-drf/perf-report.md
           if-no-files-found: warn

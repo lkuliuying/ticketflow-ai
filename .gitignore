@@ -13,6 +13,11 @@ config.yml
 .env
 .env.*
 !.env.example
+# xadmin-client 上游跟踪的公开 Vite 构建配置
+!/frontend/.env
+!/frontend/.env.development
+!/frontend/.env.production
+!/frontend/.env.staging
 # AI 辅助开发过程产物（探针脚本/调试截图），不入库
 _delete/
 .venv/

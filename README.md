@@ -1,133 +1,43 @@
-# xadmin-server
+# TicketFlow AI
 
-xadmin-基于Django+vue3的rbac权限管理系统
+TicketFlow AI 是基于 xadmin 的智能工单与知识库协作平台。
 
-前端 [xadmin-client](https://github.com/nineaiyu/xadmin-client)
+| 目录 | 内容 |
+| --- | --- |
+| [backend-drf](backend-drf/) | Django / DRF 业务、权限、Celery 任务和后端测试 |
+| [frontend](frontend/) | xadmin-client 的 Vue 3 / Element Plus 界面 |
+| `service-fastapi/` | Phase 3 的异步 AI 服务 |
+| `deploy/` 和 `tests/` | Phase 5 的统一入口、验收和压测 |
 
-> **版本 5.0.2**：变更总览见 [CHANGELOG.md](CHANGELOG.md)；4.x → 5.0 升级步骤见
-> [docs/ops/upgrade-5.0.md](docs/ops/upgrade-5.0.md)（迁移链收敛为初始迁移 +
-> `upgrade_ledger` 账本认领，**4.2.5 起可原地升级**，更早的库走清库重建）。
-> 前后端**必须同版本发布**（CI 三方校验 `server/const.py` ↔ `xadmin-client/package.json` ↔ 发布 tag）。
+以 [Phase 1 设计评审](backend-drf/docs/plans/ticketflow-phase-1.md) 为实现基线。后端的开发与测试命令在 `backend-drf/` 执行，前端命令在 `frontend/` 执行。
 
-### 在线预览（线上演示）
+## Phase 2 后端启动与验证
 
-[https://xadmin.dvcloud.xin/](https://xadmin.dvcloud.xin/)
-账号密码：admin/admin123（线上演示账号；本地初始化的账号为 `xadmin`，见下方快速开始）
+后端底座依赖 Linux 文件锁。在 Windows 上从 WSL 或 Docker 运行。开发配置沿用 [config_example.yml](backend-drf/config_example.yml)，`XADMIN_APPS` 包含 `tickets` 和 `knowledge`。首次启动前填写数据库、Redis 和站点配置。若需要按工单分类路由到其他部门，在配置中填写部门 UUID。
 
-## 快速开始
-
-```shell
-# 方式一：Docker 一键体验（起后端全栈 + 幂等初始化 + 启动前端；需 Docker 与 Node/pnpm）
-bash ops/dev_up.sh              # --with-demo 追加演示数据；--backend-only 仅起后端；--hot 热加载（改后端代码自动重载）；--help 查看帮助
+```bash
+cd backend-drf
+bash ops/dev_up.sh --backend-only --hot
+docker compose exec server python manage.py load_init_json --check
+docker compose restart server celery-worker celery-heavy celery-beat
+curl -fsS http://127.0.0.1:8896/api/common/api/health
 ```
 
-- 浏览器打开 <http://127.0.0.1:8848>，账号 `xadmin`，初始密码在初始化输出中**仅打印一次**；
-- 停止后端：`bash ops/dev_down.sh`；重复执行是幂等的（升级后同样适用）；
-- 首次运行会自动构建镜像（数分钟）。
+种子会建立默认支持部门以及工单提交人、处理人和管理员角色。默认角色也可提交工单和阅读已发布的知识库。为处理人设置对应部门，即可用不同角色账号验证数据隔离。
 
-```shell
-# 方式二：本机源码启动（Python 3.14+，需自备数据库（PostgreSQL/MySQL/SQLite）与 Redis）
-uv sync --all-groups          # 依赖以 uv.lock 为准，见下方「依赖管理」
-#   无 uv 时：python3.14 -m venv .venv && source .venv/bin/activate
-#             && pip install -r requirements.txt -r requirements-dev.txt
-bash ops/init_config.sh            # 生成 config.yml（密钥/凭据随机化）；可跳过：不创建时用内置默认配置并自动生成密钥
-uv run python manage.py migrate    # 走 uv 时命令加 `uv run`；或 source .venv/bin/activate 后直接用 python
-uv run python ops/init_data.py   # 幂等；--with-demo / --skip-ip-db / --admin-password
-uv run python manage.py start all -d
+默认 SLA 时限分别为 P0 2 小时、P1 8 小时、P2 24 小时、P3 72 小时，距截止 30 分钟开始记录预警。
+
+```bash
+docker compose -f compose.test.yml up -d --wait
+uv sync --all-groups
+uv run pytest tests/integration/tickets tests/unit/system/test_seed_ownership.py -n 0
 ```
 
-超管初始密码：`--admin-password` 或环境变量 `XADMIN_ADMIN_PASSWORD` 显式指定，未设置时随机生成并仅打印一次。
+### 面试复盘
 
-### 依赖管理（pyproject + uv 工作区）
+- **工单并发流转**。行锁串行化写操作，版本号判定客户端读到的状态是否过时。状态、版本和审计日志在同一事务提交。
+- **建单幂等**。Redis 记录短时占位与完成结果，PostgreSQL 唯一约束是并发和缓存丢失后的防重依据。调用方可用同一个键重试。
+- **查询与授权**。角色决定可执行动作，QuerySet 统一限制数据范围。详情预取可见的日志与评论，导出任务按照提交人的当前权限重放筛选。
+- **SLA 任务**。Beat 每分钟触发扫描，告警用工单、SLA 轮次和告警类型做唯一约束。重新打开的工单开始新的 SLA 轮次。
 
-- **事实源**：根 `pyproject.toml`（运行依赖 + `dev` 组）与 `uv.lock`（锁文件，入库）；
-  **框架内核（`common`）是工作区成员**——打包元数据在 `packages/xadmin-common/pyproject.toml`，
-  源码在 `packages/xadmin-common/common/`，根项目以 `workspace + editable` 消费（改内核源码即时生效）；
-  分发名 `xadmin-common`，独立构建 `uv build --package xadmin-common`，宿主接线与 settings 契约见
-  [docs/architecture/kernel-package.md](docs/architecture/kernel-package.md)；
-- **安装路径**（`uv.lock` 是版本唯一依据）：本地开发 `uv sync --all-groups`；CI
-  `uv sync --locked` + `uv lock --check`（见 `.github/workflows/`）；**容器构建**
-  `uv pip install -r requirements*.txt --index-url ${PIP_MIRROR}`（见 `Dockerfile-base` /
-  `Dockerfile-dev`）。容器为何不用 `uv sync --frozen`：`--frozen` 不重新解析，uv 会直接用
-  `uv.lock` 里固化的 `files.pythonhosted.org`（PyPI 官方 CDN）地址下载，**绕过 PIP_MIRROR**
-  （[astral-sh/uv#19625](https://github.com/astral-sh/uv/issues/19625)）——国内直连官方 CDN 只有
-  10 KB/s 级、走镜像源可达 10+ MB/s。这也是 `requirements*.txt` 的第一个硬用途：镜像源场景的
-  安装输入（与 `uv.lock` 的一致性由 `tests/unit/test_dependency_manifest.py` 守护）；
-- **`requirements.txt` / `requirements-dev.txt` 是 `uv export` 的导出产物**（请勿手工编辑，
-  改依赖 = 改 pyproject 后重新导出）。它们不再是安装依据，保留给三类固定用途：pip 生态安全扫描
-  （`pip-audit -r requirements.txt`）、无 uv 环境的手工与离线安装、国产化平台版本适配
-  （见 `docs/ops/deployment.md` §7）；
-- **uv 版本下界**：`[tool.uv].required-version`（CI 的 `astral-sh/setup-uv` 依此选版本；
-  容器内由 `ARG UV_VERSION` 固定，两处同源）：
-
-```shell
-uv sync --all-groups              # 创建/同步 .venv（含 dev 组；内核以 editable 安装）
-uv lock                           # 变更依赖（含内核成员 pyproject）后刷新 uv.lock（入库，保证解析可复现）
-# 重新导出产物（pyproject.toml 头部注释同口径）：
-uv export --no-hashes --no-emit-project --no-emit-workspace --no-group dev --no-annotate -o requirements.txt
-uv export --no-hashes --no-emit-project --no-emit-workspace --only-group dev --no-annotate -o requirements-dev.txt
-```
-
-- **可选依赖**（对象存储后端）：声明于两处 `[project.optional-dependencies].storage`（根项目与内核
-  成员同口径），默认不装，未装时文件链路回退本地，启用方式 `uv sync --extra storage` 或
-  `pip install django-storages boto3`（详见 `docs/ops/storage.md`）；
-- **守护**（`tests/unit/test_dependency_manifest.py`，纯解析、不依赖网络）：pyproject ↔ 产物 ↔ uv.lock
-  三方一致（工作区成员以路径形态存在、经 `--no-emit-workspace` 从产物剔除）、工作区骨架
-  （成员 editable 锁定 / wheel 只收内核包本体 / 内核依赖全部落在运行产物中）、容器与 CI 的安装方式
-  未回退到产物、uv 版本同源、`.dockerignore` 排除宿主环境；本机存在 uv 时额外校验「产物与导出逐行一致」。
-
-## 开发部署文档
-
-**优先查阅本仓库文档中心：[docs/README.md](docs/README.md)**（环境搭建、架构总览、三层权限、部署运维 runbook、ADR）
-
-- 本地部署 / Docker 部署 / 升级回滚 / 国产化适配：[docs/ops/deployment.md](docs/ops/deployment.md)
-- 常见故障排查：[docs/ops/runbook.md](docs/ops/runbook.md)
-- 外站在线文档（补充资料）：[https://docs.dvcloud.xin/](https://docs.dvcloud.xin/)
-
-### [Centos 9 Stream 安装部署](https://docs.dvcloud.xin/guide/installation-local.html)
-
-### [Docker 容器化部署](https://docs.dvcloud.xin/guide/installation-docker.html)
-
-# 附录
-
-⚠️ Windows上面无法正常运行celery flower，导致任务监控无法正常使用，请使用Linux环境开发部署
-
-## 启动程序(启动之前必须配置好Redis和数据库)
-
-### A.一键执行命令【不支持windows平台，如果是Windows，请使用 手动执行命令】
-
-```shell
-python manage.py start all -d  # -d 参数是后台运行，如果去掉，则前台运行
-```
-
-### B.手动执行命令
-
-> 日常运行推荐直接用上面的 A 一键命令；以下为拆解示意，各服务参数（端口 / 地址 / 认证）以
-> `packages/xadmin-common/common/management/commands/services/` 下的定义为准。
-
-#### 1.api服务
-
-```shell
-python manage.py runserver 0.0.0.0:8896
-```
-
-#### 2.定时任务
-
-```shell
-python -m celery -A server beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler --max-interval 60
-python -m celery -A server worker -P threads -l INFO -c 10 -Q celery --heartbeat-interval 10 -n celery@%h --without-mingle
-```
-
-#### 3.任务监控[windows可能会异常]
-
-```shell
-python -m celery -A server flower -logging=info --url_prefix=api/flower --auto_refresh=False
-```
-
-> 地址与端口由 `config.yml` 的 `CELERY_FLOWER_HOST` / `CELERY_FLOWER_PORT` 决定（未配置认证时仅允许绑定
-> 127.0.0.1，见 `packages/xadmin-common/common/management/commands/services/services/flower.py`）。
-```
-
-## 捐赠
-
-如果你觉得这个项目帮助到了你，可以 [star](https://github.com/nineaiyu/xadmin-server) 表示鼓励；捐赠方式与捐赠者权益见[捐赠页](https://docs.dvcloud.xin/donate.html)。
+底座来源为 [xadmin-server](https://github.com/nineaiyu/xadmin-server) 和 [xadmin-client](https://github.com/nineaiyu/xadmin-client)。上游许可证保留在各组件目录。

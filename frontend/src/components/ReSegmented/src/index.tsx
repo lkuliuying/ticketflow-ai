@@ -1,0 +1,245 @@
+import "./index.css";
+import type { OptionsType } from "./type";
+import { useRenderIcon } from "@/components/ReIcon/src/hooks";
+import { Z_INDEX } from "@/utils/zIndex";
+import { isFunction, isNumber, useResizeObserver } from "@pureadmin/utils";
+import {
+  computed,
+  defineComponent,
+  getCurrentInstance,
+  h,
+  nextTick,
+  type PropType,
+  ref,
+  toRef,
+  watch
+} from "vue";
+
+const props = {
+  options: {
+    type: Array<OptionsType>,
+    default: () => []
+  },
+  /**
+   * 默认选中，按照第一个索引为 `0` 的模式，可选（`modelValue`只有传`number`类型时才为响应式）。
+   * `Boolean` 是为 RePlusPage 表单布尔字段预留的兼容值：plus-pro-components 的
+   * PlusRender 会把表单字段原始布尔值强制注入为 `modelValue`（调用侧无法覆盖），
+   * 布尔值在本组件内不参与响应式，选中态回落到 `defaultValue` 驱动。
+   */
+  modelValue: {
+    type: [String, Number, Boolean] as PropType<string | number | boolean>,
+    require: false,
+    default: "0"
+  },
+  defaultValue: {
+    type: [String, Number, Boolean] as PropType<string | number | boolean>,
+    require: false,
+    default: "0"
+  },
+  /** 将宽度调整为父元素宽度   */
+  block: {
+    type: Boolean,
+    default: false
+  },
+  /** 控件尺寸 */
+  size: {
+    type: String as PropType<"small" | "default" | "large">
+  },
+  /** 是否全局禁用，默认 `false` */
+  disabled: {
+    type: Boolean,
+    default: false
+  },
+  /** 当内容发生变化时，设置 `resize` 可使其自适应容器位置 */
+  resize: {
+    type: Boolean,
+    default: false
+  }
+};
+
+export default defineComponent({
+  name: "ReSegmented",
+  props,
+  emits: ["change", "update:modelValue"],
+  setup(props, { emit }) {
+    const width = ref(0);
+    const translateX = ref(0);
+    const initStatus = ref(false);
+    const curMouseActive = ref(-1);
+    const segmentedItembg = ref("");
+    const instance = getCurrentInstance()!;
+    // 每个实例独立的 radio 组名：避免页面多个 ReSegmented 的选项互相串组
+    const radioName = `pure-segmented-${instance.uid}`;
+    const curIndex = isNumber(props.modelValue)
+      ? toRef(props, "modelValue")
+      : isNumber(props.defaultValue)
+        ? ref(computed(() => props.defaultValue))
+        : ref(0);
+
+    function handleChange({
+      option,
+      index
+    }: {
+      option: { disabled?: boolean };
+      index: number;
+    }) {
+      if (props.disabled || option.disabled) return;
+      // 不再阻止默认行为：选中语义交由原生 radio 维护（键盘方向键/读屏可用），
+      // 组件视觉选中态仍由 curIndex 驱动
+      if (isNumber(props.modelValue)) {
+        emit("update:modelValue", index);
+      }
+      segmentedItembg.value = "";
+      emit("change", { index, option });
+    }
+
+    function handleMouseenter(
+      { option, index }: { option: { disabled?: boolean }; index: number },
+      event: Event
+    ) {
+      if (props.disabled) return;
+      event.preventDefault();
+      curMouseActive.value = index;
+      if (option.disabled || curIndex.value === index) {
+        segmentedItembg.value = "";
+      } else {
+        segmentedItembg.value = "hsl(var(--fg) / 6%)";
+      }
+    }
+
+    function handleMouseleave(_: unknown, event: Event) {
+      if (props.disabled) return;
+      event.preventDefault();
+      curMouseActive.value = -1;
+    }
+
+    function handleInit(index = curIndex.value) {
+      nextTick(() => {
+        const curLabelRef = instance?.proxy?.$refs[`labelRef${index}`] as ElRef;
+        if (!curLabelRef) return;
+        width.value = curLabelRef.clientWidth;
+        translateX.value = curLabelRef.offsetLeft;
+        initStatus.value = true;
+      });
+    }
+
+    function handleResizeInit() {
+      useResizeObserver(".pure-segmented", () => {
+        nextTick(() => {
+          handleInit(curIndex.value);
+        });
+      });
+    }
+
+    if (props.block || props.resize) {
+      handleResizeInit();
+    }
+
+    watch(
+      () => curIndex.value,
+      index => {
+        nextTick(() => {
+          handleInit(index);
+        });
+      },
+      {
+        immediate: true
+      }
+    );
+
+    watch(() => props.size, handleResizeInit, {
+      immediate: true
+    });
+
+    const rendLabel = () => {
+      return props.options.map((option, index) => {
+        return (
+          <label
+            ref={`labelRef${index}`}
+            class={[
+              "pure-segmented-item",
+              (props.disabled || option?.disabled) &&
+                "pure-segmented-item-disabled"
+            ]}
+            style={{
+              background:
+                curMouseActive.value === index ? segmentedItembg.value : "",
+              color: props.disabled
+                ? undefined
+                : !option.disabled &&
+                    (curIndex.value === index || curMouseActive.value === index)
+                  ? "hsl(var(--fg) / 88%)"
+                  : ""
+            }}
+            onMouseenter={event => handleMouseenter({ option, index }, event)}
+            onMouseleave={event => handleMouseleave({ option, index }, event)}
+          >
+            {/* 键盘/读屏可用：native radio 携带组名、选中态与禁用态，
+                由 change 事件统一处理（点击 label 会由浏览器转发到本 input） */}
+            <input
+              type="radio"
+              name={radioName}
+              value={String(index)}
+              checked={curIndex.value === index}
+              disabled={props.disabled || !!option?.disabled}
+              aria-label={
+                typeof option.label === "string" ? option.label : undefined
+              }
+              onChange={() => handleChange({ option, index })}
+            />
+            <div
+              class="pure-segmented-item-label"
+              v-tippy={{
+                content: option?.tip,
+                zIndex: Z_INDEX.tippy
+              }}
+            >
+              {option.icon && !isFunction(option.label) ? (
+                <span
+                  class="pure-segmented-item-icon"
+                  style={{ marginRight: option.label ? "6px" : 0 }}
+                >
+                  {h(
+                    useRenderIcon(option.icon, {
+                      ...option?.iconAttrs
+                    })
+                  )}
+                </span>
+              ) : null}
+              {option.label ? (
+                isFunction(option.label) ? (
+                  h(option.label)
+                ) : (
+                  <span>{option.label}</span>
+                )
+              ) : null}
+            </div>
+          </label>
+        );
+      });
+    };
+
+    return () => (
+      <div
+        class={{
+          "pure-segmented": true,
+          "pure-segmented-block": props.block,
+          "pure-segmented--large": props.size === "large",
+          "pure-segmented--small": props.size === "small"
+        }}
+      >
+        <div class="pure-segmented-group">
+          <div
+            class="pure-segmented-item-selected"
+            style={{
+              width: `${width.value}px`,
+              transform: `translateX(${translateX.value}px)`,
+              display: initStatus.value ? "block" : "none"
+            }}
+          ></div>
+          {rendLabel()}
+        </div>
+      </div>
+    );
+  }
+});

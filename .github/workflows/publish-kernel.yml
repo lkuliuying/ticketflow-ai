@@ -13,6 +13,10 @@ on:
         type: boolean
         default: true
 
+defaults:
+  run:
+    working-directory: backend-drf
+
 jobs:
   publish:
     name: Publish xadmin-common
@@ -66,9 +70,9 @@ jobs:
       - name: Generate SBOM (CycloneDX)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
-          path: sbom/unpacked
+          path: backend-drf/sbom/unpacked
           format: cyclonedx-json
-          output-file: sbom/sbom-kernel.cdx.json
+          output-file: backend-drf/sbom/sbom-kernel.cdx.json
           # 产物附件由后面的 Release 步骤统一附带，此处不上传 Actions 产物 / Release 资产
           upload-artifact: false
           upload-release-assets: false
@@ -77,8 +81,8 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: |
-            dist/*.whl
-            dist/*.tar.gz
+            backend-drf/dist/*.whl
+            backend-drf/dist/*.tar.gz
 
       - name: Upload to private index
         # dry_run 默认 true：先跑通流程再真上传（真上传加 --upload）
@@ -94,8 +98,8 @@ jobs:
           # 必须 prerelease：xadmin-installer 以 releases/latest 取平台版本，内核 Release 不能进 latest
           prerelease: true
           files: |
-            dist/*.whl
-            dist/*.tar.gz
+            backend-drf/dist/*.whl
+            backend-drf/dist/*.tar.gz
             sbom/sbom-kernel.cdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

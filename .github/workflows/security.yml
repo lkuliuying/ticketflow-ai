@@ -8,6 +8,10 @@ on:
     branches: [ main, dev ]
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: backend-drf
+
 jobs:
   pip-audit:
     runs-on: ubuntu-latest

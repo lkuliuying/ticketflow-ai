@@ -1,0 +1,158 @@
+.pure-segmented {
+  /* 组件内部几何：轨道内边距、选中块描边宽、项水平内边距
+     （水平内边距对齐 EP 控件尺寸步进：默认 12px / small 8px） */
+  --segmented-track-padding: 2px;
+  --segmented-line-width: 1px;
+  --segmented-padding-horizontal: var(--space-3);
+  --segmented-padding-horizontal-sm: var(--space-2);
+
+  box-sizing: border-box;
+  display: inline-block;
+  padding: var(--segmented-track-padding);
+  font-size: var(--el-font-size-base);
+  /* 未选中文案：72% 在 --bg-page 上 ≈5.1:1，满足 WCAG AA；与选中态 88% 保留层次差 */
+  color: hsl(var(--fg) / 72%);
+  background-color: hsl(var(--bg-page));
+  border-radius: var(--radius-md);
+}
+
+.pure-segmented-block {
+  display: flex;
+}
+
+.pure-segmented-block .pure-segmented-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.pure-segmented-block .pure-segmented-item > .pure-segmented-item-label > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* small */
+.pure-segmented.pure-segmented--small {
+  border-radius: var(--radius-sm);
+}
+
+.pure-segmented.pure-segmented--small .pure-segmented-item {
+  border-radius: var(--el-border-radius-small);
+}
+
+.pure-segmented.pure-segmented--small .pure-segmented-item > div {
+  min-height: calc(
+    var(--el-component-size-small) - var(--segmented-track-padding) * 2
+  );
+  line-height: calc(
+    var(--el-component-size-small) - var(--segmented-track-padding) * 2
+  );
+  padding: 0
+    calc(var(--segmented-padding-horizontal-sm) - var(--segmented-line-width));
+}
+
+/* large */
+.pure-segmented.pure-segmented--large {
+  border-radius: var(--radius-lg);
+}
+
+.pure-segmented.pure-segmented--large .pure-segmented-item {
+  border-radius: calc(
+    var(--el-border-radius-base) + var(--el-border-radius-small)
+  );
+}
+
+.pure-segmented.pure-segmented--large .pure-segmented-item > div {
+  min-height: calc(
+    var(--el-component-size-large) - var(--segmented-track-padding) * 2
+  );
+  line-height: calc(
+    var(--el-component-size-large) - var(--segmented-track-padding) * 2
+  );
+  padding: 0
+    calc(var(--segmented-padding-horizontal) - var(--segmented-line-width));
+  font-size: var(--el-font-size-medium);
+}
+
+/* default */
+.pure-segmented-item {
+  position: relative;
+  text-align: center;
+  cursor: pointer;
+  border-radius: var(--el-border-radius-base);
+  transition: all var(--duration-instant) var(--ease-standard);
+}
+
+.pure-segmented .pure-segmented-item > div {
+  min-height: calc(
+    var(--el-component-size) - var(--segmented-track-padding) * 2
+  );
+  line-height: calc(
+    var(--el-component-size) - var(--segmented-track-padding) * 2
+  );
+  padding: 0
+    calc(var(--segmented-padding-horizontal) - var(--segmented-line-width));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pure-segmented-group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-items: flex-start;
+  width: 100%;
+}
+
+.pure-segmented-item-selected {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  display: none;
+  width: 0;
+  height: 100%;
+  padding: var(--space-1) 0;
+  background-color: hsl(var(--bg-elevated));
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-slower) var(--ease-standard),
+    width var(--duration-slower) var(--ease-standard);
+  will-change: transform, width;
+  border: 2px solid var(--el-color-primary);
+}
+
+.pure-segmented-item > input {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 键盘焦点可见（a11y）：input 视觉隐藏，焦点环透传到相邻 label 容器 */
+.pure-segmented-item > input:focus-visible + .pure-segmented-item-label {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
+  border-radius: var(--el-border-radius-base);
+}
+
+.pure-segmented-item-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pure-segmented-item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pure-segmented-item-disabled {
+  color: hsl(var(--fg) / 25%);
+  cursor: not-allowed;
+}

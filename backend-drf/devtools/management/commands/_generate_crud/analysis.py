@@ -1,0 +1,481 @@
+#!/usr/bin/env python
+# -*- coding:utf-8 -*-
+"""代码生成器：模型解析、字段规划与产物收集。"""
+
+import os
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from django.apps import apps
+from django.conf import settings
+from django.core.management.base import CommandError
+
+from .field_plan import FieldPlanMixin
+from .seed_ingest import SeedIngestMixin
+
+#: 非关联字段可选的专用字段类（渲染能力随字段类下发，见 common/core/fields.py）。
+#: CLI 旗标与 GUI 表单共用（GUI 侧 fields.py 再导出为选项清单数据源）。
+FIELD_CLASS_OPTIONS = ("PhoneField", "ColorField", "RichTextField", "StepFloatField")
+
+
+class AnalysisMixin(FieldPlanMixin, SeedIngestMixin):
+    """模型 → 生成上下文与产物清单（不落盘）。"""
+
+    if TYPE_CHECKING:  # 宿主 Command（BaseCommand + 兄弟 mixin）提供的接口（mixin 模式）
+        stdout: Any
+        style: Any
+
+        def _existing_text(self, *args: Any, **kwargs: Any) -> str: ...
+
+        def _strip_block(self, *args: Any, **kwargs: Any) -> str: ...
+
+        def _model_label_pk(self, *args: Any, **kwargs: Any) -> str: ...
+
+        def _render_serializer_module(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_views_module(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_urls_module(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_config(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_ai_declarations(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_test_skeleton(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_menu_seed(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_client_api(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_client_hook(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _render_client_page(self, *args: Any, **kwargs: Any) -> Any: ...
+
+        def _client_locale(self, *args: Any, **kwargs: Any) -> dict[str, Any]: ...
+
+        def _render_client_locale(self, *args: Any, **kwargs: Any) -> str: ...
+
+    # ------------------------------------------------------------- 上下文构建
+
+    def _resolve_model(self, label: str) -> Any:
+        if "." not in label:
+            raise CommandError("模型标签需形如 <app_label>.<ModelName>，如 demo.Book")
+        app_label, model_name = label.split(".", 1)
+        try:
+            model = apps.get_model(app_label, model_name)
+        except LookupError as exc:
+            raise CommandError(f"未找到模型 {label}（模型需已注册在 INSTALLED_APPS）") from exc
+        if model._meta.abstract:
+            raise CommandError(f"{label} 是抽象模型，不能生成 CRUD")
+        return model
+
+    def _build_context(self, model: Any, options: dict[str, Any]) -> dict[str, Any]:
+        model_snake = self._snake(model.__name__)
+        app_label = model._meta.app_label
+        component = options["component"] or f"{app_label.title()}{model.__name__}"
+        router_path = model_snake.replace("_", "-")
+        ordering = self._parse_ordering(options)
+        client_root = Path(options["frontend_root"]) if options["frontend_root"] else self._default_client_root()
+        ctx = {
+            "model": model,
+            "app_label": app_label,
+            "model_name": model.__name__,
+            "model_snake": model_snake,
+            "verbose_name": str(model._meta.verbose_name),
+            "menu_title": str(options.get("menu_title") or "").strip() or str(model._meta.verbose_name),
+            "component": component,
+            "router_path": router_path,
+            "url_prefix": options["url_prefix"] or f"api/{app_label}/{router_path}",
+            "frontend_dir": options["frontend_dir"] or f"{app_label}/{model_snake}",
+            "locale_name": component[:1].lower() + component[1:],
+            "basename": router_path,
+            "with_import_export": options["with_import_export"],
+            "menu_icon": str(options.get("menu_icon") or "").strip(),
+            "default_ordering": ordering or self._default_ordering(model),
+            # 只有确实会写前端词条时才把菜单标题落 key；--skip-frontend 或找不到
+            # 前端仓库时保留中文标题，避免生成一个无人翻译的 menus.<Component>
+            "use_locale_title": not options["skip_frontend"] and client_root is not None,
+        }
+        ctx.update(self._field_plan(model))
+        return ctx
+
+    @staticmethod
+    def _parse_ordering(options: dict[str, Any]) -> str:
+        """显式排序覆盖（--ordering）：单个字段名（可带 - 前缀），空串走引擎推导。
+
+        生成物里 ordering 直接落进源码，先做标识符校验防注入；模型已声明
+        Meta.ordering 时显式覆盖仍然生效（开发者明确的意图优先）。
+        """
+        ordering = str(options.get("ordering") or "").strip()
+        if not ordering:
+            return ""
+        if not re.fullmatch(r"-?[A-Za-z_][A-Za-z0-9_]*", ordering):
+            raise CommandError(f"--ordering 需为单个模型字段名（可带 - 前缀），收到：{ordering!r}")
+        return ordering
+
+    def _apply_dict_fields(self, ctx: dict[str, Any], pairs: list[str]) -> dict[str, str]:
+        """字典绑定：``字段名=字典 code`` 对收敛为 ctx["dict_fields"]（渲染 DictChoiceField 声明）。
+
+        字段名越界即报错（CLI CommandError / GUI CodegenError 文案一致）；字典 code 的
+        存在性由调用方校验（CLI 无库环境降级为警告，GUI 侧硬校验）。
+        """
+        dict_fields: dict[str, str] = {}
+        for pair in pairs:
+            name, _, code = str(pair).partition("=")
+            name, code = name.strip(), code.strip()
+            if not name or not code:
+                raise CommandError(f"--dict-field 需形如 <字段名>=<字典code>，收到：{pair!r}")
+            known = {item.name for item in ctx["model"]._meta.fields} | {
+                item.name for item in ctx["model"]._meta.many_to_many
+            }
+            if name not in known:
+                raise CommandError(f"未知字段：{name}（模型 {ctx['model']._meta.label} 无此字段）")
+            dict_fields[name] = code
+        if dict_fields:
+            ctx["dict_fields"] = dict_fields
+        return dict_fields
+
+    def _apply_field_classes(
+        self,
+        ctx: dict[str, Any],
+        pairs: list[str],
+        overrides: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """专用字段类声明（薄委托：见模块级 :func:`apply_field_classes`）。"""
+        return apply_field_classes(ctx, pairs, overrides)
+
+    # --------------------------------------------------------------- 产物收集
+
+    def _core_artifacts(self, ctx: dict[str, Any], app_dir: Path) -> list[dict[str, Any]]:
+        """核心后端产物：序列化器 / 视图 / 路由 / 应用配置（回填 ctx 模块路径）。"""
+        artifacts: list[dict[str, Any]] = []
+
+        serializer_package = (app_dir / "serializers").is_dir()
+        serializer_path = (
+            app_dir / "serializers" / f"{ctx['model_snake']}.py" if serializer_package else app_dir / "serializers.py"
+        )
+        ctx["serializer_import"] = (
+            f"{ctx['app_label']}.serializers.{ctx['model_snake']}"
+            if serializer_package
+            else f"{ctx['app_label']}.serializers"
+        )
+        serializer_key = f"serializer-{ctx['model_snake']}"
+        artifacts.append(
+            {
+                "label": "序列化器",
+                "path": serializer_path,
+                "content": self._render_serializer_module(
+                    ctx,
+                    existing=""
+                    if serializer_package
+                    else self._strip_block(self._existing_text(serializer_path), serializer_key),
+                    standalone=serializer_package,
+                ),
+                "mode": "create" if serializer_package else "block",
+                "key": serializer_key,
+            }
+        )
+
+        views_package = (app_dir / "views").is_dir()
+        views_path = app_dir / "views" / f"{ctx['model_snake']}.py" if views_package else app_dir / "views.py"
+        views_key = f"views-{ctx['model_snake']}"
+        ctx["view_module"] = (
+            f"{ctx['app_label']}.views.{ctx['model_snake']}" if views_package else f"{ctx['app_label']}.views"
+        )
+        artifacts.append(
+            {
+                "label": "视图",
+                "path": views_path,
+                "content": self._render_views_module(
+                    ctx,
+                    existing="" if views_package else self._strip_block(self._existing_text(views_path), views_key),
+                    standalone=views_package,
+                ),
+                "mode": "create" if views_package else "block",
+                "key": views_key,
+            }
+        )
+
+        artifacts.append(
+            {
+                "label": "路由",
+                "path": app_dir / "urls.py",
+                "content": self._render_urls_module(ctx),
+                "mode": "urls",
+                "key": f"urls-{ctx['model_snake']}",
+                "ctx": ctx,
+            }
+        )
+        artifacts.append(
+            {
+                "label": "应用配置",
+                "path": app_dir / "config.py",
+                "content": self._render_config(ctx),
+                "mode": "create",
+                "key": f"config-{ctx['model_snake']}",
+            }
+        )
+        return artifacts
+
+    def _optional_backend_artifacts(
+        self, ctx: dict[str, Any], options: dict[str, Any], app_dir: Path, backend_root: Path
+    ) -> list[dict[str, Any]]:
+        """可选后端产物：「生成即接入」AI 动作声明 + 测试骨架。
+
+        AI 声明在 ``--skip-ai`` 时不产出（纯内部管理表等无需 AI 接入的场景）。
+        """
+        artifacts: list[dict[str, Any]] = []
+        if not options.get("skip_ai"):
+            artifacts.append(
+                {
+                    "label": "AI 动作声明",
+                    "path": app_dir / "ai_declarations.py",
+                    "content": self._render_ai_declarations(ctx, options),
+                    # 同一应用多模型按生成块合并（dict 内分块，重复生成幂等）
+                    "mode": "ai_actions",
+                    "key": f"ai-actions-{ctx['model_snake']}",
+                }
+            )
+        if options.get("with_tests"):
+            artifacts.append(
+                {
+                    "label": "测试骨架",
+                    "path": backend_root / "tests" / "unit" / ctx["app_label"] / f"test_{ctx['model_snake']}_api.py",
+                    "content": self._render_test_skeleton(ctx),
+                    "mode": "create",
+                    "key": f"tests-{ctx['model_snake']}",
+                }
+            )
+        return artifacts
+
+    def _collect_artifacts(self, ctx: dict[str, Any], options: dict[str, Any]) -> list[dict[str, Any]]:
+        backend_root = Path(options["output"] or settings.PROJECT_DIR)
+        app_dir = backend_root / ctx["app_label"]
+        artifacts = self._core_artifacts(ctx, app_dir)
+
+        artifacts.extend(self._optional_backend_artifacts(ctx, options, app_dir, backend_root))
+
+        if not options["skip_frontend"]:
+            artifacts.extend(self._frontend_artifacts(ctx, options))
+
+        if options["with_module"]:
+            artifacts.append(self._module_artifact(ctx, options))
+
+        if not options["skip_menu_seed"]:
+            artifacts.extend(self._menu_seed_artifacts(ctx, options, backend_root))
+        return artifacts
+
+    def _module_artifact(self, ctx: dict[str, Any], options: dict[str, Any]) -> dict[str, Any]:
+        """可选产物：{app}/modules.py 模块声明（可裁剪模块的脚手架）。
+
+        模块 id 已存在时不中断生成，降级为提示（换 --module-id 或去掉 --with-module）；
+        模板与 `generate_module` 同源（packages/xadmin-common/common/core/modules/scaffold.py）。
+        """
+        from common.core.modules import derive_route_prefixes, module_id_conflict, render_modules_source
+
+        module_id = options["module_id"] or ctx["app_label"]
+        key = f"modules-{ctx['app_label']}"
+        if module_id_conflict(module_id):
+            return {
+                "label": "模块声明",
+                "path": None,
+                "content": "",
+                "mode": "notice",
+                "key": key,
+                "notice": f"模块 id 已存在：{module_id}（换 --module-id，或不加 --with-module）",
+            }
+        app_config = apps.get_app_config(ctx["app_label"])
+        # 菜单根 name 取生成的页面菜单名（component）；跳过菜单种子时无从声明，留空
+        menus = () if options["skip_menu_seed"] else (ctx["component"],)
+        # 路由前缀：app 有 config.py::URLPATTERNS 时留空（运行期按同一事实源推导，
+        # 见 packages/xadmin-common/common/core/modules/routes.py）；没有才写显式兜底声明（如内置 app 的
+        # 路由挂在 server/urls.py，无可推导来源）。
+        routes = () if derive_route_prefixes(ctx["app_label"]) else (f"^/api/{ctx['app_label']}/",)
+        return {
+            "label": "模块声明",
+            "path": Path(options["output"] or settings.PROJECT_DIR) / ctx["app_label"] / "modules.py",
+            "content": render_modules_source(
+                app_title=app_config.verbose_name or app_config.name,
+                module_id=module_id,
+                label=module_id,
+                level=options["module_level"],
+                menus=menus,
+                routes=routes,
+            ),
+            "mode": "create",
+            "key": key,
+        }
+
+    def _frontend_artifacts(self, ctx: dict[str, Any], options: dict[str, Any]) -> list[dict[str, Any]]:
+        client_root = Path(options["frontend_root"]) if options["frontend_root"] else self._default_client_root()
+        if client_root is None:
+            return [
+                {
+                    "label": "前端页面",
+                    "path": None,
+                    "content": "".join(
+                        [
+                            self._render_client_api(ctx),
+                            self._render_client_hook(ctx),
+                            self._render_client_page(ctx),
+                        ]
+                    ),
+                    "mode": "notice",
+                    "key": f"frontend-{ctx['model_snake']}",
+                    "notice": "未找到前端仓库根：设置 XADMIN_CLIENT_DIR、传 --frontend-root 或 --skip-frontend"
+                    "（以下内容可手工复制）",
+                }
+            ]
+        view_dir = client_root / "src" / "views" / ctx["frontend_dir"]
+        return [
+            {
+                "label": "前端页面",
+                "path": view_dir / "index.vue",
+                "content": self._render_client_page(ctx),
+                "mode": "create",
+                "key": f"client-page-{ctx['model_snake']}",
+            },
+            {
+                "label": "前端 API",
+                "path": view_dir / "utils" / "api.ts",
+                "content": self._render_client_api(ctx),
+                "mode": "create",
+                "key": f"client-api-{ctx['model_snake']}",
+            },
+            {
+                "label": "前端逻辑",
+                "path": view_dir / "utils" / "hook.tsx",
+                "content": self._render_client_hook(ctx),
+                "mode": "create",
+                "key": f"client-hook-{ctx['model_snake']}",
+            },
+            *[
+                {
+                    "label": f"前端词条（{locale}）",
+                    "path": client_root / "locales" / f"{locale}.yaml",
+                    "content": self._render_client_locale(ctx, locale),
+                    "mode": "locale_yaml",
+                    "key": f"client-locale-{locale}-{ctx['model_snake']}",
+                    "locale": self._client_locale(ctx, locale),
+                }
+                for locale in ("zh-CN", "en")
+            ],
+        ]
+
+    @staticmethod
+    def _default_client_root() -> Path | None:
+        """前端仓库根缺省解析：XADMIN_CLIENT_DIR 环境变量优先，其次同级 xadmin-client
+        （对齐客户端 sync-contract.mjs 的 XADMIN_SERVER_DIR 覆盖口径）。
+
+        显式设置的环境变量指向不存在目录时不回退同级缺省——按「未找到」降级为
+        notice 产物，避免静默写进另一个根。
+        """
+        env_dir = os.environ.get("XADMIN_CLIENT_DIR")
+        if env_dir:
+            candidate = Path(env_dir)
+            return candidate if candidate.is_dir() else None
+        workspace = Path(settings.PROJECT_DIR).parent
+        monorepo_client = workspace / "frontend"
+        candidate = monorepo_client if (monorepo_client / "package.json").is_file() else workspace / "xadmin-client"
+        return candidate if candidate.is_dir() else None
+
+    # --------------------------------------------------------------- 后续步骤
+
+    def _next_steps(self, ctx: dict[str, Any], options: dict[str, Any]) -> list[str]:
+        """后续步骤清单（可复用：CLI 打印 / GUI 生成 NEXT_STEPS.md 同一口径）。
+
+        口径与 docs/guide/first-module-30min.md 同步：权限点种子入库 →
+        字段权限树（模型节点缺失时）→ 菜单与授权 → doctor 自检 →（可选）模块声明。
+        --bootstrap 已代办的动作从清单中移除。
+        """
+        bootstrapped = (
+            bool(options.get("bootstrap")) and not options.get("dry_run") and not options.get("skip_menu_seed")
+        )
+        steps: list[str] = []
+        if ctx["app_label"] in (getattr(settings, "XADMIN_APPS", None) or []):
+            pass  # 本就注册（或本进程已加载新配置），无需提示
+        elif ctx.get("app_registered"):
+            steps.append(
+                f'应用注册：已由 --register-app 写入 config.yml 的 XADMIN_APPS（含 "{ctx["app_label"]}"），重启进程后生效'
+            )
+        else:
+            steps.append(
+                f'应用注册：config.yml 的 XADMIN_APPS 加入 "{ctx["app_label"]}"（或重跑本命令加 --register-app；改后需重启进程）'
+            )
+        if not options["skip_menu_seed"] and not bootstrapped:
+            seed = self._seed_relpath(ctx)
+            steps.append(
+                f"权限点与菜单入库：python manage.py loaddata {seed}"
+                f"（menumeta 先于 menu；重跑本命令加 --bootstrap 更省事）"
+            )
+            if not ctx.get("model_label_pk"):
+                steps.append(
+                    "字段权限树：python manage.py sync_model_field 后加 --force 重跑本命令"
+                    "（模型节点写回种子后字段权限才可用）"
+                )
+        if not bootstrapped:
+            steps.append(f"菜单与授权：菜单管理里挂到目标目录；角色管理勾选 *:{ctx['component']} 权限点")
+        steps.append("自检：python manage.py doctor（权限点缺口 / 依赖 / 契约一次看全）")
+        if not options["with_module"]:
+            steps.append("（可选）声明为可裁剪模块：重跑本命令加 --with-module，或 manage.py generate_module")
+        return steps
+
+    def _print_next_steps(self, ctx: dict[str, Any], options: dict[str, Any]) -> None:
+        """生成后「后续步骤」清单：把散落教程里的手工动作收敛为可复制命令。"""
+        steps = self._next_steps(ctx, options)
+        lines: list[str] = ["", "后续步骤（命令在项目根执行）："] if steps else [""]
+        lines.extend(f"  {index}) {text}" for index, text in enumerate(steps, start=1))
+        lines.append("")
+        lines.append("复核：关联字段 input_type 是否符合数据量（大数据量换 api-search-* 形态）；")
+        lines.append("      菜单上级是否要挂到已有目录（--parent 或菜单管理里调整）。")
+        self.stdout.write("\n".join(lines))
+
+
+def apply_field_classes(
+    ctx: dict[str, Any],
+    pairs: list[str],
+    overrides: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """专用字段类声明：``字段名=类名`` 对收敛为 ctx["field_declarations"]。
+
+    CLI 旗标（--field-class）与 GUI 表单（fields.apply_field_overrides）共用本
+    推导——单一规则，不引入第二套；``overrides`` 携带 GUI 表单对该字段的
+    label / read_only / required 覆盖（CLI 不传，走模型属性推导）。声明后从
+    extra_kwargs 摘除同名字段（DRF 对显式声明 + extra_kwargs 并存会直接断言失败）。
+    """
+    declarations: dict[str, Any] = {}
+    for pair in pairs:
+        name, _, field_class = str(pair).partition("=")
+        name, field_class = name.strip(), field_class.strip()
+        if not name or not field_class:
+            raise CommandError(f"专用字段类需形如 <字段名>=<类名>，收到：{pair!r}")
+        field = next(
+            (item for item in [*ctx["model"]._meta.fields, *ctx["model"]._meta.many_to_many] if item.name == name),
+            None,
+        )
+        if name == "pk" or field is None or field.is_relation:
+            raise CommandError(f"{name}：专用字段类仅支持非关联字段")
+        if field_class not in FIELD_CLASS_OPTIONS:
+            raise CommandError(f"{name}：非法专用字段类「{field_class}」（可选：{', '.join(FIELD_CLASS_OPTIONS)}）")
+        if name in (ctx.get("dict_fields") or {}):
+            raise CommandError(f"{name}：已绑定字典，不能同时声明专用字段类")
+        kwargs = (overrides or {}).get(name) or {}
+        declaration: dict[str, Any] = {"label": kwargs.get("label") or str(field.verbose_name or name)}
+        if kwargs.get("read_only"):
+            declaration["read_only"] = True
+        else:
+            declaration["required"] = kwargs.get("required", not field.blank and not field.null)
+        if field_class in {"PhoneField", "ColorField", "RichTextField"}:
+            if getattr(field, "max_length", None):
+                declaration["max_length"] = field.max_length
+            if field.blank and not declaration.get("read_only"):
+                declaration["allow_blank"] = True
+            if field.null:
+                declaration["allow_null"] = True
+        declarations[name] = {"class": field_class, "kwargs": declaration}
+        # 显式声明的字段不能再出现在 extra_kwargs（DRF 会直接断言失败）
+        ctx["extra_kwargs"].pop(name, None)
+    if declarations:
+        ctx.setdefault("field_declarations", {}).update(declarations)
+    return declarations

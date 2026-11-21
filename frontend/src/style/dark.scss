@@ -1,0 +1,169 @@
+@use "element-plus/theme-chalk/src/dark/css-vars.scss" as *;
+
+/**
+ * 暗色模式：Element Plus 暗色变量导入 + 少量组件级行为覆写。
+ *
+ * 语义槽（背景 / 前景 / 描边 / 填充 / 阴影 / color-scheme）的暗色取值统一在
+ * tokens/semantic.scss 的 `html.dark` 块声明；本文件只保留 EP 变量表达不了的
+ * 组件覆写，且取值一律引用语义令牌，不写颜色字面量。
+ */
+html.dark {
+  .navbar,
+  .tags-view,
+  .contextmenu,
+  .sidebar-container,
+  .horizontal-header,
+  .sidebar-logo-container,
+  .horizontal-header .el-sub-menu__title,
+  .horizontal-header .submenu-title-noDropdown {
+    background: var(--header) !important;
+  }
+
+  .app-main,
+  .app-main-nofixed-header {
+    background: hsl(var(--bg-page)) !important;
+  }
+
+  .logic-flow-view,
+  .wangeditor {
+    filter: invert(0.9) hue-rotate(180deg);
+  }
+
+  /* 标签页 */
+  .tags-view {
+    .arrow-left,
+    .arrow-right {
+      border-right: 1px solid hsl(var(--border));
+      box-shadow: none;
+    }
+
+    .arrow-right {
+      border-left: 1px solid hsl(var(--border));
+    }
+
+    .scroll-item {
+      .el-icon-close {
+        &:hover {
+          color: hsl(var(--fg) / 85%) !important;
+          background-color: hsl(var(--fg) / 12%);
+        }
+      }
+
+      .chrome-tab {
+        .tag-title {
+          color: hsl(var(--fg-disabled));
+        }
+
+        &:hover {
+          .chrome-tab__bg {
+            color: hsl(var(--fill-strong));
+          }
+
+          .tag-title {
+            color: hsl(var(--fg-subtle));
+          }
+        }
+      }
+
+      &.is-active {
+        .chrome-tab__bg {
+          color: var(--el-color-primary-light-8) !important;
+        }
+      }
+    }
+  }
+
+  .el-card {
+    --el-card-bg-color: var(--el-bg-color);
+  }
+
+  /* 暗色下拉项 hover：保留可感知的反馈背景（此前置为 transparent，
+     导致整行高亮消失、用户看不出可点范围） */
+  .el-dropdown-menu__item:not(.is-disabled):hover {
+    background: var(--el-fill-color);
+  }
+
+  /* 全局覆盖 element-plus 的 el-dialog、el-drawer、el-message-box、el-notification
+     组件右上角关闭图标的样式，表现更鲜明（亮色对应项见 element-plus.scss） */
+  .el-icon {
+    &.el-dialog__close,
+    &.el-drawer__close,
+    &.el-message-box__close,
+    &.el-notification__closeBtn {
+      &:hover {
+        color: hsl(var(--fg) / 85%) !important;
+        background-color: hsl(var(--fg) / 12%);
+
+        .pure-dialog-svg {
+          color: hsl(var(--fg) / 85%) !important;
+        }
+      }
+    }
+  }
+
+  /* 克隆并自定义 ElMessage 样式，不会影响 ElMessage 原本样式，在 src/utils/message.ts 中调用自定义样式 ElMessage 方法即可，整体浅色风格在 src/style/element-plus.scss 文件进行了适配 */
+  .pure-message {
+    background-color: hsl(var(--bg-elevated)) !important;
+    background-image: initial !important;
+    box-shadow: var(--shadow-lg) !important;
+
+    & .el-message__content {
+      color: hsl(var(--fg)) !important;
+      pointer-events: all !important;
+      background-image: initial !important;
+    }
+
+    & .el-message__closeBtn {
+      &:hover {
+        color: hsl(var(--fg) / 85%);
+        background-color: hsl(var(--fg) / 12%);
+      }
+    }
+  }
+
+  /* 自定义菜单搜索样式 */
+  .pure-search-dialog {
+    .el-dialog__footer {
+      box-shadow:
+        0 -1px 0 0 hsl(var(--border-strong)),
+        0 -3px 6px 0 hsl(var(--fg) / 12%);
+    }
+
+    .search-footer {
+      .search-footer-item {
+        color: hsl(var(--fg) / 60%);
+
+        .icon {
+          box-shadow: none;
+        }
+      }
+    }
+  }
+
+  /* ReSegmented 组件：轨道取页面底色（下陷语义）、选中项取抬升面 */
+  .pure-segmented {
+    color: hsl(var(--fg) / 65%);
+    background-color: hsl(var(--bg-page));
+
+    .pure-segmented-item-selected {
+      background-color: hsl(var(--bg-elevated));
+    }
+
+    .pure-segmented-item-disabled {
+      color: hsl(var(--fg) / 25%);
+    }
+  }
+
+  /* 仿 el-scrollbar 滚动条样式 支持大多数浏览器，如Chrome、Edge、Firefox、Safari等 */
+  .pure-scrollbar {
+    scrollbar-color: hsl(var(--border)) transparent;
+
+    ::-webkit-scrollbar-thumb {
+      background-color: hsl(var(--border));
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--border-strong));
+    }
+  }
+}
