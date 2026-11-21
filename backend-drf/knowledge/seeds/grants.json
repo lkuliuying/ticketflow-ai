@@ -28,6 +28,13 @@
       "retrieve:TicketFlowKnowledge",
       "create:TicketFlowKnowledge",
       "partialUpdate:TicketFlowKnowledge"
+    ],
+    "ticketflow_kb_editor": [
+      "TicketFlow",
+      "TicketFlowKnowledge",
+      "list:TicketFlowKnowledge",
+      "retrieve:TicketFlowKnowledge",
+      "partialUpdate:TicketFlowKnowledge"
     ]
   }
 }

@@ -48,15 +48,23 @@ def assignment_candidates(access: "TicketAccess") -> QuerySet[UserInfo]:
 class TicketAccess:
     user_id: int
     department_id: UUID | None
-    agent: bool
-    admin: bool
+    roles: frozenset[str]
+    is_superuser: bool
 
     @classmethod
     def for_user(cls, user: UserInfo) -> "TicketAccess":
         roles = set(user.roles.filter(is_active=True).values_list("code", flat=True))
         if user.dept_id is not None:
             roles.update(user.dept.roles.filter(is_active=True).values_list("code", flat=True))
-        return cls(user.pk, user.dept_id, AGENT_ROLE in roles, user.is_superuser or ADMIN_ROLE in roles)
+        return cls(user.pk, user.dept_id, frozenset(roles), user.is_superuser)
+
+    @property
+    def agent(self) -> bool:
+        return AGENT_ROLE in self.roles
+
+    @property
+    def admin(self) -> bool:
+        return self.is_superuser or ADMIN_ROLE in self.roles
 
     def scope(self, queryset: QuerySet[Ticket]) -> QuerySet[Ticket]:
         if self.admin:

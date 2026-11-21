@@ -25,6 +25,12 @@
       "order": 20
     },
     {
+      "name": "userrole.json",
+      "model": "identity.userrole",
+      "kind": "contract",
+      "order": 45
+    },
+    {
       "name": "fieldpermission.json",
       "model": "system.fieldpermission",
       "kind": "contract",

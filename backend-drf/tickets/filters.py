@@ -10,10 +10,10 @@ class TicketFilter(filters.FilterSet):
     status = filters.ChoiceFilter(choices=Status.choices)
     priority = filters.ChoiceFilter(choices=Priority.choices)
     category = filters.ChoiceFilter(choices=Category.choices)
-    assignee_id = filters.NumberFilter()
-    department_id = filters.UUIDFilter()
+    assignee_id = filters.NumberFilter(label="处理人")
+    department_id = filters.UUIDFilter(label="所属部门")
     sla = filters.ChoiceFilter(
-        choices=[(state, state) for state in ("ON_TRACK", "DUE_SOON", "OVERDUE", "MET")],
+        choices=[("ON_TRACK", "正常"), ("DUE_SOON", "即将超时"), ("OVERDUE", "已超时"), ("MET", "按时完成")],
         method="filter_sla",
     )
     q = filters.CharFilter(method="filter_q", max_length=200)

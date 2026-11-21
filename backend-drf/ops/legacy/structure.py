@@ -125,6 +125,7 @@ def _atomic(connection: Any) -> Any:
 PREREQUISITE_CALLABLES = (
     "create_vector_extension",
     "_ensure_trgm_extension",
+    "create_trigram_extension",
     # 登录标识唯一索引的存量重复前置检查：只读校验，必须在 AddConstraint 前执行
     "check_duplicate_logins",
 )
@@ -464,5 +465,6 @@ def missing_constraints(dsn: str) -> list[str]:
 # 链上的「前置操作」白名单（迁移里以 RunPython 承担，幂等且必须先于建表）
 #   create_vector_extension  —— pgvector 扩展（ai 域向量列依赖）
 #   _ensure_trgm_extension   —— pg_trgm 扩展（检索索引依赖）
+#   create_trigram_extension —— pg_trgm 扩展（工单知识库检索索引依赖）
 # 新增 RunPython/RunSQL 时若不在名单内一律**不执行**并报告：未知操作可能是数据回填，
 # 在结构对齐路径上盲目执行会写坏数据（守护测试锁住这条口径）。

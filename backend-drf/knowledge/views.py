@@ -23,12 +23,14 @@ from knowledge.serializers import (
     ArticleSerializer,
     ArticleUpdateSerializer,
 )
-from knowledge.services import article_key, count_article_view, create_article, references_for
+from knowledge.services import article_key, create_article, load_article_detail, references_for
 from tickets.cache import check_rate
 from tickets.models import Category
 from tickets.policy import TicketAccess, has_permission
 from tickets.serializers import TicketSerializer
 from tickets.views import TicketViewSet
+
+KB_EDITOR_ROLE = "ticketflow_kb_editor"
 
 
 @extend_schema_view(list=extend_schema(responses=article_list_result))
@@ -53,11 +55,15 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
     def access(self) -> TicketAccess:
         return TicketAccess.for_user(self.actor)
 
+    @property
+    def can_review(self) -> bool:
+        return self.access.admin or KB_EDITOR_ROLE in self.access.roles
+
     def get_queryset(self) -> QuerySet[KnowledgeArticle]:
         if not self.request.user.is_authenticated:
             return self.queryset.none()
         queryset = super().get_queryset()
-        if not self.access.admin:
+        if not self.can_review:
             queryset = queryset.filter(
                 Q(status=ArticleStatus.PUBLISHED) | Q(status=ArticleStatus.DRAFT, creator=self.actor)
             )
@@ -85,10 +91,11 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
     def _response(self, article: KnowledgeArticle, status: int = 200) -> ApiResponse:
         data = ArticleSerializer(article, context=self.get_serializer_context()).data
         can_update = has_permission(self.actor, "partialUpdate:TicketFlowKnowledge")
+        can_publish = can_update and self.can_review
         data["viewer"] = {
-            "can_edit": can_update
-            and (self.access.admin or (article.status == ArticleStatus.DRAFT and article.creator_id == self.actor.pk)),
-            "can_publish": can_update and self.access.admin,
+            "can_edit": can_publish
+            or (can_update and article.status == ArticleStatus.DRAFT and article.creator_id == self.actor.pk),
+            "can_publish": can_publish,
         }
         return ApiResponse(data=data, status=status)
 
@@ -104,7 +111,7 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
     def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> ApiResponse:
         """知识库文章详情"""
         article = self.get_object()
-        count_article_view(article)
+        load_article_detail(article)
         return self._response(article)
 
     @extend_schema(responses={201: article_result})
@@ -124,8 +131,8 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
         serializer = self.get_serializer(article, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         status = serializer.validated_data.get("status", article.status)
-        if not self.access.admin and (article.status != ArticleStatus.DRAFT or status != ArticleStatus.DRAFT):
-            raise PermissionDenied("只有知识库管理员可发布、归档或编辑已发布文章")
+        if not self.can_review and (article.status != ArticleStatus.DRAFT or status != ArticleStatus.DRAFT):
+            raise PermissionDenied("只有工单管理员或知识维护人员可发布、归档或编辑非草稿文章")
         old_key = article_key(article)
         serializer.save(modifier=self.actor)
         transaction.on_commit(lambda: cache.delete(old_key), robust=True)
