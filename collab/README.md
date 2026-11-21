@@ -62,9 +62,9 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| BE-01 | 测试环境与全量门禁基线 | Codex | — | 待开始 |
+| BE-01 | 测试环境与全量门禁基线 | Codex | — | 已完成：GitHub Unit Tests 7916 passed / 覆盖率 89.40%（run 44890598079） |
 | BE-02 | 前端所需的契约补口 | Codex | — | 已合并 |
-| BE-03 | Phase 2 测试补全 | Codex | BE-04 | 进行中 |
+| BE-03 | Phase 2 测试补全 | Codex | BE-04 | 评审通过 |
 | BE-04 | Phase 2 遗留问题修复 | Codex | — | 评审通过 |
 | IT-01 | 联调环境（BE-02 + FE-01） | Codex | BE-02 | 已完成，环境常驻 :8896 |
 | CI-01 | GitHub CI 在 Monorepo 下转绿（后端） | Codex | — | 已合并 |
