@@ -16,6 +16,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from runlog import track
+
 ROOT = Path(__file__).resolve().parents[2]
 COLLAB = ROOT / "collab"
 DESIGN = ROOT / "backend-drf" / "docs" / "plans" / "ticketflow-phase-1.md"
@@ -111,7 +113,9 @@ def main() -> None:
     target = COLLAB / "reviews" / f"{args.task}.md"
     previous = target.read_text(encoding="utf-8") if target.exists() else ""
     round_no = previous.count("评审 · 第") + 1
-    response = run_agy(build_prompt(args.task, args.branch, args.repo, round_no, previous))
+    with track("gemini", args.task, "review", f"{args.branch} 第 {round_no} 轮") as record:
+        response = run_agy(build_prompt(args.task, args.branch, args.repo, round_no, previous))
+        record["exit_code"] = 0
 
     target.parent.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")

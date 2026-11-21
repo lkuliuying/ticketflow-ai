@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>代理指挥台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>TicketFlow 代理指挥台</h1>
+          <p>Claude 总指导 · Codex 后端 · Gemini 评审 — 实时协作流水线</p>
+        </div>
+      </div>
+      <div id="stage-pills" class="stage-pills"></div>
+      <div class="live">
+        <span id="live-dot" class="live-dot"></span>
+        <span id="live-text">连接中…</span>
+        <button id="rotate-toggle" class="ghost off" title="自动旋转">⟳ 巡航</button>
+      </div>
+    </header>
+
+    <aside id="agents" class="panel left"></aside>
+
+    <aside class="panel right">
+      <nav class="tabs">
+        <button data-tab="pipeline" class="active">流水线</button>
+        <button data-tab="detail">详情</button>
+        <button data-tab="git">Git</button>
+      </nav>
+      <div id="tab-pipeline" class="tab active"></div>
+      <div id="tab-detail" class="tab"></div>
+      <div id="tab-git" class="tab"></div>
+    </aside>
+
+    <footer class="timeline">
+      <div class="timeline-head">
+        <strong>事件流</strong>
+        <span class="legend" id="legend"></span>
+      </div>
+      <div id="events" class="events"></div>
+    </footer>
+
+    <div id="tooltip" class="tooltip"></div>
+    <div id="error" class="error-banner"></div>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
