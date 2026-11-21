@@ -75,10 +75,27 @@ def test_ticket_viewer_matches_role_and_archive_state(users, ticket, role, expec
     assert api.get(resource).data["data"]["viewer"]["can_archive"] is False
 
 
+@pytest.mark.parametrize("is_superuser", [False, True])
+def test_ticket_viewer_assignment_requires_both_menu_permissions(users, ticket, api_client, is_superuser):
+    if is_superuser:
+        user = UserInfo.objects.create_user(username="viewer-superuser", is_superuser=True)
+    else:
+        role = UserRole.objects.get(code=AGENT_ROLE)
+        role.menu.add(Menu.objects.get(name="assign:TicketFlowTickets"))
+        user = users["agent"]
+    api_client.force_authenticate(user=user)
+    resource = f"/api/tickets/{ticket.pk}"
+    detail = api_client.get(resource)
+    assert detail.status_code == 200, detail.data
+    assert detail.data["data"]["viewer"]["can_handle"] is True
+    assert detail.data["data"]["viewer"]["can_assign"] is is_superuser
+    assert api_client.get(f"{resource}/assignees").status_code == (200 if is_superuser else 403)
+
+
 def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ticket):
     role = UserRole.objects.get(code=AGENT_ROLE)
     role.menu.remove(Menu.objects.get(name="create:TicketFlowKnowledge"))
-    role.menu.add(Menu.objects.get(name="assign:TicketFlowTickets"))
+    role.menu.add(*Menu.objects.filter(name__in=["assign:TicketFlowTickets", "assignees:TicketFlowTickets"]))
     ticket.status = Status.CLOSED
     ticket.save(update_fields=["status"])
     api = authenticated(users["agent"])
@@ -89,6 +106,15 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
     ticket.save(update_fields=["submitter", "department"])
     viewer = api.get(f"/api/tickets/{ticket.pk}").data["data"]["viewer"]
     assert not any(viewer.values())
+
+
+def test_ticket_viewer_cannot_archive_without_knowledge_app(users, ticket, settings):
+    ticket.status = Status.CLOSED
+    ticket.save(update_fields=["status"])
+    settings.INSTALLED_APPS = [app for app in settings.INSTALLED_APPS if app != "knowledge"]
+    response = authenticated(users["admin"]).get(f"/api/tickets/{ticket.pk}")
+    assert response.status_code == 200, response.data
+    assert response.data["data"]["viewer"]["can_archive"] is False
 
 
 def grant_assignment(user: UserInfo) -> None:

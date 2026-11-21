@@ -25,8 +25,8 @@ TRANSITIONS = cast(
 VERIFY_STATES = (Status.PENDING_VERIFY, Status.CLOSED)
 
 
-def has_permission(user: UserInfo, code: str) -> bool:
-    return user.is_superuser or code in get_user_permission_codes(user)
+def has_permission(user: UserInfo, code: str, *additional_codes: str) -> bool:
+    return user.is_superuser or {code, *additional_codes} <= get_user_permission_codes(user)
 
 
 def assignment_candidates(access: "TicketAccess") -> QuerySet[UserInfo]:

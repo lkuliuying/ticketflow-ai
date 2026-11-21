@@ -13,7 +13,7 @@
       "additionalProperties": false,
       "properties": {
         "can_handle": {"type": "boolean"},
-        "can_assign": {"type": "boolean"},
+        "can_assign": {"type": "boolean", "description": "可处理工单，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
         "can_comment_internal": {"type": "boolean"},
         "can_archive": {"type": "boolean", "description": "已关闭、可处理、有知识库创建权限且尚未转存。"}
       }

@@ -1,6 +1,7 @@
 from typing import Any, cast
 from uuid import UUID
 
+from django.apps import apps
 from django.core.cache import cache
 from django.db.models import Count, Q, QuerySet
 from django.http import Http404
@@ -118,13 +119,15 @@ class TicketViewSet(
         can_handle = self.access.can_handle(ticket)
         data["viewer"] = {
             "can_handle": can_handle,
-            "can_assign": can_handle and has_permission(self.actor, "assign:TicketFlowTickets"),
+            "can_assign": can_handle
+            and has_permission(self.actor, "assign:TicketFlowTickets", "assignees:TicketFlowTickets"),
             "can_comment_internal": can_handle,
             "can_archive": (
                 can_handle
                 and ticket.status == Status.CLOSED
+                and apps.is_installed("knowledge")
                 and has_permission(self.actor, "create:TicketFlowKnowledge")
-                and not hasattr(ticket, "knowledge_article")
+                and not Ticket.objects.filter(pk=ticket.pk, knowledge_article__isnull=False).exists()
             ),
         }
         data["available_transitions"] = self.access.targets(ticket)
