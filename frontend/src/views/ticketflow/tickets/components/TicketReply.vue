@@ -17,6 +17,7 @@ defineOptions({ name: "TicketFlowTicketReply" });
 const props = defineProps<{
   ticket: TicketDetail;
   run: TicketRun;
+  busy: boolean;
 }>();
 
 const { t } = useI18n();
@@ -42,7 +43,13 @@ async function send() {
   if (ok) body.value = "";
 }
 
-defineExpose({ fill: (text: string) => (body.value = text) });
+/** 外部填入建议回复（如 AI 生成）：始终回到对外回复，避免误以内部备注发出 */
+defineExpose({
+  fill: (text: string) => {
+    body.value = text;
+    visibility.value = "PUBLIC";
+  }
+});
 </script>
 
 <template>
@@ -74,7 +81,7 @@ defineExpose({ fill: (text: string) => (body.value = text) });
       <el-button
         type="primary"
         :loading="sending"
-        :disabled="!body.trim()"
+        :disabled="!body.trim() || busy"
         @click="send"
       >
         {{ t("ticketflow.detail.send") }}

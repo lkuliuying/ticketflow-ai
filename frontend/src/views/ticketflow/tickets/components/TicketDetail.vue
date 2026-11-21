@@ -22,7 +22,7 @@ const props = defineProps<{
 }>();
 
 const { t, te } = useI18n();
-const { detail, loading, notFound, load, run } = useTicketDetail(
+const { detail, loading, busy, notFound, load, run } = useTicketDetail(
   props.pk,
   props.onChanged
 );
@@ -110,7 +110,7 @@ function time(value: string | null | undefined) {
 
       <section class="flex flex-col gap-2">
         <h4 class="m-0">{{ t("ticketflow.detail.actions") }}</h4>
-        <TicketActions :ticket="detail" :run="run" />
+        <TicketActions :ticket="detail" :run="run" :busy="busy" />
         <div v-if="detail.viewer.can_archive && onArchive">
           <el-button
             type="success"
@@ -125,7 +125,7 @@ function time(value: string | null | undefined) {
 
       <section v-if="canReply" class="flex flex-col gap-2">
         <h4 class="m-0">{{ t("ticketflow.detail.reply") }}</h4>
-        <TicketReply :ticket="detail" :run="run" />
+        <TicketReply :ticket="detail" :run="run" :busy="busy" />
       </section>
 
       <section class="flex flex-col gap-2">
