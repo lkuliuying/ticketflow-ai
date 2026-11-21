@@ -4416,6 +4416,51 @@ codegen:
   planImported: Plans imported
   planImportFailed: Import failed
 ticketflow:
+  kb:
+    title: Title
+    category: Category
+    tags: Tags
+    status: Status
+    view_count: Views
+    updated_time: Updated At
+    created_time: Created At
+    body: Body
+    q: Keyword
+    tag: Tag
+    open: Article Detail
+    notFound: Article not found or not visible
+    create: New Article
+    createTitle: New Knowledge Article
+    created: Draft created
+    editTitle: Edit Article
+    edit: Edit
+    preview: Preview
+    saved: Article saved
+    archiveTitle: Save Ticket as Knowledge Draft
+    archived: Saved as a knowledge draft, pending review and publishing
+    problem: Problem
+    solution: Solution
+    views: "{count} views"
+    fromTicket: "Source ticket {id}"
+    titleRequired: Please enter a title
+    titleTooLong: Title must be at most 200 characters
+    categoryRequired: Please select a category
+    bodyRequired: Please enter the body
+    tagsInvalid: At most 12 tags, each up to 64 characters
+    tagsPlaceholder: Type and press Enter to add a tag
+    bodyPlaceholder: Markdown supported
+    statusValue:
+      DRAFT: Draft
+      PUBLISHED: Published
+      ARCHIVED: Archived
+    toStatus:
+      DRAFT: Back to Draft
+      PUBLISHED: Publish
+      ARCHIVED: Archive
+    statusChanged:
+      DRAFT: Moved back to draft
+      PUBLISHED: Published
+      ARCHIVED: Archived
   visibility:
     PUBLIC: Public Reply
     INTERNAL: Internal Note

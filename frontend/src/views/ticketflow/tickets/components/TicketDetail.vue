@@ -18,7 +18,7 @@ defineOptions({ name: "TicketFlowTicketDetail" });
 const props = defineProps<{
   pk: string;
   onChanged?: () => void;
-  onArchive?: (_ticket: TicketDetail) => void;
+  onArchive?: (_ticket: TicketDetail, _reload: () => void) => void;
 }>();
 
 const { t, te } = useI18n();
@@ -116,7 +116,7 @@ function time(value: string | null | undefined) {
             type="success"
             plain
             data-testid="ticket-archive"
-            @click="onArchive(detail)"
+            @click="onArchive(detail, load)"
           >
             {{ t("ticketflow.detail.archive") }}
           </el-button>

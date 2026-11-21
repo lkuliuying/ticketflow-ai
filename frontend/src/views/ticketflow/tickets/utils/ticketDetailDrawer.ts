@@ -10,7 +10,7 @@ export function openTicketDetail(
   row: Pick<TicketItem, "pk" | "number">,
   options: {
     onChanged?: () => void;
-    onArchive?: (_ticket: TicketDetail) => void;
+    onArchive?: (_ticket: TicketDetail, _reload: () => void) => void;
   } = {}
 ) {
   addDrawer({

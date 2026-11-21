@@ -3,7 +3,12 @@ import { useI18n } from "vue-i18n";
 import { usePageAuth } from "@/router/utils";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import type { OperationProps } from "@/components/RePlusPage";
-import { ticketApi, type TicketItem } from "@/api/ticketflow/tickets";
+import {
+  ticketApi,
+  type TicketDetail,
+  type TicketItem
+} from "@/api/ticketflow/tickets";
+import { openArticleEditor } from "../../knowledge/utils/articleEditorDialog";
 import { useTicketColumns } from "./ticketColumns";
 import { openTicketDetail } from "./ticketDetailDrawer";
 import View from "~icons/ep/view";
@@ -26,6 +31,27 @@ export function useTickets(tableRef: PageRef) {
   const { listColumnsFormat } = useTicketColumns({ t, te });
   const reload = () => tableRef.value?.handleGetData?.();
 
+  /** 已关闭工单转存知识库草稿：预填标题、分类与问题描述，保存后刷新详情 */
+  function archive(ticket: TicketDetail, reloadDetail: () => void) {
+    openArticleEditor({
+      title: t("ticketflow.kb.archiveTitle"),
+      savedText: t("ticketflow.kb.archived"),
+      sourceTicketId: ticket.pk,
+      initial: {
+        title: ticket.title,
+        category: ticket.category,
+        tags: ticket.ai_tags,
+        body_markdown: [
+          `## ${t("ticketflow.kb.problem")}`,
+          ticket.description,
+          `## ${t("ticketflow.kb.solution")}`,
+          ""
+        ].join("\n\n")
+      },
+      onSaved: reloadDetail
+    });
+  }
+
   const operationButtonsProps = shallowRef<OperationProps>({
     hideDetail: true,
     buttons: [
@@ -39,7 +65,10 @@ export function useTickets(tableRef: PageRef) {
         },
         tooltip: { content: t("ticketflow.detail.open") },
         onClick: ({ row }) =>
-          openTicketDetail(row as TicketItem, { onChanged: reload }),
+          openTicketDetail(row as TicketItem, {
+            onChanged: reload,
+            onArchive: archive
+          }),
         index: -10,
         show: Boolean(auth.retrieve)
       }
