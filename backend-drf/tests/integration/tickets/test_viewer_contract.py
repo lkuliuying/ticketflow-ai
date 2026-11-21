@@ -25,7 +25,7 @@ def validate(data: object, definition: str) -> None:
 
 
 @pytest.fixture
-def users(seeded_module: None) -> dict[str, UserInfo]:
+def users(db: None, seeded_module: None) -> dict[str, UserInfo]:
     support = DeptInfo.objects.get(code="ticketflow_support")
     result = {}
     for name, role in (("requester", REQUESTER_ROLE), ("agent", AGENT_ROLE), ("admin", ADMIN_ROLE)):
@@ -291,13 +291,15 @@ def test_only_published_article_detail_counts_views(users, api_client):
     assert article.view_count == 6
 
 
-def test_ticket_search_fields_use_localized_sla_choices_and_relation_labels(users, api_client):
+def test_ticket_search_fields_use_localized_labels_and_sla_choices(users, api_client):
     api_client.force_authenticate(user=users["admin"])
     response = api_client.get("/api/tickets/search-fields")
     assert response.status_code == 200, response.data
     fields = {field["key"]: field for field in response.data["data"]}
     assert fields["assignee_id"]["label"] == "处理人"
     assert fields["department_id"]["label"] == "所属部门"
+    assert fields["sla"]["label"] == "SLA 状态"
+    assert fields["q"]["label"] == "关键字"
     assert {choice["value"]: choice["label"] for choice in fields["sla"]["choices"] if choice["value"]} == {
         "ON_TRACK": "正常",
         "DUE_SOON": "即将超时",

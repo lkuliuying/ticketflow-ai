@@ -8,7 +8,7 @@
     "visibility": {"enum": ["PUBLIC", "INTERNAL"]},
     "ticketSla": {
       "enum": ["ON_TRACK", "DUE_SOON", "OVERDUE", "MET"],
-      "description": "工单 sla 筛选值。search-fields 展示名依次为正常、即将超时、已超时、按时完成；assignee_id 和 department_id 分别显示为处理人和所属部门。"
+      "description": "工单 sla 筛选值。search-fields 中 sla 显示为 SLA 状态，选项依次显示为正常、即将超时、已超时、按时完成。q、assignee_id 和 department_id 分别显示为关键字、处理人和所属部门。"
     },
     "ticketViewer": {
       "type": "object",

@@ -97030,6 +97030,7 @@
             }
           },
           {
+            "description": "关键字",
             "in": "query",
             "name": "q",
             "schema": {
@@ -97046,7 +97047,7 @@
             }
           },
           {
-            "description": "* `ON_TRACK` - 正常\n* `DUE_SOON` - 即将超时\n* `OVERDUE` - 已超时\n* `MET` - 按时完成",
+            "description": "SLA 状态\n\n* `ON_TRACK` - 正常\n* `DUE_SOON` - 即将超时\n* `OVERDUE` - 已超时\n* `MET` - 按时完成",
             "in": "query",
             "name": "sla",
             "schema": {

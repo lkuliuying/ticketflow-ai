@@ -39,11 +39,15 @@ def add_trigram_indexes(apps, schema_editor):
 
 
 def remove_trigram_indexes(apps, schema_editor):
-    if schema_editor.connection.vendor != "postgresql":
+    connection = schema_editor.connection
+    if connection.vendor != "postgresql":
         return
     article = apps.get_model("knowledge", "KnowledgeArticle")
+    with connection.cursor() as cursor:
+        constraints = connection.introspection.get_constraints(cursor, article._meta.db_table)
     for index in reversed(INDEXES):
-        schema_editor.remove_index(article, index)
+        if constraints.get(index.name, {}).get("index"):
+            schema_editor.remove_index(article, index)
 
 
 class Migration(migrations.Migration):
