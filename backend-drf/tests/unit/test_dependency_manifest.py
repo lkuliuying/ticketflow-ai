@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.paths import WORKFLOW_DIR
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 LOCK_FILE = REPO_ROOT / "uv.lock"
@@ -340,7 +342,6 @@ def test_uv_export_reproduces_requirements_files():
 DOCKERFILE_BASE = REPO_ROOT / "Dockerfile-base"
 DOCKERFILE_DEV = REPO_ROOT / "Dockerfile-dev"
 DOCKERIGNORE = REPO_ROOT / ".dockerignore"
-WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 
 INSTALL_FROM_EXPORT = "pip install -r requirements"
 

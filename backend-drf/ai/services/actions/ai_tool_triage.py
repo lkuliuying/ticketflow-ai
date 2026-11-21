@@ -36,6 +36,15 @@ TRIAGE_RESOURCES = {
         "开放平台应用凭据为集成运维面",
     ),
     "file": ("exempt", "文件中心（上传/预览/回收站）为页面链路，含上传策略校验"),
+    "tickets": (
+        "exempt",
+        "工单查询、时间线、候选人与导出由有权限的用户在页面发起；建单、指派、流转、回复及采纳 AI 建议由用户提交，"
+        "沿用业务权限与状态校验。AI 只读通过工单专用上下文接口取授权字段与知识片段。",
+    ),
+    "knowledge/articles": (
+        "exempt",
+        "知识库列表与详情由页面读取，草稿创建、编辑及发布由有权限的用户发起；AI 侧通过专用上下文读取已发布文章片段。",
+    ),
     "audit": ("exempt", "审计日志查询为运维排障面（含脱敏与数据域控制），数据脱敏规则为安全配置面"),
     "task": (
         "exempt",
@@ -58,12 +67,12 @@ TRIAGE_RESOURCES = {
 
 
 def resource_key(url: str) -> str:
-    """候选 URL → 资源域键（``api/system/menu/...`` → ``system/menu``；``api/identity/user/...`` → ``identity``）。"""
+    """候选 URL → 资源域键；平台和知识库按资源细分，其余按首段归类。"""
     parts = [part for part in str(url or "").strip("/").split("/") if part and part != "api"]
     if not parts:
         return "?"
-    if parts[0] == "system" and len(parts) > 1:
-        return f"system/{parts[1]}"
+    if parts[0] in ("system", "knowledge") and len(parts) > 1:
+        return f"{parts[0]}/{parts[1]}"
     return parts[0]
 
 

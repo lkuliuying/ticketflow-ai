@@ -26,34 +26,34 @@
       "order": 20
     },
     {
-      "name": "modellabelfield.json",
-      "model": "system.modellabelfield",
-      "kind": "generated",
-      "order": 30
-    },
-    {
-      "name": "fieldpermission.json",
-      "model": "system.fieldpermission",
+      "name": "datadict.json",
+      "model": "system.datadict",
       "kind": "contract",
-      "order": 60
+      "order": 40
     },
     {
       "name": "userrole.json",
       "model": "identity.userrole",
       "kind": "contract",
-      "order": 35
+      "order": 45
+    },
+    {
+      "name": "fieldpermission.json",
+      "model": "system.fieldpermission",
+      "kind": "contract",
+      "order": 50
+    },
+    {
+      "name": "modellabelfield.json",
+      "model": "system.modellabelfield",
+      "kind": "generated",
+      "order": 60
     },
     {
       "name": "deptinfo.json",
       "model": "identity.deptinfo",
       "kind": "contract",
-      "order": 35
-    },
-    {
-      "name": "datadict.json",
-      "model": "system.datadict",
-      "kind": "contract",
-      "order": 40
+      "order": 70
     }
   ],
   "grants": "grants.json"

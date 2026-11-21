@@ -8,9 +8,7 @@
 任一处漂移都会让「压测基线」失去可比性，因此用测试锁住字面参数。
 """
 
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[3]
+from tests.paths import BACKEND_ROOT, WORKFLOW_DIR
 
 KEEP_ALIVE = "5"
 GRACEFUL_TIMEOUT = "30"
@@ -30,11 +28,11 @@ class TestGunicornParams:
         assert f"--graceful-timeout {GRACEFUL_TIMEOUT}" in cmd
 
     def test_perf_ci_uses_same_params(self):
-        text = (ROOT / ".github/workflows/perf.yml").read_text(encoding="utf-8")
+        text = (WORKFLOW_DIR / "perf.yml").read_text(encoding="utf-8")
         assert f"--keep-alive {KEEP_ALIVE}" in text
         assert f"--graceful-timeout {GRACEFUL_TIMEOUT}" in text
 
     def test_doc_records_same_params(self):
-        text = (ROOT / "docs/ops/performance-baseline.md").read_text(encoding="utf-8")
+        text = (BACKEND_ROOT / "docs/ops/performance-baseline.md").read_text(encoding="utf-8")
         assert f"--keep-alive {KEEP_ALIVE}" in text
         assert f"--graceful-timeout {GRACEFUL_TIMEOUT}" in text

@@ -8,11 +8,11 @@ CI 由命令行 ``--cov-fail-under`` 生效（该处同时是文档事实源 ``w
 """
 
 import re
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-COVERAGERC = REPO_ROOT / ".coveragerc"
-CI_WORKFLOW = REPO_ROOT / ".github/workflows/test.yml"
+from tests.paths import BACKEND_ROOT, WORKFLOW_DIR
+
+COVERAGERC = BACKEND_ROOT / ".coveragerc"
+CI_WORKFLOW = WORKFLOW_DIR / "test.yml"
 
 _FAIL_UNDER_RE = re.compile(r"^\s*fail_under\s*=\s*(\d+)\s*$", re.MULTILINE)
 _CI_FLAG_RE = re.compile(r"--cov-fail-under=(\d+)")

@@ -122,8 +122,10 @@ def _assert_inplace_fill(config_path):
     assert "# DB_PASSWORD: <your-db-password>" in config
     # 与 DB 无关的注释占位不被误改（模板尾部的注释键仍保持注释态）
     assert "#DEFAULT_CACHE_ID: 1" in config
-    # 追加分支兜底验证：文件末尾不应出现凭据（XADMIN_APPS 是模板最后一行）
-    assert xadmin_idx == len(lines) - 1
+    # 原位写入不增减行；应用和工单配置段在填充后应与模板一致。
+    template_lines = _read(os.path.join(REPO, "config_example.yml")).splitlines()
+    assert len(lines) == len(template_lines)
+    assert lines[xadmin_idx:] == template_lines[xadmin_idx:]
     assert redis_idx < xadmin_idx and db_idx < xadmin_idx
     # ALLOWED_HOSTS 原位填在模板注释占位处（Host 校验段，DEBUG 注释段之后、
     # 数据库配置段之前——与模板顺序一致，无重复键）

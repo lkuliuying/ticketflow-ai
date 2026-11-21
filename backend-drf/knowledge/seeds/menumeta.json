@@ -3,7 +3,7 @@
     "model": "system.menumeta",
     "pk": "d2431bc0-217a-49eb-a6fa-000000000061",
     "fields": {
-      "title": "工单知识库",
+      "title": "menus.ticketflowKnowledge",
       "icon": "ep:reading",
       "is_show_menu": true
     }

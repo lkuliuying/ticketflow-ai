@@ -226,7 +226,9 @@ class TestAppModuleDiscovery:
         assert "core_rbac" in module_index()
         assert "my_biz" not in module_index()
 
-    def test_missing_declaration_is_ignored(self, module_config):
+    def test_missing_declaration_is_ignored(self, monkeypatch, module_config):
+        app_without_declaration = django_apps.get_app_config("contenttypes")
+        monkeypatch.setattr(django_apps, "get_app_configs", lambda: [app_without_declaration])
         module_config()
         assert modules.discovered_modules() == ()
 
