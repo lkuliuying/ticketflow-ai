@@ -93,7 +93,7 @@ describe("ticketApi 写操作路径", () => {
     requestMock.mockResolvedValue({ code: 1000, data: {} });
   });
 
-  it("流转、指派、回复、时间线与看板", () => {
+  it("流转、指派、候选人、回复、时间线、看板与 AI 元数据", () => {
     const pk = "7f1c2d1e-0000-4000-8000-000000000001";
     ticketApi.transition(pk, { target_status: "IN_PROGRESS", version: 3 });
     ticketApi.assign(pk, { assignee_id: 9, version: 4 });
@@ -101,6 +101,7 @@ describe("ticketApi 写操作路径", () => {
     ticketApi.timeline(pk, { page: 2, size: 20 });
     ticketApi.dashboard({ status: "OPEN" });
     ticketApi.aiMetadata(pk, { version: 5, summary: "摘要", tags: ["vpn"] });
+    ticketApi.assignees(pk, "客服");
 
     const calls = requestMock.mock.calls.map(call => [call[0], call[1]]);
     expect(calls).toEqual([
@@ -109,11 +110,33 @@ describe("ticketApi 写操作路径", () => {
       ["post", `/api/tickets/${pk}/comments`],
       ["get", `/api/tickets/${pk}/timeline`],
       ["get", "/api/tickets/dashboard"],
-      ["post", `/api/tickets/${pk}/ai-metadata`]
+      ["post", `/api/tickets/${pk}/ai-metadata`],
+      ["get", `/api/tickets/${pk}/assignees`]
     ]);
+    expect(requestMock.mock.calls[6][2].params).toEqual({ q: "客服" });
     expect(requestMock.mock.calls[0][2].data).toEqual({
       target_status: "IN_PROGRESS",
       version: 3
     });
+  });
+});
+
+describe("ticketApi 指派候选人", () => {
+  beforeEach(() => {
+    requestMock.mockReset();
+    requestMock.mockResolvedValue({ code: 1000, data: [] });
+  });
+
+  it("关键字为空或只有空白时不带 q，否则去掉首尾空白", () => {
+    const pk = "7f1c2d1e-0000-4000-8000-000000000002";
+    ticketApi.assignees(pk);
+    ticketApi.assignees(pk, "   ");
+    ticketApi.assignees(pk, "  tf_agent ");
+
+    expect(requestMock.mock.calls.map(call => call[2].params)).toEqual([
+      {},
+      {},
+      { q: "tf_agent" }
+    ]);
   });
 });

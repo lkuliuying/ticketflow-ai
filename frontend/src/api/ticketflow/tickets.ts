@@ -63,6 +63,13 @@ export type TicketDashboard = {
   sla: Record<TicketSlaState, number>;
 };
 
+export type TicketAssignee = {
+  pk: number;
+  username: string;
+  nickname: string;
+  department_name: string | null;
+};
+
 export type TicketComment = {
   id: string;
   body: string;
@@ -164,6 +171,17 @@ class TicketApi extends BaseApi {
       {},
       data,
       `${this.baseApi}/${pk}/assign`
+    );
+  };
+
+  /** 指派候选人：可见且可处理该工单、并持有指派权限时可用；最多 20 条，按用户名与主键排序 */
+  assignees = (pk: string, q?: string) => {
+    const keyword = q?.trim();
+    return this.request<DetailResult<TicketAssignee[]>>(
+      "get",
+      keyword ? { q: keyword } : {},
+      undefined,
+      `${this.baseApi}/${pk}/assignees`
     );
   };
 
