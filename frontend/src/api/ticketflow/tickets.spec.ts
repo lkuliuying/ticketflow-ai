@@ -100,6 +100,7 @@ describe("ticketApi 写操作路径", () => {
     ticketApi.comments(pk, { body: "已处理", visibility: "INTERNAL" });
     ticketApi.timeline(pk, { page: 2, size: 20 });
     ticketApi.dashboard({ status: "OPEN" });
+    ticketApi.aiMetadata(pk, { version: 5, summary: "摘要", tags: ["vpn"] });
 
     const calls = requestMock.mock.calls.map(call => [call[0], call[1]]);
     expect(calls).toEqual([
@@ -107,7 +108,8 @@ describe("ticketApi 写操作路径", () => {
       ["post", `/api/tickets/${pk}/assign`],
       ["post", `/api/tickets/${pk}/comments`],
       ["get", `/api/tickets/${pk}/timeline`],
-      ["get", "/api/tickets/dashboard"]
+      ["get", "/api/tickets/dashboard"],
+      ["post", `/api/tickets/${pk}/ai-metadata`]
     ]);
     expect(requestMock.mock.calls[0][2].data).toEqual({
       target_status: "IN_PROGRESS",

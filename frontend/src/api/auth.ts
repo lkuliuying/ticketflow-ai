@@ -180,8 +180,8 @@ export function toAuthInfo(
     token: Boolean(caps?.basic?.token),
     encrypted: Boolean(caps?.basic?.encrypted),
     reset: Boolean(caps?.reset?.enabled),
-    email: Boolean(caps?.code?.email),
-    sms: Boolean(caps?.code?.sms)
+    email: Boolean(caps?.code?.enabled && caps.code.email),
+    sms: Boolean(caps?.code?.enabled && caps.code.sms)
   };
 }
 

@@ -52,6 +52,12 @@ describe("登录页能力探测", () => {
     });
   });
 
+  it("验证码登录总开关关闭时，邮箱与短信入口一并关闭", () => {
+    expect(
+      toAuthInfo({ code: { enabled: false, email: true, sms: true } })
+    ).toMatchObject({ email: false, sms: false });
+  });
+
   it("缺失字段一律视为关闭", () => {
     expect(toAuthInfo(undefined)).toMatchObject({
       access: false,

@@ -56,10 +56,8 @@ export function useTicketColumns({ t, te }: { t: TFunction; te: TeFunction }) {
       status: column => {
         column["cellRenderer"] = ({ row }) => {
           const status = (row as TicketItem).status;
-          return renderTag(
-            STATUS_TONE[status],
-            t(`ticketflow.statusValue.${status}`)
-          );
+          const key = `ticketflow.statusValue.${status}`;
+          return renderTag(STATUS_TONE[status], te(key) ? t(key) : status);
         };
       },
       category: column => {
@@ -86,7 +84,10 @@ export function useTicketColumns({ t, te }: { t: TFunction; te: TeFunction }) {
               type: SLA_TONE[state] ?? "info",
               effect: urgent ? "dark" : "plain"
             },
-            () => t(`ticketflow.slaValue.${state}`)
+            () =>
+              te(`ticketflow.slaValue.${state}`)
+                ? t(`ticketflow.slaValue.${state}`)
+                : state
           );
         };
       },
