@@ -122,6 +122,7 @@ import "element-plus/es/components/button/style/css";
 import "element-plus/es/components/button-group/style/css";
 import "element-plus/es/components/card/style/css";
 import "element-plus/es/components/cascader/style/css";
+import "element-plus/es/components/check-tag/style/css";
 import "element-plus/es/components/checkbox/style/css";
 import "element-plus/es/components/checkbox-button/style/css";
 import "element-plus/es/components/checkbox-group/style/css";
@@ -269,6 +270,10 @@ const lazyComponents: Record<string, () => Promise<Component>> = {
   ElCascader: () =>
     import("element-plus/es/components/cascader/index.mjs").then(
       m => m.ElCascader
+    ),
+  ElCheckTag: () =>
+    import("element-plus/es/components/check-tag/index.mjs").then(
+      m => m.ElCheckTag
     ),
   ElCheckboxButton: () =>
     import("element-plus/es/components/checkbox/index.mjs").then(
