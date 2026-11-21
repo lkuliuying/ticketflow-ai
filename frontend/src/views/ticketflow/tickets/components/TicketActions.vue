@@ -25,6 +25,7 @@ defineOptions({ name: "TicketFlowTicketActions" });
 const props = defineProps<{
   ticket: TicketDetail;
   run: TicketRun;
+  busy: boolean;
 }>();
 
 const { t } = useI18n();
@@ -68,6 +69,7 @@ async function searchCandidates(keyword: string) {
 }
 
 async function assign() {
+  if (assigneeId.value == null) return;
   const ok = await props.run(
     () =>
       ticketApi.assign(props.ticket.pk, {
@@ -91,6 +93,7 @@ async function assign() {
         v-for="to in ticket.available_transitions"
         :key="to"
         :type="transitionButtonType(ticket.status, to)"
+        :loading="busy"
         @click="transition(to)"
       >
         {{ t(transitionLabelKey(ticket.status, to)) }}
@@ -111,6 +114,7 @@ async function assign() {
         filterable
         remote
         clearable
+        :value-on-clear="null"
         :remote-method="searchCandidates"
         :loading="searching"
         :placeholder="t('ticketflow.detail.assigneePlaceholder')"
@@ -128,7 +132,11 @@ async function assign() {
           </span>
         </el-option>
       </el-select>
-      <el-button :disabled="assigneeId === null" @click="assign">
+      <el-button
+        :disabled="assigneeId == null || busy"
+        :loading="busy"
+        @click="assign"
+      >
         {{ t("ticketflow.detail.assign") }}
       </el-button>
     </div>

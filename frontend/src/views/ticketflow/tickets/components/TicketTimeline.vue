@@ -25,6 +25,8 @@ const entries = ref<TimelineEntry[]>([]);
 const total = ref(0);
 const page = ref(1);
 const loadingMore = ref(false);
+/** 服务端返回不足一页或没有新条目时视为到底，避免期间有新记录导致计数对不上而反复翻页 */
+const exhausted = ref(false);
 
 watch(
   () => props.ticket,
@@ -32,11 +34,14 @@ watch(
     entries.value = [...ticket.timeline.results];
     total.value = ticket.timeline.total;
     page.value = 1;
+    exhausted.value = false;
   },
   { immediate: true }
 );
 
-const hasMore = computed(() => entries.value.length < total.value);
+const hasMore = computed(
+  () => !exhausted.value && entries.value.length < total.value
+);
 
 async function loadMore() {
   loadingMore.value = true;
@@ -46,9 +51,13 @@ async function loadMore() {
     .catch(() => null);
   if (res && isSuccess(res)) {
     const seen = new Set(entries.value.map(item => item.id));
-    entries.value.push(...res.data.results.filter(item => !seen.has(item.id)));
+    const fresh = res.data.results.filter(item => !seen.has(item.id));
+    entries.value.push(...fresh);
     total.value = res.data.total ?? total.value;
     page.value = next;
+    if (res.data.results.length < PAGE_SIZE || fresh.length === 0) {
+      exhausted.value = true;
+    }
   }
   loadingMore.value = false;
 }

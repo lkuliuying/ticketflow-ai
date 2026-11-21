@@ -3,27 +3,29 @@ import { isSuccess } from "@/api/types";
 import { ticketApi, type TicketDetail } from "@/api/ticketflow/tickets";
 import { message } from "@/utils/message";
 
-/** 详情内写操作的统一执行器：成功刷新、409 提示并重新加载 */
+/** 详情内写操作的统一执行器：成功刷新、409 重新加载；执行中再次调用直接返回 false */
 export type TicketRun = (
   _action: () => Promise<{ code?: number }>,
   _successText: string
 ) => Promise<boolean>;
 
-/** http 拦截器对 4xx 以响应体 reject；工单冲突时响应体的 code 即 409 */
-function isConflict(error: unknown): boolean {
-  return (error as { code?: number } | null)?.code === 409;
+/** http 拦截器对 4xx 以响应体 reject，响应体的 code 与 HTTP 状态码一致 */
+function errorCode(error: unknown): number | undefined {
+  return (error as { code?: number } | null)?.code;
 }
 
 /**
  * 工单详情的数据与写操作。
  *
- * 写操作统一经 `run` 执行：成功后重新加载详情并通知列表刷新；收到 409
- * （版本过期或状态已不允许该动作）时重新加载，用户基于最新状态再操作。
- * 失败提示（含 409 的“工单已变更”）由 http 拦截器展示服务端 detail。
+ * - `load`：只有 404（不存在或不在可见范围）才进入“不存在”状态；网络异常或 5xx
+ *   保留当前已加载的详情，失败提示由 http 拦截器展示。
+ * - `run`：写操作统一入口，`busy` 期间拒绝重复提交；成功后重新加载详情并通知列表刷新；
+ *   收到 409（版本过期或状态已不允许该动作）时重新加载到最新版本，冲突文案由拦截器展示。
  */
 export function useTicketDetail(pk: string, onChanged?: () => void) {
   const detail = ref<TicketDetail | null>(null);
   const loading = ref(false);
+  const busy = ref(false);
   const notFound = ref(false);
 
   async function load() {
@@ -34,17 +36,16 @@ export function useTicketDetail(pk: string, onChanged?: () => void) {
         detail.value = res.data;
         notFound.value = false;
       }
-    } catch {
-      notFound.value = true;
+    } catch (error) {
+      if (errorCode(error) === 404) notFound.value = true;
     } finally {
       loading.value = false;
     }
   }
 
-  async function run(
-    action: () => Promise<{ code?: number }>,
-    successText: string
-  ): Promise<boolean> {
+  const run: TicketRun = async (action, successText) => {
+    if (busy.value) return false;
+    busy.value = true;
     try {
       const res = await action();
       if (!isSuccess(res)) return false;
@@ -53,14 +54,15 @@ export function useTicketDetail(pk: string, onChanged?: () => void) {
       onChanged?.();
       return true;
     } catch (error) {
-      // 冲突文案（服务端 detail）已由 http 拦截器展示，这里只负责刷新到最新状态
-      if (isConflict(error)) {
+      if (errorCode(error) === 409) {
         await load();
         onChanged?.();
       }
       return false;
+    } finally {
+      busy.value = false;
     }
-  }
+  };
 
-  return { detail, loading, notFound, load, run };
+  return { detail, loading, busy, notFound, load, run };
 }
