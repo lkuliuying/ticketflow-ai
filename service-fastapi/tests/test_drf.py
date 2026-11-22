@@ -68,7 +68,7 @@ async def test_drf_errors_are_not_retried(status, error, headers):
     assert len(calls) == 1
 
 
-async def test_drf_retries_connections_and_5xx_with_slot_released(monkeypatch, context_response):
+async def test_drf_retries_connections_and_5xx_with_jitter(monkeypatch, context_response):
     calls = []
     bounds = []
 
@@ -85,7 +85,6 @@ async def test_drf_retries_connections_and_5xx_with_slot_released(monkeypatch, c
         return high / 2
 
     async def pause(delay):
-        assert not resources.upstream_slots.locked()
         delays.append(delay)
 
     delays = []
@@ -106,6 +105,7 @@ async def test_drf_retries_connections_and_5xx_with_slot_released(monkeypatch, c
         (httpx.ConnectError, 3, 503, "DRF_UNAVAILABLE"),
         (httpx.ConnectTimeout, 3, 504, "DRF_TIMEOUT"),
         (httpx.ReadTimeout, 1, 504, "DRF_TIMEOUT"),
+        (httpx.PoolTimeout, 1, 503, "UPSTREAM_BUSY"),
         (httpx.WriteError, 1, 503, "DRF_UNAVAILABLE"),
     ],
 )
@@ -128,28 +128,22 @@ async def test_drf_exhaustion_and_timeout_mapping(monkeypatch, failure, attempts
     assert len(calls) == attempts
 
 
-async def test_total_budget_cancels_request_and_releases_slot():
+async def test_total_budget_cancels_request():
+    cancelled = False
+
     async def transport(request):
-        await sleep_forever()
+        nonlocal cancelled
+        try:
+            await sleep_forever()
+        finally:
+            cancelled = True
 
     async with transport_resources(transport, drf_total_timeout=0.02) as resources:
         with pytest.raises(ServiceError) as raised:
             await drf.fetch_ticket_context(resources, TICKET, TOKEN)
-        assert not resources.upstream_slots.locked()
 
+    assert cancelled
     assert (raised.value.status_code, raised.value.error) == (504, "DRF_TIMEOUT")
-
-
-async def test_wait_for_slot_has_its_own_budget():
-    def transport(request):
-        pytest.fail("must not make an HTTP request without a slot")
-
-    async with transport_resources(transport, upstream_slot_timeout=0.02) as resources:
-        async with resources.upstream_slots:
-            with pytest.raises(ServiceError) as raised:
-                await drf.fetch_ticket_context(resources, TICKET, TOKEN)
-
-    assert (raised.value.status_code, raised.value.error) == (503, "UPSTREAM_BUSY")
 
 
 @pytest.mark.parametrize("invalid", ["envelope", "wrong_ticket", "missing_reference_field", "not_json"])

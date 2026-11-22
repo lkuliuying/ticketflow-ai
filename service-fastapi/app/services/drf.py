@@ -6,7 +6,7 @@ from uuid import UUID
 import httpx
 
 from app.core.errors import ServiceError
-from app.core.resources import Resources, upstream_slot
+from app.core.resources import Resources
 from app.schemas.context import DrfContextResponse, TicketContext
 
 FORWARDED_ERRORS = {
@@ -17,17 +17,13 @@ FORWARDED_ERRORS = {
 }
 
 
-async def _request(resources: Resources, url: str, raw_token: str) -> httpx.Response:
-    async with upstream_slot(resources):
-        return await resources.http.get(url, headers={"Authorization": f"Bearer {raw_token}"})
-
-
 async def _request_with_retries(resources: Resources, url: str, raw_token: str) -> httpx.Response:
+    headers = {"Authorization": f"Bearer {raw_token}"}
     retries_left = resources.settings.drf_max_retries
     backoff = 0.1
     while True:
         try:
-            response = await _request(resources, url, raw_token)
+            response = await resources.drf_http.get(url, headers=headers)
         except httpx.ConnectError, httpx.ConnectTimeout:
             if not retries_left:
                 raise
@@ -65,6 +61,8 @@ async def fetch_ticket_context(resources: Resources, ticket_id: UUID, raw_token:
     try:
         async with timeout(resources.settings.drf_total_timeout):
             response = await _request_with_retries(resources, url, raw_token)
+    except httpx.PoolTimeout as exc:
+        raise ServiceError(503, "UPSTREAM_BUSY", "DRF 上下文连接池已用完") from exc
     except (httpx.TimeoutException, TimeoutError) as exc:
         raise ServiceError(504, "DRF_TIMEOUT", "DRF 上下文请求超时") from exc
     except httpx.RequestError as exc:

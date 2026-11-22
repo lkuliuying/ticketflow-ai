@@ -30,10 +30,10 @@ uv run uvicorn app.main:app --port 8897
 | `HTTP_CONNECT_TIMEOUT` | `1.0` | HTTP 连接超时，单位秒 |
 | `HTTP_READ_TIMEOUT` | `3.0` | HTTP 读写各阶段超时，单位秒 |
 | `DRF_TOTAL_TIMEOUT` | `5.0` | 工单上下文 HTTP 调用的总预算，包含排队与重试，单位秒 |
-| `HTTP_MAX_CONNECTIONS` | `32` | 每个进程 HTTP 连接池的总连接数与空闲连接数上限 |
-| `UPSTREAM_CONCURRENCY` | `16` | 每个进程同时执行的上游请求上限 |
-| `UPSTREAM_SLOT_TIMEOUT` | `1.0` | 等待上游并发额度或 HTTP 池连接的超时，单位秒 |
-| `DRF_MAX_RETRIES` | `2` | 连接失败、连接超时和 5xx 的额外尝试次数，范围 0–5。退避期间释放并发额度 |
+| `HTTP_MAX_CONNECTIONS` | `32` | 每个进程的 DRF 与模型提供方各有独立连接池，每个池的总连接数与空闲连接数均受此值限制。DRF 以连接池限制并发 |
+| `UPSTREAM_CONCURRENCY` | `16` | 每个进程同时执行的模型分析和流式生成上限 |
+| `UPSTREAM_SLOT_TIMEOUT` | `1.0` | 等待模型并发额度或 HTTP 池连接的超时，单位秒 |
+| `DRF_MAX_RETRIES` | `2` | 连接失败、连接超时和 5xx 的额外尝试次数，范围 0–5 |
 | `LLM_TIMEOUT` | `30` | 分析模型调用总预算及兼容提供方的 HTTP 读写超时，单位秒 |
 | `STREAM_TIMEOUT` | `90` | 整条流式生成的总预算，单位秒 |
 | `STREAM_PING_INTERVAL` | `10` | 流式心跳间隔，单位秒 |
@@ -65,4 +65,4 @@ uv run ruff check .
 uv run mypy
 ```
 
-真实 Redis 用例需设置 `AUTH_TEST_REDIS_URL` 后运行同一套测试。例如启动 DRF 的测试栈后，将它设为 `redis://127.0.0.1:56379/1`。该用例使用随机令牌和键，并清理自己写入的数据。
+真实 Redis 用例需设置 `AUTH_TEST_REDIS_URL` 后运行同一套测试。例如启动 DRF 的测试栈后，将它设为 `redis://127.0.0.1:56379/1`。这些用例使用随机令牌和键，验证撤销状态及分析缓存的读写，并清理各自写入的数据。

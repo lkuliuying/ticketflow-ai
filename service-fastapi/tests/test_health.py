@@ -7,8 +7,11 @@ from redis.exceptions import ConnectionError
 
 
 def test_health_uses_shared_clients_and_closes_them(application, monkeypatch):
+    monkeypatch.setenv("MOCK_LLM", "false")
+    monkeypatch.setenv("LLM_API_KEY", "test-only")
     with TestClient(application) as client:
         resources = application.state.resources
+        llm_http = resources.provider.http
         ping = AsyncMock(return_value=True)
         monkeypatch.setattr(resources.redis, "ping", ping)
         close_redis = AsyncMock(wraps=resources.redis.aclose)
@@ -19,9 +22,12 @@ def test_health_uses_shared_clients_and_closes_them(application, monkeypatch):
         assert response.json() == {"status": "ok", "redis": "ok"}
         assert client.get("/ai/v1/health").status_code == 200
         assert ping.await_count == 2
-        assert not resources.http.is_closed
+        assert resources.drf_http is not llm_http
+        assert not resources.drf_http.is_closed
+        assert not llm_http.is_closed
 
-    assert resources.http.is_closed
+    assert resources.drf_http.is_closed
+    assert llm_http.is_closed
     close_redis.assert_awaited_once()
 
 

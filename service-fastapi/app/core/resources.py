@@ -16,7 +16,7 @@ from app.services.providers import LLMProvider
 @dataclass(frozen=True, slots=True)
 class Resources:
     settings: Settings
-    http: httpx.AsyncClient
+    drf_http: httpx.AsyncClient
     redis: Redis
     upstream_slots: asyncio.Semaphore
     provider: LLMProvider

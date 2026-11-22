@@ -18,19 +18,18 @@ from app.services.providers import build_provider
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = Settings()
+    http_timeout = httpx.Timeout(
+        settings.http_read_timeout,
+        connect=settings.http_connect_timeout,
+        pool=settings.upstream_slot_timeout,
+    )
+    http_limits = httpx.Limits(
+        max_connections=settings.http_max_connections,
+        max_keepalive_connections=settings.http_max_connections,
+    )
     async with (
-        httpx.AsyncClient(
-            timeout=httpx.Timeout(
-                settings.http_read_timeout,
-                connect=settings.http_connect_timeout,
-                pool=settings.upstream_slot_timeout,
-            ),
-            limits=httpx.Limits(
-                max_connections=settings.http_max_connections,
-                max_keepalive_connections=settings.http_max_connections,
-            ),
-            trust_env=False,
-        ) as http,
+        httpx.AsyncClient(timeout=http_timeout, limits=http_limits, trust_env=False) as drf_http,
+        httpx.AsyncClient(timeout=http_timeout, limits=http_limits, trust_env=False) as llm_http,
         Redis.from_url(
             str(settings.auth_redis_url),
             decode_responses=False,
@@ -39,8 +38,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             retry=Retry(NoBackoff(), 0),
         ) as redis,
     ):
-        provider = build_provider(settings, http)
-        app.state.resources = Resources(settings, http, redis, Semaphore(settings.upstream_concurrency), provider)
+        provider = build_provider(settings, llm_http)
+        app.state.resources = Resources(settings, drf_http, redis, Semaphore(settings.upstream_concurrency), provider)
         yield
 
 

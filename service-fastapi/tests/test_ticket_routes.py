@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from dataclasses import replace
 from uuid import uuid4
 
@@ -7,15 +8,16 @@ import httpx
 import jwt
 import pytest
 from conftest import ARTICLE, TICKET
+from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from app.api import tickets
 from app.core.config import Settings
 from app.core.errors import ProviderError
 from app.core.resources import Resources
 from app.schemas.context import TicketContext
 from app.schemas.tickets import AnalysisDraft
 from app.services import prompts, retry
+from app.services.analysis import analysis_cache_key
 from app.services.providers import OpenAICompatibleProvider
 
 ANALYZE = "/ai/v1/tickets/analyze"
@@ -25,7 +27,7 @@ pytestmark = pytest.mark.anyio
 
 class InMemoryRedis:
     def __init__(self):
-        self.values = {}
+        self.values: dict[bytes, bytes] = {}
         self.reads = 0
         self.ttls = []
         self.outage = False
@@ -37,12 +39,12 @@ class InMemoryRedis:
         self.reads += 1
         if self.outage:
             raise RedisConnectionError
-        return self.values.get(key)
+        return self.values.get(key.encode())
 
     async def set(self, key, value, *, ex):
         if self.outage:
             raise RedisConnectionError
-        self.values[key] = value
+        self.values[key.encode()] = value.encode()
         self.ttls.append(ex)
 
 
@@ -110,19 +112,53 @@ async def test_cache_rechecks_drf_and_uses_current_ticket(harness, context_respo
     other_ticket = str(uuid4())
     context_response["data"]["ticket"].update(id=other_ticket, title="ＶＰＮ\n无法 连接", version=9)
     body["ticket_id"] = other_ticket
-    hit = await http.post(ANALYZE, json=body, headers=bearer())
-    assert hit.json() == {**first.json(), "ticket_id": other_ticket, "ticket_version": 9}
-    assert resources.provider.analyzed == 1
-    assert len(calls) == 2
+    async with resources.upstream_slots:
+        assert resources.upstream_slots.locked()
+        hit = await http.post(ANALYZE, json=body, headers=bearer())
+        assert hit.status_code == 200
+        assert hit.json() == {**first.json(), "ticket_id": other_ticket, "ticket_version": 9}
 
-    for status in (403, 404):
-        set_status(status)
-        denied = await http.post(ANALYZE, json=body, headers=bearer())
-        assert denied.status_code == status
-        assert denied.json()["code"] == status
+        for status in (403, 404):
+            set_status(status)
+            denied = await http.post(ANALYZE, json=body, headers=bearer())
+            assert denied.status_code == status
+            assert denied.json()["code"] == status
     assert resources.redis.reads == 2
     assert len(calls) == 4
     assert resources.provider.analyzed == 1
+
+
+@pytest.mark.integration
+async def test_analysis_writes_and_reads_real_redis_cache(harness, context_response, claims):
+    redis_url = os.environ.get("AUTH_TEST_REDIS_URL")
+    if not redis_url:
+        pytest.skip("set AUTH_TEST_REDIS_URL to run against the real test Redis")
+
+    http, application, resources, bearer, calls, _ = harness
+    context = TicketContext.model_validate(context_response["data"])
+    key = analysis_cache_key(resources, claims["user_id"], context)
+    body = {"ticket_id": str(TICKET)}
+    headers = bearer()
+
+    async with Redis.from_url(redis_url, decode_responses=False) as redis:
+        application.state.resources = replace(resources, redis=redis)
+        try:
+            assert await redis.get(key) is None
+            miss = await http.post(ANALYZE, json=body, headers=headers)
+            assert miss.status_code == 200
+            cached = await redis.get(key)
+            assert isinstance(cached, bytes)
+            assert AnalysisDraft.model_validate_json(cached) == resources.provider.draft
+            assert 0 < await redis.ttl(key) <= resources.settings.analysis_cache_ttl
+
+            async with resources.upstream_slots:
+                hit = await http.post(ANALYZE, json=body, headers=headers)
+            assert hit.status_code == 200
+            assert hit.json() == miss.json()
+            assert resources.provider.analyzed == 1
+            assert len(calls) == 2
+        finally:
+            await redis.delete(key)
 
 
 async def test_cache_keys_bind_user_text_categories_model_and_prompt(harness, context_response, monkeypatch):
@@ -177,18 +213,14 @@ async def test_analysis_cache_outage_falls_through(harness):
 
 
 @pytest.mark.parametrize("path", [ANALYZE, STREAM])
-async def test_provider_slot_timeout_is_json_before_generation(harness, context_response, monkeypatch, path):
-    http, _, resources, bearer, _, _ = harness
-
-    async def context(*args):
-        return TicketContext.model_validate(context_response["data"])
-
-    monkeypatch.setattr(tickets, "fetch_ticket_context", context)
+async def test_provider_slot_timeout_is_json_before_generation(harness, path):
+    http, _, resources, bearer, calls, _ = harness
     async with resources.upstream_slots:
         result = await http.post(path, json={"ticket_id": str(TICKET)}, headers=bearer())
         assert resources.upstream_slots.locked()
     assert result.status_code == 503
     assert result.json()["error"] == "UPSTREAM_BUSY"
+    assert len(calls) == 1
     assert resources.provider.analyzed == resources.provider.streamed == 0
 
 
