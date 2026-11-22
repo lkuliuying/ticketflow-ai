@@ -54,3 +54,14 @@
 > 当前映射：998 → 400、999 → 429、40001/40002 → 401、未预期异常 → 500；
 > **验证码发送限流**（`CodeSendOverRate` / `CodeSendTooFrequently`，目标维度发送间隔，文案含剩余秒数）
 > 同样归类 429——业务码随状态码写回，前端 `errorStrategies` 的 429 策略负责提示与去重。
+
+### TicketFlow FastAPI
+
+FastAPI 的 `code` 为 HTTP 状态码整数。SSE 在已建流后用相同的错误码，并附 `retryable`。
+
+| code | error | 含义 |
+| --- | --- | --- |
+| 502 | `LLM_INVALID_OUTPUT` | 提供方输出无效，包含不符合当前工单分类词表的结果 |
+| 503 | `UPSTREAM_BUSY` | 等待上游并发槽位超时 |
+| 503 | `LLM_UNAVAILABLE` | 模型提供方请求失败或限流 |
+| 504 | `LLM_TIMEOUT` | 模型提供方调用或整条生成流超时 |
