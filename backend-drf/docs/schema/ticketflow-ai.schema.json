@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TicketFlow FastAPI contract",
+  "$defs": {
+    "request": {
+      "description": "POST /ai/v1/tickets/analyze 与 POST /ai/v1/tickets/suggest-reply/stream 共用 Bearer access token 和请求体。",
+      "type": "object",
+      "required": ["ticket_id"],
+      "properties": {"ticket_id": {"type": "string", "format": "uuid"}}
+    },
+    "analysis": {
+      "description": "分析成功时返回 HTTP 200 和此 JSON 对象。category 必须属于当前 DRF 上下文的 categories。",
+      "type": "object",
+      "required": ["ticket_id", "ticket_version", "category", "suggested_priority", "summary", "tags"],
+      "properties": {
+        "ticket_id": {"type": "string", "format": "uuid"},
+        "ticket_version": {"type": "integer", "minimum": 1},
+        "category": {"type": "string", "minLength": 1},
+        "suggested_priority": {"$ref": "ticketflow.schema.json#/$defs/priority"},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "tags": {"type": "array", "uniqueItems": true, "maxItems": 12, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+      }
+    },
+    "httpError": {
+      "description": "HTTP JSON 错误，code 等于响应状态码。",
+      "type": "object",
+      "required": ["code", "error", "detail"],
+      "properties": {"code": {"type": "integer"}, "error": {"type": "string"}, "detail": {"type": "string"}}
+    },
+    "streamMeta": {
+      "description": "HTTP 200 text/event-stream 的首帧 meta，references 为引用文章 ID。",
+      "type": "object",
+      "required": ["ticket_id", "ticket_version", "references"],
+      "properties": {
+        "ticket_id": {"type": "string", "format": "uuid"},
+        "ticket_version": {"type": "integer", "minimum": 1},
+        "references": {"type": "array", "items": {"type": "string", "format": "uuid"}}
+      }
+    },
+    "streamDelta": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {"text": {"type": "string", "minLength": 1}}
+    },
+    "streamPing": {"const": {}},
+    "streamDone": {
+      "type": "object",
+      "required": ["finish_reason"],
+      "properties": {"finish_reason": {"const": "stop"}}
+    },
+    "streamError": {
+      "description": "建流后失败，以 error 帧结束。",
+      "allOf": [{"$ref": "#/$defs/httpError"}, {"type": "object", "required": ["retryable"], "properties": {"retryable": {"type": "boolean"}}}]
+    }
+  }
+}

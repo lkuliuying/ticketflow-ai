@@ -38,10 +38,14 @@ def git(repo: Path, *args: str) -> str:
 
 def task_brief(task: str) -> str:
     """从任务书中截取该任务的小节。"""
-    name = "backend.md" if task.startswith("BE-") else "frontend.md"
-    text = read(COLLAB / "tasks" / name)
-    match = re.search(rf"^## {re.escape(task)}\b.*?(?=^## |\Z)", text, re.S | re.M)
-    return match.group(0) if match else text
+    texts = [read(COLLAB / "tasks" / name) for name in ("backend.md", "frontend.md")]
+    for text in texts:
+        match = re.search(rf"^## {re.escape(task)}\b.*?(?=^## |^# |^---|\Z)", text, re.S | re.M)
+        if match:
+            # 迭代小节（“# 迭代 N”到第一个任务之间）写的是通用要求，评审也需要看到
+            preamble = re.search(r"^# 迭代.*?(?=^## )", text[: match.start()], re.S | re.M)
+            return (preamble.group(0) if preamble else "") + match.group(0)
+    return "\n\n".join(texts)
 
 
 def build_prompt(task: str, branch: str, repo: Path, round_no: int, previous: str, base: str = "main") -> str:

@@ -60,25 +60,19 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 ## 当前迭代
 
+迭代 3：AI 能力（Phase 3 FastAPI 服务 + Phase 4b AI 面板），里程碑 M3 见
+[开发计划书](../docs/development/开发计划书.md)。迭代 2 的 13 项任务已全部合并到 `main`。
+
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| BE-01 | 测试环境与全量门禁基线 | Codex | — | 已完成：GitHub Unit Tests 7916 passed / 覆盖率 89.40%（run 44890598079） |
-| BE-02 | 前端所需的契约补口 | Codex | — | 已合并 |
-| BE-03 | Phase 2 测试补全 | Codex | BE-04 | 评审通过 |
-| BE-04 | Phase 2 遗留问题修复 | Codex | — | 评审通过 |
-| IT-01 | 联调环境（BE-02 + FE-01） | Codex | BE-02 | 已完成，环境常驻 :8896 |
-| CI-01 | GitHub CI 在 Monorepo 下转绿（后端） | Codex | — | 已合并 |
-| CI-02 | CI 前端侧：assignees 消费与菜单词条 | Claude | — | 已合并 |
-| CI-03 | 修复 CI 中 Unit Tests 卡死（关闭 BE-01） | Codex | BE-04 | 评审通过 |
-| FE-01 | 工单 API 层与列表页 | Claude | — | 已合并 |
-| FE-02 | 工单详情：流转、指派、回复、时间线 | Claude | BE-02 | 评审通过 |
-| FE-03 | 知识库列表、详情、编辑与转存 | Claude | BE-02 | 评审通过 |
-| FE-04 | 看板与异步导出入口 | Claude | FE-01 | 评审通过 |
-| FE-05 | 词条、单测与 E2E 冒烟 | Claude | FE-01..04 | 待开始 |
-| FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 待开始 |
+| SV-01 | FastAPI 骨架、联合鉴权与健康检查 | Codex | — | 评审通过，已集成 |
+| SV-02 | 工单分析、流式回复、提供方与联调常驻 | Codex | SV-01 | 评审通过，已集成，常驻 :8897 |
+| FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 评审通过，已集成 |
+| FE-07 | 工单 AI 面板 | Claude | SV-02 | 评审通过，已集成 |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)。
-Phase 3（FastAPI）和 Phase 4b（AI 面板）在本迭代评审通过后再下发。
+集成分支 `integration/iter3`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
+FE-05（E2E 冒烟）随迭代 4 交付。
 
 ## CLI 调度（Claude 执行）
 

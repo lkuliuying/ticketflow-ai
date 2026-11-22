@@ -58,3 +58,22 @@
 - `locales` 增加 `menus.ticketflow`、`menus.ticketflowTickets`、`menus.ticketflowKnowledge`（zh / en 对称），
   与 CI-01 改为 i18n key 的菜单标题配套。
 
+
+## FE-07 工单 AI 面板（迭代 3，依赖 SV-02）
+
+分支：`fe/ai-panel`。接口见 Phase 1 设计评审的 FastAPI 契约与 SV-02 完成报告。
+
+- 开发代理：`vite.config.ts` 增加 `/ai` → `http://127.0.0.1:8897`（HTTP，不缓冲）。生产由 Nginx 转发，前端只用相对路径 `/ai/v1/...`。
+- API 层 `src/api/ticketflow/ai.ts`：`analyze(ticketId)` 走 axios（`/ai/v1/tickets/analyze`，错误信封 `{code, error, detail}`，`code` 为 HTTP 状态码整数）；
+  `streamReply(ticketId, handlers, signal)` 复用 `src/utils/sse.ts` 的 `postSse`，按 `meta` / `delta` / `done` / `error` / `ping` 分发。
+  缺少 `done` 就结束的流按中断处理。
+- 详情抽屉右侧 AI 面板，只在 `viewer.can_handle` 为真时显示：
+  - **分析**：显示建议分类、优先级、摘要、标签，“一键采纳”调用 `POST /api/tickets/{id}/ai-metadata`，带分析结果里的 `ticket_version`；
+    409 时提示工单已变更并重新加载详情，分析结果标记为过期。采纳后刷新详情。
+  - **流式回复**：点“生成回复”逐帧追加正文，生成中可“停止”（AbortController），切换工单或关闭抽屉时自动取消；
+    `done` 后可“填入回复框”，填入对外回复编辑区，发送仍由用户点击。`error` 帧显示 `detail`，`retryable` 时提供重试。
+    显示引用的知识文章（`meta.references`）。
+  - 401 走既有登录过期处理；403 / 404 / 429 / 503 / 504 显示服务端 `detail`。
+- 单测：帧分发（含半帧、`ping`、缺 `done`、`error`）、采纳请求带版本、停止后不再追加正文。
+- 词条 zh / en 对称；跑 `frontend/AGENTS.md` 第六节门禁。
+- 联调：在 `:8848` 用 `tf_agent` 走通分析 → 采纳、生成 → 停止 → 重新生成 → 填入回复 → 发送；用 `tf_requester` 确认面板不出现。

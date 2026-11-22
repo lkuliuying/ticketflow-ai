@@ -1,5 +1,7 @@
 # 后端任务书（Codex）
 
+迭代 2 的任务（BE-01~BE-04、IT-01、CI-01、CI-03）已完成；迭代 3 的 SV-01、SV-02 在文末。
+
 工作目录 `backend-drf/`，遵循 `backend-drf/AGENTS.md`。契约基线是
 [Phase 1 设计评审](../../backend-drf/docs/plans/ticketflow-phase-1.md)。顺序：BE-02 优先（阻塞前端），
 BE-01 可并行；BE-03、BE-04 在 BE-01 之后。
@@ -211,3 +213,104 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
    与 `postUpdateOptions`，后端规则限定到 `backend-drf/**`；删除 `backend-drf/renovate.json`。`frontend/renovate.json` 由 Claude 删除。
    Django 规则说明里的 `docs/adr` 改为 `backend-drf/docs/adr`。
 3. `TicketFilter.sla` 补 `label="SLA 状态"`，`q` 补 `label="关键字"`。
+
+---
+
+# 迭代 3：FastAPI 异步 AI 服务（Phase 3）
+
+两个任务在同一分支 `be/ai-service`（从最新 `main` 切出）上顺序完成，SV-02 在 SV-01 评审通过后开始。
+代码放在仓库根目录 `service-fastapi/`（任务书明确允许改这个目录、根目录 `.github/workflows/` 中新增的服务工作流，
+以及 `backend-drf/` 里为联调所需的最小配置）。设计依据是 Phase 1 设计评审的“API 契约”“JWT 联合鉴权”
+“FastAPI 与前端接线”三节，契约以那里为准；有必须偏离的地方，先在报告里写明理由。
+
+通用要求：
+
+- 独立依赖锁：`service-fastapi/pyproject.toml` + `uv.lock`，与 `backend-drf` 互不引用。Python 版本与后端一致。
+  依赖控制在 FastAPI、uvicorn、httpx、redis（asyncio）、pydantic v2 / pydantic-settings、PyJWT 这一级，测试用 pytest、
+  pytest-asyncio（或 anyio）、respx 或 httpx `MockTransport`。
+- 目录：`app/api`（路由）、`app/core`（配置、lifespan、鉴权、错误）、`app/schemas`（Pydantic 模型）、`app/services`
+  （DRF 客户端、提供方、缓存）。单文件 ≤ 500 行、单函数 ≤ 100 行，沿用后端的这条约定。
+- 配置全部来自环境变量（`pydantic-settings`），不写死密钥；提供 `service-fastapi/.env.example`（只放占位值）。
+- 测试用真实 Redis（后端测试栈 `compose.test.yml` 的 56379，或服务自己的 compose），DRF 用 `MockTransport` / respx 模拟；
+  `ruff format --check`、`ruff check`、`mypy`（strict 或接近 strict）、`pytest` 全部通过，报告贴结果。
+- 根目录 `.github/workflows/` 新增一个只在 `service-fastapi/**` 变化时触发的工作流：`uv sync --locked`、ruff、mypy、
+  pytest（带 Redis service）。不要改动现有后端和前端工作流的行为。
+- 源码、注释、测试名里不写任务编号。
+
+## SV-01 FastAPI 骨架、联合鉴权与健康检查
+
+分支：`be/ai-service`
+
+1. **应用与 lifespan**：`app/main.py` 创建应用，lifespan 内建立整个进程复用的 `httpx.AsyncClient`（分别设置连接、
+   读取、总超时与连接池上限）、`redis.asyncio` 客户端（连 DRF 认证用的同一个逻辑库，由配置 `AUTH_REDIS_URL` 指定，
+   语义对应 DRF 的 `DEFAULT_CACHE_ID`，默认 1）以及上游并发信号量（容量可配），关闭时释放。路由前缀 `/ai/v1`。
+2. **鉴权依赖 `get_current_user`**：完全按设计文档“JWT 联合鉴权”实现：
+   - PyJWT 固定 `algorithms=["HS256"]`，校验 `aud="x"`、`iss="server"`、`exp`、`iat`、`jti`、`user_id`，`token_type == "access"`，
+     leeway 0；签名密钥来自 `JWT_SIGNING_KEY`（与 DRF 的 `SIMPLE_JWT.SIGNING_KEY` 同值）。缺少 `sid` 的旧 token 允许通过。
+   - 一次 `MGET` 读取三个撤销键：`black_access_token_{user_id}_{md5(raw_token)}`、`user_token_revoked_{user_id}`
+     （存在有效时间戳且 `iat <= revoked_at` 时拒绝）、`session_token_revoked_{sid}`（有 `sid` 时）。
+     先读 `backend-drf/packages/xadmin-common/common/core/auth/authentication.py` 和 `common/cache/storage.py`，
+     **按 DRF 实际写入的值格式解析**（Django 缓存的序列化方式、键是否带前缀和版本），并在报告里写明依据。
+   - 认证 Redis 超时或异常返回 503；任一校验失败返回 401。
+3. **错误信封**：建流前的所有错误统一为 `{code, error, detail}`（`code` 为 HTTP 状态码整数，`error` 为机器可读标识），HTTP 状态码按设计文档（401 / 403 / 404 / 422 / 503 / 504）。
+   重写 FastAPI 默认的 422 和 HTTPException 输出，`detail` 为字符串。
+4. **`GET /ai/v1/health`**：不需要 token，Redis `PING` 正常返回 200 `{status: "ok", redis: "ok"}`，否则 503。
+5. **DRF 上下文客户端**：`services/drf.py` 用同一个 `AsyncClient` 转发用户原始 Bearer token 调用
+   `GET {DRF_BASE_URL}/api/tickets/{id}/ai-context`，把 DRF 的 401 / 403 / 404 / 429 / 5xx 映射到服务的 `{code, detail}`
+   （429 透传 `Retry-After`），连接失败或超时返回 503 / 504。只对短暂连接错误和 5xx 做有上限的带抖动指数退避，
+   等待期间不占用上游信号量。解析为 Pydantic 模型（工单 `id/title/description/category/priority/version`、
+   `categories`、`references[{article_id, title, excerpt}]`）。本任务先实现并测试客户端，SV-02 的接口再用它。
+6. **测试**：用测试内签发的 token 覆盖：合法 access 通过；refresh token、过期、`iat` 在未来、错误 `aud` / `iss`、
+   错误算法（包括 `none`）、缺 `jti` 都 401；三个撤销键各自生效；Redis 不可达返回 503；health 正常与 Redis 断开；
+   DRF 客户端的状态码映射与重试次数。
+7. **启动方式**：`uv run uvicorn app.main:app --port 8897` 可在宿主机启动；提供 `service-fastapi/Dockerfile`
+   （多阶段、非 root）。README 写清环境变量。
+
+完成标准：上述测试与门禁通过；报告给出各错误路径的示例响应和撤销键值格式的依据。
+
+## SV-02 工单分析、流式回复、提供方与联调常驻
+
+分支：`be/ai-service`（接着 SV-01 的提交继续）
+
+在 SV-01 的基础上：
+
+1. **提供方抽象**：`LLMProvider` 协议，两个方法：`analyze(context) -> AnalysisDraft`、`stream_reply(context) -> AsyncIterator[str]`。
+   - `MockProvider`（`MOCK_LLM=true`，默认）：结果由工单文本确定性生成（分类从 `categories` 中选、优先级 P0–P3、
+     摘要与 2–5 个标签，长度在 Pydantic 限制内），可配置首字延迟、段间延迟、段数，以及 `MOCK_LLM_MODE=normal|slow|timeout|error`
+     模拟慢响应、超时和上游错误。用 `asyncio.sleep`，不阻塞事件循环。
+   - `OpenAICompatibleProvider`：OpenAI 兼容的 chat completions（`LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`），分析用 JSON 输出
+     再经 Pydantic 校验，流式解析上游 SSE。没有密钥时不可选；CI 和联调只跑 Mock，但要有用 `MockTransport` 模拟上游的单测。
+   - 两种提供方共用同一套验权、信号量、超时与错误映射，提供方之外的代码不区分 Mock。
+   - 模型输入只包含 `ai-context` 返回的工单文本和知识片段；提示词放在单独模块并带 `PROMPT_VERSION`。
+2. **`POST /ai/v1/tickets/analyze`**，请求 `{ticket_id: UUID}`：
+   - 鉴权 → 调 DRF `ai-context`（缓存命中时也必须先调，以确认授权）→ 查缓存 → 未命中时在信号量内调提供方 → Pydantic v2 校验 →
+     写缓存 → 返回 `{ticket_id, ticket_version, category, suggested_priority, summary, tags}`。
+   - 校验：`category` 必须在本次上下文的 `categories` 内，`suggested_priority` ∈ P0–P3，`summary` 有长度上限，`tags` 为去重后的
+     有限个短字符串（上限与 DRF `POST /api/tickets/{id}/ai-metadata` 的校验一致，先读 DRF 序列化器）。提供方返回不合法时返回 502 或 503
+     （在报告里说明选择），不写缓存。
+   - 缓存键绑定：用户 ID、规范化文本摘要（标题 + 描述 + 分类，去除空白与格式差异后哈希）、分类词表版本（对 `categories` 取哈希）、
+     模型名、`PROMPT_VERSION`；TTL 默认 600 秒；只缓存校验通过的结果；响应里的 `ticket_id`、`ticket_version` 用本次上下文的值。
+     缓存 Redis 故障时直接回源，不影响分析。
+   - 等待信号量与调用提供方分别有超时预算：等不到槽位返回 503，提供方超时返回 504。
+3. **`POST /ai/v1/tickets/suggest-reply/stream`**，请求 `{ticket_id: UUID}`，`text/event-stream`：
+   - 建流前（鉴权、DRF 上下文、等待槽位）的错误按 `{code, error, detail}` JSON 返回对应状态码，不开流。
+   - 帧格式 `event: <name>\ndata: <json>\n\n`，事件顺序：`meta`（`{ticket_id, ticket_version, references: [article_id...]}`）→
+     零到多个 `delta`（`{text}`）→ `done`（`{finish_reason}`）；建流后失败以 `error`（`{code, error, detail, retryable}`，`code` 为整数）结束；
+     等待但没有增量超过心跳间隔（可配，默认 10 秒）时发 `ping`。
+   - 响应头带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`。
+   - 客户端断开时停止生成、关闭上游响应并**释放信号量**；整条流有总时长上限。第一段正文发出之前允许对上游做一次重试，之后不重试。
+4. **测试**：分析的缓存命中 / 未命中 / 键随文本、用户、词表、提示词版本变化 / DRF 拒绝时缓存不生效；非法提供方输出不入缓存；
+   信号量占满时的 503；提供方超时 504；SSE 帧序（含 ping、error 结尾）；**客户端中途断开后信号量计数恢复**（用断言而不是 sleep 猜测）；
+   OpenAI 兼容提供方的 JSON 解析与流式解析。
+5. **联调常驻**（不改 DRF 业务代码）：在本机起一个常驻的 FastAPI（`MOCK_LLM=true`），地址 `http://127.0.0.1:8897`，
+   使用联调环境 `ticketflow-local` 的 DRF（`http://127.0.0.1:8896`）与其 Redis 认证库，`JWT_SIGNING_KEY` 与联调 DRF 一致
+   （必要时在联调环境的 `config.yml` 显式配置同一个 `JWT_SIGNING_KEY` 并重启 DRF；只改联调配置，不提交密钥）。
+   方式自选（加入 `ticketflow-local` 的 compose 网络，或宿主机进程常驻），报告写清启停命令。
+   Mock 的首字延迟和段间延迟在联调时设成肉眼可见的值（例如首字 600ms、段间 120ms、约 20 段）。
+6. **联调自检**（贴实际输出）：
+   - 用 `tf_agent` 经 `/api/identity/login/basic` 登录取得 access，`curl -N` 调分析与流式接口，贴响应和帧序；
+   - refresh token 调用返回 401；`/api/identity/logout` 之后原 access 返回 401；对该用户执行“踢下线”（撤销全部 token）后返回 401；
+   - `tf_requester` 对自己提交的工单调用返回 403（不具备处理权限），看不到的工单返回 404；
+   - 停掉联调 Redis 或改错地址时 health 与鉴权返回 503（验证后恢复）。
+
+完成标准：上述测试与门禁通过，联调常驻可用；报告附帧序样例与自检输出，写明前端需要的接口细节（地址、事件字段）。

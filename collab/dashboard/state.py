@@ -47,6 +47,18 @@ def _git(*args: str, cwd: Path = ROOT) -> str:
     return result.stdout if result.returncode == 0 else ""
 
 
+def _is_ancestor(commit: str, head: str) -> bool:
+    """commit 是否在 head 的历史里（git merge-base --is-ancestor 以退出码表达结果）。"""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, head],
+            capture_output=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
 def _alive(pid: int | None) -> bool:
     if not pid:
         return False
@@ -303,6 +315,10 @@ def _stage(task: dict, branch: dict | None, runs: list[dict], log: dict, done: s
     reviewed_sha = rounds[-1].get("sha") if rounds else None
     head = (branch or {}).get("sha") or ""
     current = bool(reviewed_sha and head and (head.startswith(reviewed_sha) or reviewed_sha.startswith(head)))
+    # 多个任务共用一个分支时，后续任务的提交会让前一个任务的评审提交不再是分支头；
+    # 看板已标记评审通过且评审提交仍在分支历史里，就沿用该结论
+    if not current and reviewed_sha and task["board_status"].startswith("评审通过"):
+        current = _is_ancestor(reviewed_sha, head or "HEAD")
     if report and verdict and (current or (not reviewed_sha and task["review"]["mtime"] >= report["mtime"])):
         return "已通过" if verdict == "APPROVE" else "需修改"
     if report:

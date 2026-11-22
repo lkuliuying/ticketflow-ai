@@ -341,6 +341,16 @@ sliderRotateCaptcha:
 sliderTranslateCaptcha:
   text: Drag to fit the puzzle piece
 
+captcha:
+  title: Security check
+  slideHint: Drag the slider to fit the puzzle
+  imageAlt: Image captcha, click to refresh
+  imagePlaceholder: Enter the characters shown
+  refresh: Try another
+  confirm: Verify
+  unsupported: A stronger security check is required. Please try again later
+  failed: Security check failed. Please try again
+
 backTop:
   text: Back to top
 
@@ -1020,7 +1030,6 @@ invite:
   invalid: The invitation link is invalid or has expired. Please contact the administrator to resend it.
   accepted: The account is already activated, please sign in directly
   toLogin: Go to sign in
-  captchaRequired: Please complete the puzzle verification first
 
 oauth:
   title: Third-party login
@@ -4416,6 +4425,27 @@ codegen:
   planImported: Plans imported
   planImportFailed: Import failed
 ticketflow:
+  ai:
+    analysis: AI analysis
+    analyze: Analyze
+    reanalyze: Analyze again
+    analysisHint: Suggests category, priority, summary and tags from the ticket and published articles
+    adopt: Apply suggestions
+    adopted: AI suggestions applied
+    stale: The ticket is now at v{to} but this analysis is based on v{from}. Analyze again before applying
+    reply: Suggested reply
+    generate: Generate reply
+    regenerate: Generate again
+    stop: Stop
+    fill: Insert into reply box
+    retry: Retry
+    noReplyBox: Replies are not available in the current state
+    failed: Generation failed. Please try again later
+    references: Cites {count} published article(s)
+    status:
+      streaming: Generating…
+      stopped: Generation stopped
+      interrupted: Connection interrupted and the reply is incomplete. Please generate again
   kb:
     title: Title
     category: Category

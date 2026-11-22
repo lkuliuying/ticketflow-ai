@@ -12,6 +12,7 @@
 | `openapi.json` | 全量 OpenAPI 3 契约（路径 / 组件 schema），前端类型生成真源 | `dump_openapi --check`（导出幂等） |
 
 工单核心写入载荷、数据枚举和知识片段见 [ticketflow.schema.json](ticketflow.schema.json)。
+独立 FastAPI 服务的分析与流式回复契约见 [ticketflow-ai.schema.json](ticketflow-ai.schema.json)。
 
 ## OpenAPI 全量契约（`openapi.json`）
 

@@ -16,7 +16,8 @@ const mocks = vi.hoisted(() => ({
   inviteAcceptApi: vi.fn(),
   rulesPasswordApi: vi.fn(),
   message: vi.fn(),
-  routerPush: vi.fn()
+  routerPush: vi.fn(),
+  obtain: vi.fn()
 }));
 
 vi.mock("vue-router", () => ({
@@ -30,13 +31,27 @@ vi.mock("@/api/auth", () => ({
   rulesPasswordApi: mocks.rulesPasswordApi
 }));
 vi.mock("@/utils/message", () => ({ message: mocks.message }));
+// 人机校验组件替换为桩：obtain() 的结果由各用例指定（ticket / 用户取消）
+vi.mock("@/components/ReHumanCheck", async () => {
+  const { defineComponent, h } = await import("vue");
+  class HumanCheckCancelled extends Error {}
+  const ReHumanCheck = defineComponent({
+    name: "ReHumanCheck",
+    props: { scene: String, action: String, types: Array },
+    setup(_, { expose }) {
+      expose({ obtain: mocks.obtain });
+      return () => h("div");
+    }
+  });
+  return { HumanCheckCancelled, ReHumanCheck };
+});
 vi.mock("@/utils", async () => {
   // 复用真实规则校验实现，仅替换 barrel 入口避免牵出无关副作用
   const { passwordRulesCheck } = await import("@/utils/password");
   return { passwordRulesCheck };
 });
 
-import ReSliderTranslateCaptcha from "@/components/ReSliderTranslateCaptcha";
+import { HumanCheckCancelled } from "@/components/ReHumanCheck";
 import InviteAccept from "./accept.vue";
 
 const SUCCESS_CODE = 1000;
@@ -47,6 +62,10 @@ beforeEach(() => {
   if (!globalThis.crypto?.subtle) {
     vi.stubGlobal("crypto", webcrypto);
   }
+  mocks.obtain.mockReset();
+  mocks.obtain.mockResolvedValue("ticket-1");
+  mocks.inviteAcceptApi.mockReset();
+  mocks.message.mockReset();
 });
 
 const mountPage = async () => {
@@ -64,24 +83,12 @@ const setInput = async (wrapper: Awaited<ReturnType<typeof mountPage>>) => {
   await wrapper.find('[data-testid="invite-confirm"]').setValue("Str0ng!pwd");
 };
 
-/**
- * 完成拼图人机校验（ReSliderTranslateCaptcha 的 v-model）：匿名激活入口按
- * 「一次提交一次校验」放行，测试态直接置为通过。
- */
-const passSlider = async (wrapper: Awaited<ReturnType<typeof mountPage>>) => {
-  wrapper
-    .findComponent(ReSliderTranslateCaptcha)
-    .vm.$emit("update:modelValue", true);
-  await flushPromises();
-};
-
 const submit = async (wrapper: Awaited<ReturnType<typeof mountPage>>) => {
-  await passSlider(wrapper);
   await wrapper.find('[data-testid="invite-submit"]').trigger("click");
   await flushPromises();
 };
 
-/** 直接触发提交（不经过 helper 的滑块步骤）时使用 */
+/** 只触发点击、不等待收尾（加密走宏任务的用例自行轮询） */
 const clickSubmit = (wrapper: Awaited<ReturnType<typeof mountPage>>) =>
   wrapper.find('[data-testid="invite-submit"]').trigger("click");
 
@@ -127,7 +134,8 @@ describe("InviteAccept 激活密码规则前置校验", () => {
 
     expect(mocks.inviteAcceptApi).toHaveBeenCalledWith({
       token: "tok-1",
-      password: "Str0ng!pwd"
+      password: "Str0ng!pwd",
+      captcha_ticket: "ticket-1"
     });
     expect(mocks.message).toHaveBeenCalledWith("ok", { type: "success" });
   });
@@ -165,7 +173,6 @@ describe("InviteAccept 激活密码规则前置校验", () => {
     });
     const wrapper = await mountPage();
     await setInput(wrapper);
-    await passSlider(wrapper);
     await clickSubmit(wrapper);
     // v2 加密走 WebCrypto（完成回调为宏任务，flushPromises 只冲刷微任务），
     // 以轮询等待加密完成后的激活请求
@@ -184,7 +191,7 @@ describe("InviteAccept 激活密码规则前置校验", () => {
     expect(await AesDecrypted("tok-1", payload.password)).toBe("Str0ng!pwd");
   });
 
-  it("未完成拼图人机校验时本地拦截，不发起激活请求", async () => {
+  it("密码不合规时不出题，也不发起激活请求", async () => {
     mocks.inviteValidateApi.mockResolvedValue({
       code: SUCCESS_CODE,
       data: { state: "pending" }
@@ -194,17 +201,15 @@ describe("InviteAccept 激活密码规则前置校验", () => {
       data: { password_rules: MIN_LENGTH_RULES }
     });
     const wrapper = await mountPage();
-    await setInput(wrapper);
-    await clickSubmit(wrapper);
-    await flushPromises();
+    await wrapper.find('[data-testid="invite-password"]').setValue("abc");
+    await wrapper.find('[data-testid="invite-confirm"]').setValue("abc");
+    await submit(wrapper);
 
-    expect(mocks.message).toHaveBeenCalledWith("invite.captchaRequired", {
-      type: "warning"
-    });
+    expect(mocks.obtain).not.toHaveBeenCalled();
     expect(mocks.inviteAcceptApi).not.toHaveBeenCalled();
   });
 
-  it("提交收尾复位滑块（一次提交一次校验）", async () => {
+  it("用户关闭人机校验时静默收尾，不发起激活请求", async () => {
     mocks.inviteValidateApi.mockResolvedValue({
       code: SUCCESS_CODE,
       data: { state: "pending" }
@@ -213,24 +218,44 @@ describe("InviteAccept 激活密码规则前置校验", () => {
       code: SUCCESS_CODE,
       data: { password_rules: MIN_LENGTH_RULES }
     });
-    // 业务失败（HTTP 200 + 非 1000）：表单保留，便于验证「一次提交一次校验」
+    mocks.obtain.mockRejectedValue(new HumanCheckCancelled());
+    const wrapper = await mountPage();
+    await setInput(wrapper);
+    await submit(wrapper);
+
+    expect(mocks.inviteAcceptApi).not.toHaveBeenCalled();
+    expect(mocks.message).not.toHaveBeenCalled();
+  });
+
+  it("每次提交都重新换取一次性 ticket", async () => {
+    mocks.inviteValidateApi.mockResolvedValue({
+      code: SUCCESS_CODE,
+      data: { state: "pending", captcha_types: ["slide", "image"] }
+    });
+    mocks.rulesPasswordApi.mockResolvedValue({
+      code: SUCCESS_CODE,
+      data: { password_rules: MIN_LENGTH_RULES }
+    });
+    // 业务失败（HTTP 200 + 非 1000）：表单保留，可再次提交
     mocks.inviteAcceptApi.mockResolvedValue({
       code: 2001,
       detail: "邀请链接无效或已过期"
     });
+    mocks.obtain
+      .mockResolvedValueOnce("ticket-a")
+      .mockResolvedValueOnce("ticket-b");
     const wrapper = await mountPage();
     await setInput(wrapper);
     await submit(wrapper);
-    expect(mocks.inviteAcceptApi).toHaveBeenCalledTimes(1);
-
-    // 收尾已复位：不重新滑动即被拦截
-    await clickSubmit(wrapper);
-    await flushPromises();
-    expect(mocks.inviteAcceptApi).toHaveBeenCalledTimes(1);
-
-    // 重新滑动后可再次提交
     await submit(wrapper);
-    expect(mocks.inviteAcceptApi).toHaveBeenCalledTimes(2);
+
+    expect(mocks.obtain).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.inviteAcceptApi.mock.calls.map(call => call[0].captcha_ticket)
+    ).toEqual(["ticket-a", "ticket-b"]);
+    const check = wrapper.findComponent({ name: "ReHumanCheck" });
+    expect(check.props("types")).toEqual(["slide", "image"]);
+    expect(check.props("scene")).toBe("invite");
   });
 
   it("预检下发 encrypted=false 时提交体保持明文", async () => {
@@ -252,7 +277,8 @@ describe("InviteAccept 激活密码规则前置校验", () => {
 
     expect(mocks.inviteAcceptApi).toHaveBeenCalledWith({
       token: "tok-1",
-      password: "Str0ng!pwd"
+      password: "Str0ng!pwd",
+      captcha_ticket: "ticket-1"
     });
   });
 });
