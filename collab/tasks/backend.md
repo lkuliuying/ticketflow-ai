@@ -403,4 +403,14 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
 3. 压测经网关进行（与真实部署一致）；如需直连对比，单独列出。
 4. 报告写明每组的命令，结论只写数据支持的判断。
 
+前置修复（来自 DP-02 联调，先做再压测）：
+
+5. **演示栈登录限流可配**：`LoginThrottle`（50/h，登录页的 `auth/capabilities` 与登录共用）经网关后所有本机流量同一 IP，
+   E2E、网关验收与压测互相耗尽额度（实测 429、`Retry-After` 二十多分钟）。交付栈用环境变量覆盖该速率，
+   演示 `.env` 默认放宽（如 `1000/h`），生产保持 50/h，`deploy/README.md` 说明。压测每个虚拟用户只登录一次并复用 token，
+   不为压测关闭限流。
+6. **缓存锁释放失败不应拒绝请求**：`MagicCacheData.make_cache` 的 Redis 锁在计算超过锁 TTL（或 VM 时钟前跳导致键提前过期）后
+   `__exit__` 抛 `LockNotOwnedError`，`_load_field_permission` 把它转成 403（DP-02 报告中的字段权限锁 403、FE-05 联调的瞬时 403 同源）。
+   计算已成功时只记告警并返回结果；补单测（模拟锁释放抛 `LockNotOwnedError`）。不改变计算本身失败时 fail-closed 的行为。
+
 完成标准：报告与原始数据齐全，命令可复现。
