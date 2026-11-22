@@ -65,10 +65,10 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| SV-01 | FastAPI 骨架、联合鉴权与健康检查 | Codex | — | 评审通过 |
-| SV-02 | 工单分析、流式回复、提供方与联调常驻 | Codex | SV-01 | 进行中 |
-| FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 评审通过 |
-| FE-07 | 工单 AI 面板 | Claude | SV-02 | 进行中（按契约完成，待联调） |
+| SV-01 | FastAPI 骨架、联合鉴权与健康检查 | Codex | — | 评审通过，已集成 |
+| SV-02 | 工单分析、流式回复、提供方与联调常驻 | Codex | SV-01 | 评审通过，已集成，常驻 :8897 |
+| FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 评审通过，已集成 |
+| FE-07 | 工单 AI 面板 | Claude | SV-02 | 评审通过，已集成 |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)。
 集成分支 `integration/iter3`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
