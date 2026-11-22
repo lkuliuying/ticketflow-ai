@@ -183,6 +183,7 @@ function time(value: string | null | undefined) {
         :ticket="detail"
         :run="run"
         :busy="busy"
+        :can-fill="canReply"
         @fill="fillReply"
       />
     </div>

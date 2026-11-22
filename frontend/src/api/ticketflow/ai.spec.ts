@@ -120,12 +120,22 @@ describe("streamReply", () => {
     expect(result).toMatchObject({ status: "interrupted", text: "半句" });
   });
 
-  it("marks a cancelled stream as stopped and stops appending", async () => {
-    emit([frame("delta", { text: "已生成" })], { hang: true });
+  it("marks a cancelled stream as stopped and drops frames after abort", async () => {
     const controller = new AbortController();
-    const pending = streamReply("t-1", () => undefined, controller.signal);
-    controller.abort();
-    const result = await pending;
+    mocks.postSse.mockImplementation(
+      async (
+        _url: string,
+        _body: unknown,
+        { onFrame }: { onFrame: (f: SseFrame) => void }
+      ) => {
+        onFrame(frame("delta", { text: "已生成" }));
+        controller.abort();
+        // 取消后同一轮事件循环里迟到的一帧
+        onFrame(frame("delta", { text: "迟到" }));
+        throw new DOMException("aborted", "AbortError");
+      }
+    );
+    const result = await streamReply("t-1", () => undefined, controller.signal);
     expect(result).toMatchObject({ status: "stopped", text: "已生成" });
   });
 

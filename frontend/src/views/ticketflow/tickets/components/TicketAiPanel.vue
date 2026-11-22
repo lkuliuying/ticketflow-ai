@@ -16,6 +16,8 @@ const props = defineProps<{
   ticket: TicketDetail;
   run: TicketRun;
   busy: boolean;
+  /** 详情里有回复框时才能填入（例如已关闭工单没有回复框） */
+  canFill: boolean;
 }>();
 const emit = defineEmits<{ fill: [text: string] }>();
 
@@ -144,14 +146,25 @@ function category(value: string) {
       >
         {{ reply.text }}<span v-if="streaming" class="ai-reply__cursor" />
       </div>
-      <el-text
-        v-if="statusText"
-        size="small"
-        :type="reply.status === 'error' ? 'danger' : 'info'"
-        data-testid="ai-reply-status"
-      >
-        {{ statusText }}
-      </el-text>
+      <div v-if="statusText" class="flex items-center gap-2">
+        <el-text
+          size="small"
+          :type="reply.status === 'error' ? 'danger' : 'info'"
+          data-testid="ai-reply-status"
+        >
+          {{ statusText }}
+        </el-text>
+        <el-button
+          v-if="reply.status === 'error' && reply.error?.retryable"
+          link
+          type="primary"
+          size="small"
+          data-testid="ai-retry"
+          @click="generate"
+        >
+          {{ t("ticketflow.ai.retry") }}
+        </el-button>
+      </div>
       <span
         v-if="reply.references.length"
         class="text-xs text-(--el-text-color-secondary)"
@@ -161,12 +174,15 @@ function category(value: string) {
       <div class="flex gap-2">
         <el-button
           type="primary"
-          :disabled="reply.status !== 'done' || !reply.text.trim()"
+          :disabled="!canFill || reply.status !== 'done' || !reply.text.trim()"
           data-testid="ai-fill"
           @click="emit('fill', reply.text)"
         >
           {{ t("ticketflow.ai.fill") }}
         </el-button>
+        <el-text v-if="!canFill" size="small" type="info">
+          {{ t("ticketflow.ai.noReplyBox") }}
+        </el-text>
       </div>
     </section>
   </aside>

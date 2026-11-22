@@ -27,6 +27,7 @@ vi.mock("vue", async importOriginal => ({
 }));
 
 import { useReplyStream, useTicketAnalysis } from "../useTicketAi";
+import { nextTick } from "vue";
 import type { TicketDetail } from "@/api/ticketflow/tickets";
 
 const PK = "2da1c8a8-31ca-40d4-90e3-e3842c849b02";
@@ -79,6 +80,18 @@ describe("useTicketAnalysis", () => {
     await analyze();
     ticket.value = { ...ticket.value, version: 4 };
     expect(stale.value).toBe(true);
+    await expect(adopt()).resolves.toBe(false);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("drops the analysis when the panel switches to another ticket", async () => {
+    mocks.analyzeTicket.mockResolvedValue(analysis);
+    const { analyze, analysis: result, ticket, adopt, run } = setup();
+
+    await analyze();
+    ticket.value = { pk: "other-ticket", version: 3 } as TicketDetail;
+    await nextTick();
+    expect(result.value).toBeNull();
     await expect(adopt()).resolves.toBe(false);
     expect(run).not.toHaveBeenCalled();
   });
@@ -161,5 +174,75 @@ describe("useReplyStream", () => {
     await generate();
     expect(mocks.retrieve).toHaveBeenCalledWith(PK);
     expect(mocks.streamReply).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands a 401 to the axios session path and retries the stream once", async () => {
+    mocks.retrieve.mockResolvedValue({ code: 1000 });
+    mocks.streamReply
+      .mockRejectedValueOnce(
+        Object.assign(new Error("令牌失效"), { code: 401 })
+      )
+      .mockResolvedValueOnce({ status: "done" });
+    const { generate, reply } = useReplyStream(() => PK);
+
+    await generate();
+    expect(mocks.retrieve).toHaveBeenCalledWith(PK);
+    expect(mocks.streamReply).toHaveBeenCalledTimes(2);
+    expect(reply.value.status).not.toBe("error");
+  });
+
+  it("does not retry when the session cannot be restored", async () => {
+    mocks.retrieve.mockRejectedValue({ code: 401 });
+    mocks.streamReply.mockRejectedValue(
+      Object.assign(new Error("令牌失效"), { code: 401 })
+    );
+    const { generate, reply } = useReplyStream(() => PK);
+
+    await generate();
+    expect(mocks.streamReply).toHaveBeenCalledTimes(1);
+    expect(reply.value.status).toBe("error");
+    expect(reply.value.error?.retryable).toBe(false);
+  });
+
+  it("skips streaming when the session cannot be established first", async () => {
+    mocks.getToken.mockReturnValue("");
+    mocks.retrieve.mockRejectedValue({ code: 401 });
+    const { generate } = useReplyStream(() => PK);
+
+    await generate();
+    expect(mocks.streamReply).not.toHaveBeenCalled();
+  });
+
+  it("does not open a stream after being stopped during session setup", async () => {
+    mocks.getToken.mockReturnValue("");
+    let finish: (value: unknown) => void = () => undefined;
+    mocks.retrieve.mockReturnValue(new Promise(resolve => (finish = resolve)));
+    const { generate, stop } = useReplyStream(() => PK);
+
+    const pending = generate();
+    stop();
+    finish({ code: 1000 });
+    await pending;
+    expect(mocks.streamReply).not.toHaveBeenCalled();
+  });
+
+  it("cancels and clears the reply when the ticket changes", async () => {
+    const signals: AbortSignal[] = [];
+    mocks.streamReply.mockImplementation(
+      (_id: string, onUpdate: (s: ReplyState) => void, signal: AbortSignal) => {
+        signals.push(signal);
+        onUpdate({ status: "streaming", text: "旧工单", references: [] });
+        return new Promise(() => undefined);
+      }
+    );
+    const id = ref(PK);
+    const { generate, reply } = useReplyStream(() => id.value);
+
+    void generate();
+    await flushPromises();
+    id.value = "other-ticket";
+    await nextTick();
+    expect(signals[0].aborted).toBe(true);
+    expect(reply.value).toMatchObject({ status: "idle", text: "" });
   });
 });

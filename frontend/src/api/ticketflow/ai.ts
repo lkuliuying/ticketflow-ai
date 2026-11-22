@@ -116,6 +116,8 @@ export async function streamReply(
       {
         signal,
         onFrame: frame => {
+          // 已取消的流在 AbortError 抛出前仍可能回调一帧，直接丢弃
+          if (signal.aborted) return;
           const next = applyReplyFrame(state, frame);
           if (next !== state) {
             state = next;

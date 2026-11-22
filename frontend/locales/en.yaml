@@ -4438,6 +4438,8 @@ ticketflow:
     regenerate: Generate again
     stop: Stop
     fill: Insert into reply box
+    retry: Retry
+    noReplyBox: Replies are not available in the current state
     failed: Generation failed. Please try again later
     references: Cites {count} published article(s)
     status:
