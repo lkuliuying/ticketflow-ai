@@ -4423,6 +4423,25 @@ codegen:
   planImported: 方案已导入
   planImportFailed: 导入失败
 ticketflow:
+  ai:
+    analysis: AI 分析
+    analyze: 分析工单
+    reanalyze: 重新分析
+    analysisHint: 根据工单内容与已发布知识给出分类、优先级、摘要与标签建议
+    adopt: 一键采纳
+    adopted: 已采纳 AI 建议
+    stale: 工单已更新到 v{to}，这份分析基于 v{from}，请重新分析后再采纳
+    reply: 回复建议
+    generate: 生成回复
+    regenerate: 重新生成
+    stop: 停止生成
+    fill: 填入回复框
+    failed: 生成失败，请稍后重试
+    references: 引用了 {count} 篇已发布知识
+    status:
+      streaming: 正在生成…
+      stopped: 已停止生成
+      interrupted: 连接中断，回复不完整，请重新生成
   kb:
     title: 标题
     category: 分类

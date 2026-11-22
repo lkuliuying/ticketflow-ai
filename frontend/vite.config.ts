@@ -23,6 +23,8 @@ export default async ({ mode }: ConfigEnv): Promise<UserConfigExport> => {
   // （见 playwright.config.ts），此处以同端口做 /api 代理目标；常规开发（pnpm dev）无
   // 注入时默认 8896，连本机 compose 容器后端，不受影响
   const apiPort = process.env.E2E_API_PORT ?? "8896";
+  // 工单 AI 服务（FastAPI）：生产由 Nginx 把 /ai/ 转发过去，本地开发直连
+  const aiPort = process.env.AI_SERVICE_PORT ?? "8897";
   // ws 代理 ECONNRESET 降噪：页面跳转/关闭会重置在途 WebSocket，vite 8 对每个断连
   // 记两条 error（ws proxy error + ws proxy socket error）——E2E 跑批高频页面切换下
   // 是纯噪音，非后端故障信号。仅过滤「ws 代理 + ECONNRESET」组合，其余代理错误
@@ -48,7 +50,8 @@ export default async ({ mode }: ConfigEnv): Promise<UserConfigExport> => {
       // 本地跨域代理 https://cn.vitejs.dev/config/server-options.html#server-proxy
       proxy: createProxyConfig({
         [`http://127.0.0.1:${apiPort}`]: ["/api", "/media", "/api-docs"],
-        [`ws://127.0.0.1:${apiPort}`]: ["/ws"]
+        [`ws://127.0.0.1:${apiPort}`]: ["/ws"],
+        [`http://127.0.0.1:${aiPort}`]: ["/ai/"]
       }),
       // 预热文件以提前转换和缓存结果，降低启动期间的初始页面加载时长并防止转换瀑布
       warmup: {

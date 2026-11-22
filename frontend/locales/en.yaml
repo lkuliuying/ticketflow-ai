@@ -4425,6 +4425,25 @@ codegen:
   planImported: Plans imported
   planImportFailed: Import failed
 ticketflow:
+  ai:
+    analysis: AI analysis
+    analyze: Analyze
+    reanalyze: Analyze again
+    analysisHint: Suggests category, priority, summary and tags from the ticket and published articles
+    adopt: Apply suggestions
+    adopted: AI suggestions applied
+    stale: The ticket is now at v{to} but this analysis is based on v{from}. Analyze again before applying
+    reply: Suggested reply
+    generate: Generate reply
+    regenerate: Generate again
+    stop: Stop
+    fill: Insert into reply box
+    failed: Generation failed. Please try again later
+    references: Cites {count} published article(s)
+    status:
+      streaming: Generating…
+      stopped: Generation stopped
+      interrupted: Connection interrupted and the reply is incomplete. Please generate again
   kb:
     title: Title
     category: Category
