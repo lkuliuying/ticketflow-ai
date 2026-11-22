@@ -60,19 +60,18 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 ## 当前迭代
 
-迭代 3：AI 能力（Phase 3 FastAPI 服务 + Phase 4b AI 面板），里程碑 M3 见
-[开发计划书](../docs/development/开发计划书.md)。迭代 2 的 13 项任务已全部合并到 `main`。
+迭代 4：交付（Phase 5），里程碑 M4 见[开发计划书](../docs/development/开发计划书.md)。迭代 2、3 已合并到 `main`。
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| SV-01 | FastAPI 骨架、联合鉴权与健康检查 | Codex | — | 评审通过，已集成 |
-| SV-02 | 工单分析、流式回复、提供方与联调常驻 | Codex | SV-01 | 评审通过，已集成，常驻 :8897 |
-| FE-06 | 认证接口与后端 HEAD 对齐 | Claude | — | 评审通过，已集成 |
-| FE-07 | 工单 AI 面板 | Claude | SV-02 | 评审通过，已集成 |
+| DP-01 | 统一部署：一条命令起全栈 | Codex | — | 进行中 |
+| DP-02 | 网关验收测试 | Codex | DP-01 | 待开始 |
+| DP-03 | 压测 | Codex | DP-02 | 待开始 |
+| FE-05 | E2E 冒烟 | Claude | DP-01 | 待开始 |
+| DOC-01 | 交付文档 | Claude | DP-03 | 待开始 |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)。
-集成分支 `integration/iter3`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
-FE-05（E2E 冒烟）随迭代 4 交付。
+集成分支 `integration/iter4`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
 
 ## CLI 调度（Claude 执行）
 

@@ -77,3 +77,24 @@
 - 单测：帧分发（含半帧、`ping`、缺 `done`、`error`）、采纳请求带版本、停止后不再追加正文。
 - 词条 zh / en 对称；跑 `frontend/AGENTS.md` 第六节门禁。
 - 联调：在 `:8848` 用 `tf_agent` 走通分析 → 采纳、生成 → 停止 → 重新生成 → 填入回复 → 发送；用 `tf_requester` 确认面板不出现。
+
+## FE-05 E2E 冒烟（迭代 4，依赖 DP-01）
+
+分支：`fe/e2e-smoke`
+
+上游 E2E 编排（`scripts/e2e-run.mjs`）会在 `:18896` 自起一套后端，本机 Windows 无法直接使用。TicketFlow 冒烟改为针对**运行中的交付栈**：
+
+- 新增 `playwright.ticketflow.config.ts`（无 `webServer`，`baseURL` 取 `TF_E2E_BASE_URL`，默认 `http://127.0.0.1:8080`），
+  `e2e/ticketflow/*.e2e.ts`，口令从 `deploy/.accounts.local.json` 读取（文件不进 Git）。
+- 主流程：提交人建单 → 客服接单 → 提交验收 → 提交人确认解决 → 客服转存知识库草稿；中途在 AI 面板分析、采纳、生成回复并填入发送。
+- 用例幂等（唯一标题）、只用 chromium；`package.json` 增加 `test:e2e:ticketflow` 脚本。
+- 词条 zh / en 对称、单测与门禁照旧。
+
+## DOC-01 交付文档（迭代 4）
+
+分支：`fe/docs`
+
+- 根目录 `README.md` 重写：项目简介、架构图（Mermaid：网关、DRF、FastAPI、Celery、PG、Redis）、技术要点（面试复盘：并发与幂等、
+  联合鉴权、可见的流式、查询优化与压测数据）、快速开始（指向 `deploy/README.md`）、多代理协作方式。
+- 运维手册要点汇总到 `deploy/README.md` 的链接；压测数据引用 `docs/development/压测报告.md`。
+- 迭代 4 验收说明 `docs/development/迭代4验收说明.md`。
