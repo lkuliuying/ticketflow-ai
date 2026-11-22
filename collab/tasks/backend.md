@@ -252,7 +252,7 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
      先读 `backend-drf/packages/xadmin-common/common/core/auth/authentication.py` 和 `common/cache/storage.py`，
      **按 DRF 实际写入的值格式解析**（Django 缓存的序列化方式、键是否带前缀和版本），并在报告里写明依据。
    - 认证 Redis 超时或异常返回 503；任一校验失败返回 401。
-3. **错误信封**：建流前的所有错误统一为 `{code, detail}`，HTTP 状态码按设计文档（401 / 403 / 404 / 422 / 503 / 504）。
+3. **错误信封**：建流前的所有错误统一为 `{code, error, detail}`（`code` 为 HTTP 状态码整数，`error` 为机器可读标识），HTTP 状态码按设计文档（401 / 403 / 404 / 422 / 503 / 504）。
    重写 FastAPI 默认的 422 和 HTTPException 输出，`detail` 为字符串。
 4. **`GET /ai/v1/health`**：不需要 token，Redis `PING` 正常返回 200 `{status: "ok", redis: "ok"}`，否则 503。
 5. **DRF 上下文客户端**：`services/drf.py` 用同一个 `AsyncClient` 转发用户原始 Bearer token 调用
@@ -293,9 +293,9 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
      缓存 Redis 故障时直接回源，不影响分析。
    - 等待信号量与调用提供方分别有超时预算：等不到槽位返回 503，提供方超时返回 504。
 3. **`POST /ai/v1/tickets/suggest-reply/stream`**，请求 `{ticket_id: UUID}`，`text/event-stream`：
-   - 建流前（鉴权、DRF 上下文、等待槽位）的错误按 `{code, detail}` JSON 返回对应状态码，不开流。
+   - 建流前（鉴权、DRF 上下文、等待槽位）的错误按 `{code, error, detail}` JSON 返回对应状态码，不开流。
    - 帧格式 `event: <name>\ndata: <json>\n\n`，事件顺序：`meta`（`{ticket_id, ticket_version, references: [article_id...]}`）→
-     零到多个 `delta`（`{text}`）→ `done`（`{finish_reason}`）；建流后失败以 `error`（`{code, detail, retryable}`）结束；
+     零到多个 `delta`（`{text}`）→ `done`（`{finish_reason}`）；建流后失败以 `error`（`{code, error, detail, retryable}`，`code` 为整数）结束；
      等待但没有增量超过心跳间隔（可配，默认 10 秒）时发 `ping`。
    - 响应头带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`。
    - 客户端断开时停止生成、关闭上游响应并**释放信号量**；整条流有总时长上限。第一段正文发出之前允许对上游做一次重试，之后不重试。

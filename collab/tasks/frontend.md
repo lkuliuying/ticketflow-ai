@@ -64,7 +64,7 @@
 分支：`fe/ai-panel`。接口见 Phase 1 设计评审的 FastAPI 契约与 SV-02 完成报告。
 
 - 开发代理：`vite.config.ts` 增加 `/ai` → `http://127.0.0.1:8897`（HTTP，不缓冲）。生产由 Nginx 转发，前端只用相对路径 `/ai/v1/...`。
-- API 层 `src/api/ticketflow/ai.ts`：`analyze(ticketId)` 走 axios（`/ai/v1/tickets/analyze`，错误信封 `{code, detail}`）；
+- API 层 `src/api/ticketflow/ai.ts`：`analyze(ticketId)` 走 axios（`/ai/v1/tickets/analyze`，错误信封 `{code, error, detail}`，`code` 为 HTTP 状态码整数）；
   `streamReply(ticketId, handlers, signal)` 复用 `src/utils/sse.ts` 的 `postSse`，按 `meta` / `delta` / `done` / `error` / `ping` 分发。
   缺少 `done` 就结束的流按中断处理。
 - 详情抽屉右侧 AI 面板，只在 `viewer.can_handle` 为真时显示：
