@@ -26,7 +26,13 @@ describe("登录页能力探测", () => {
       data: {
         access: true,
         lifetime: 15,
-        basic: { enabled: true, captcha: true, token: false, encrypted: true },
+        basic: {
+          enabled: true,
+          captcha: true,
+          captcha_types: ["slide", "image"],
+          token: false,
+          encrypted: true
+        },
         code: { enabled: true, email: true, sms: false },
         register: { enabled: false },
         reset: { enabled: true }
@@ -44,6 +50,7 @@ describe("登录页能力探测", () => {
       lifetime: 15,
       basic: true,
       captcha: true,
+      captcha_types: ["slide", "image"],
       token: false,
       encrypted: true,
       reset: true,

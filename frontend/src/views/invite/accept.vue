@@ -12,8 +12,8 @@ import { isSuccess } from "@/api/types";
 import { passwordRulesCheck } from "@/utils";
 import { AesEncrypted } from "@/utils/aes";
 import { message } from "@/utils/message";
-import ReSliderTranslateCaptcha from "@/components/ReSliderTranslateCaptcha";
-import puzzleSrc from "@/assets/captcha/puzzle.svg";
+import { HumanCheckCancelled, ReHumanCheck } from "@/components/ReHumanCheck";
+import { CAPTCHA_ACTIONS } from "@/utils/captcha/flow";
 
 defineOptions({
   name: "InviteAccept"
@@ -28,10 +28,12 @@ const state = ref<"loading" | "pending" | "accepted" | "invalid">("loading");
 const form = reactive({ password: "", confirm: "" });
 const submitting = ref(false);
 /**
- * 人机校验（拼图）：匿名激活入口按「一次提交一次校验」放行——
- * 本地密码规则通过后仍需对齐拼图，提交收尾即复位（成功跳登录、失败要求重新验证）。
+ * 服务端人机校验：匿名激活入口每次提交都换取一张一次性 ticket，
+ * 本地密码规则通过后才出题，避免无效提交消耗挑战。
  */
-const captchaPassed = ref(false);
+const humanCheckRef = ref<InstanceType<typeof ReHumanCheck>>();
+/** 服务端启用的人机校验题型（预检下发） */
+const captchaTypes = ref<string[]>([]);
 /** 后端下发的密码安全规则（匿名端点），提交前做与注册/改密同口径的预检 */
 const passwordRules = ref<PasswordRule[]>([]);
 /** 传输加密开关：预检下发，开启时激活提交的 password 为令牌作密钥的密文 */
@@ -50,6 +52,7 @@ onMounted(async () => {
     .catch(() => undefined);
   const res = await inviteValidateApi({ token: token.value }).catch(() => null);
   encrypted.value = Boolean(res?.data?.encrypted);
+  captchaTypes.value = res?.data?.captcha_types ?? [];
   const next = res?.data?.state;
   state.value =
     next === "pending"
@@ -78,12 +81,17 @@ async function submit() {
     message(msg, { type: "warning" });
     return;
   }
-  if (!captchaPassed.value) {
-    message(t("invite.captchaRequired"), { type: "warning" });
-    return;
-  }
   submitting.value = true;
   try {
+    const captchaTicket = await humanCheckRef.value
+      ?.obtain()
+      .catch((error: unknown) => {
+        if (!(error instanceof HumanCheckCancelled)) {
+          message(t("captcha.failed"), { type: "warning" });
+        }
+        return "";
+      });
+    if (!captchaTicket) return;
     // 开关开启时先以激活令牌为密钥加密（与注册/重置密码同一套加密协议）：
     // await 置于 submitting 置位之后、请求之前，加密失败与请求失败同走
     // catch 归一为 null 直接收尾，绝不降级提交明文
@@ -94,7 +102,8 @@ async function submit() {
     // http 层失败已统一提示，归一为 null 后直接收尾，避免重复弹错
     const res = await inviteAcceptApi({
       token: token.value,
-      password
+      password,
+      captcha_ticket: captchaTicket
     }).catch(() => null);
     if (!res) return;
     if (isSuccess(res)) {
@@ -107,7 +116,6 @@ async function submit() {
     message(String(res.detail || t("results.failed")), { type: "error" });
   } finally {
     submitting.value = false;
-    captchaPassed.value = false;
   }
 }
 </script>
@@ -149,10 +157,11 @@ async function submit() {
             @keyup.enter="submit"
           />
         </el-form-item>
-        <ReSliderTranslateCaptcha
-          v-model="captchaPassed"
-          :src="puzzleSrc"
-          class="mb-4"
+        <ReHumanCheck
+          ref="humanCheckRef"
+          scene="invite"
+          :action="CAPTCHA_ACTIONS.inviteAccept"
+          :types="captchaTypes"
         />
         <el-button
           class="w-full"

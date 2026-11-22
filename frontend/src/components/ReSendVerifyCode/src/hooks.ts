@@ -6,7 +6,6 @@ import {
   verifyCodeConfigApi,
   verifyCodeSendApi
 } from "@/api/auth";
-import { useLoginPageStoreHook } from "@/store/modules/loginPage";
 import { isEmpty } from "@pureadmin/utils";
 import { buildEmailRule } from "@/utils/rules/email";
 import { buildPhoneRule } from "@/utils/rules/phone";
@@ -23,8 +22,6 @@ export interface SendVerifyFormData {
   token: string;
   phone?: string;
   email?: string;
-  captcha_key?: string;
-  captcha_code?: string;
   verify_code?: string;
   verify_token?: string;
   [key: string]: unknown;
@@ -32,7 +29,7 @@ export interface SendVerifyFormData {
 
 export const useSendVerifyCode = (
   formDataRef: Ref<FormInstance | undefined>,
-  captchaRef: Ref<{ getImgCode?: () => void } | undefined>,
+  humanCheckRef: Ref<{ obtain: () => Promise<string> } | undefined>,
   formData: Ref<SendVerifyFormData>,
   props: { category?: string },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Vue EmitFn 交叉类型在参数逆变下需 any 才能收宽
@@ -52,8 +49,6 @@ export const useSendVerifyCode = (
     phone: "",
     email: "",
     target: "",
-    captcha_key: "",
-    captcha_code: "",
     verify_code: "",
     verify_token: undefined
   };
@@ -63,6 +58,7 @@ export const useSendVerifyCode = (
   const verifyCodeConfig = reactive({
     access: false,
     captcha: false,
+    captcha_types: [] as string[],
     token: false,
     encrypted: false,
     email: false,
@@ -99,26 +95,6 @@ export const useSendVerifyCode = (
         requiredMessage: transformI18n($t("login.emailReg")),
         formatMessage: transformI18n($t("login.emailCorrectReg"))
       })
-    ],
-    captcha_code: [
-      {
-        required: true,
-
-        validator: (rule, value, callback) => {
-          if (value === "") {
-            callback(new Error(transformI18n($t("login.verifyCodeReg"))));
-          } else if (
-            useLoginPageStoreHook().verifyCodeLength !== value?.length
-          ) {
-            callback(
-              new Error(transformI18n($t("login.verifyCodeCorrectReg")))
-            );
-          } else {
-            callback();
-          }
-        },
-        trigger: "blur"
-      }
     ],
     verify_code: [
       {
@@ -170,8 +146,7 @@ export const useSendVerifyCode = (
       form_type: formData.value.form_type,
       token: formData.value.token,
       target: formData.value[formData.value.form_type],
-      captcha_key: formData.value.captcha_key,
-      captcha_code: formData.value.captcha_code
+      captcha_ticket: ""
     };
   };
 
@@ -181,10 +156,16 @@ export const useSendVerifyCode = (
     formData.value.verify_token = undefined;
     useVerifyCode().start(
       formDataRef.value,
-      [formData.value.form_type, "captcha_code"],
+      [formData.value.form_type],
       verifyCodeConfig.rate,
       async interval => {
         const data = formatSendData();
+        if (verifyCodeConfig.captcha) {
+          // 人机校验失败或用户关闭弹窗：不发码，也不进入倒计时
+          const ticket = await humanCheckRef.value?.obtain().catch(() => "");
+          if (!ticket) return;
+          data.captcha_ticket = ticket;
+        }
         if (verifyCodeConfig.encrypted) {
           data["target"] = await AesEncrypted(
             data["token"] as string,
@@ -206,11 +187,9 @@ export const useSendVerifyCode = (
           showSuccessMsg: ["email", "phone"].includes(formData.value.form_type),
           exception() {
             initToken();
-            captchaRef.value?.getImgCode?.();
           },
           failed() {
             initToken();
-            captchaRef.value?.getImgCode?.();
           }
         });
       }

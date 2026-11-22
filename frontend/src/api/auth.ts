@@ -122,20 +122,14 @@ export type TempTokenResult = {
   lifetime?: number;
 };
 
-export type CaptchaResult = {
-  code: number;
-  detail: string;
-  captcha_image: string;
-  captcha_key: string;
-  length: number;
-};
-
 export type AuthInfoResult = {
   code: number;
   detail: string;
   data: {
     access: boolean;
     captcha?: boolean;
+    /** 服务端启用的人机校验题型 */
+    captcha_types?: string[];
     token?: boolean;
     encrypted?: boolean;
     lifetime?: number;
@@ -159,6 +153,7 @@ export type LoginCapabilitiesResult = {
     lifetime?: number;
     basic?: LoginWay & {
       captcha?: boolean;
+      captcha_types?: string[];
       token?: boolean;
       encrypted?: boolean;
     };
@@ -177,6 +172,7 @@ export function toAuthInfo(
     lifetime: caps?.lifetime,
     basic: Boolean(caps?.basic?.enabled),
     captcha: Boolean(caps?.basic?.captcha),
+    captcha_types: caps?.basic?.captcha_types ?? [],
     token: Boolean(caps?.basic?.token),
     encrypted: Boolean(caps?.basic?.encrypted),
     reset: Boolean(caps?.reset?.enabled),
@@ -190,7 +186,12 @@ export function toAuthInfo(
 export type InviteValidateResult = {
   code: number;
   detail: string;
-  data: { state: string; username: string; encrypted?: boolean };
+  data: {
+    state: string;
+    username: string;
+    encrypted?: boolean;
+    captcha_types?: string[];
+  };
 };
 
 /**
@@ -246,16 +247,6 @@ class AuthApi extends BaseApi {
     );
   };
 
-  /** 图形验证码 */
-  captcha = () => {
-    return this.request<CaptchaResult>(
-      "get",
-      {},
-      undefined,
-      "/api/identity/auth/captcha"
-    );
-  };
-
   /** 刷新token */
   refreshToken = (data?: object) => {
     return this.request<TokenResult>("post", {}, data, "/api/identity/refresh");
@@ -265,16 +256,6 @@ class AuthApi extends BaseApi {
   register = (data?: object) => {
     return this.request<TokenResult>(
       "post",
-      {},
-      data,
-      "/api/identity/register"
-    );
-  };
-
-  /** 注册方式能力探测（data 仅在显式传入时作为请求体） */
-  registerAuth = (data?: object) => {
-    return this.request<AuthInfoResult>(
-      "get",
       {},
       data,
       "/api/identity/register"
@@ -350,12 +331,10 @@ export const loginVerifyCodeApi = (data?: object) =>
 export const loginAuthApi = () => authApi.loginAuth();
 
 export const getTempTokenApi = () => authApi.tempToken();
-export const getCaptchaApi = () => authApi.captcha();
 
 export const refreshTokenApi = (data?: object) => authApi.refreshToken(data);
 
 export const registerApi = (data?: object) => authApi.register(data);
-export const registerAuthApi = (data?: object) => authApi.registerAuth(data);
 
 export const logoutApi = (data?: object) => authApi.logout(data);
 
