@@ -64,11 +64,11 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| DP-01 | 统一部署：一条命令起全栈 | Codex | — | 进行中 |
-| DP-02 | 网关验收测试 | Codex | DP-01 | 待开始 |
-| DP-03 | 压测 | Codex | DP-02 | 待开始 |
-| FE-05 | E2E 冒烟 | Claude | DP-01 | 待开始 |
-| DOC-01 | 交付文档 | Claude | DP-03 | 待开始 |
+| DP-01 | 统一部署：一条命令起全栈 | Codex | — | 已通过 |
+| DP-02 | 网关验收测试 | Codex | DP-01 | 已通过 |
+| DP-03 | 压测 | Codex | DP-02 | 已通过 |
+| FE-05 | E2E 冒烟 | Claude | DP-01 | 已通过 |
+| DOC-01 | 交付文档 | Claude | DP-03 | 已完成 |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)。
 集成分支 `integration/iter4`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
