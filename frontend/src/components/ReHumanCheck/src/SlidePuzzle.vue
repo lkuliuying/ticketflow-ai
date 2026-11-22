@@ -28,9 +28,14 @@ const maxOffset = computed(() =>
   Math.max(width.value - (props.challenge.piece_size ?? 56), 0)
 );
 
+const pieceSize = computed(() => props.challenge.piece_size ?? 56);
+
 watch(
   () => props.challenge.challenge_id,
-  () => (offset.value = 0)
+  () => {
+    offset.value = 0;
+    dragging.value = false;
+  }
 );
 
 function localY(event: PointerEvent) {
@@ -58,6 +63,12 @@ function onUp(event: PointerEvent) {
   dragging.value = false;
   recorder.move(offset.value, localY(event));
   emit("submit", { x: Math.round(offset.value) }, { track: recorder.points() });
+}
+
+/** 系统手势、切屏等中断拖动：放弃这次拖动，不提交半途位置 */
+function onCancel() {
+  dragging.value = false;
+  offset.value = 0;
 }
 
 /** 键盘操作：方向键逐像素（Shift 十像素）移动，回车提交 */
@@ -107,11 +118,14 @@ function onKey(event: KeyboardEvent) {
         :aria-valuemax="maxOffset"
         :aria-valuenow="Math.round(offset)"
         :class="{ 'is-dragging': dragging }"
-        :style="{ transform: `translateX(${offset}px)` }"
+        :style="{
+          width: `${pieceSize}px`,
+          transform: `translateX(${offset}px)`
+        }"
         @pointerdown="onDown"
         @pointermove="onMove"
         @pointerup="onUp"
-        @pointercancel="onUp"
+        @pointercancel="onCancel"
         @keydown="onKey"
       >
         <span aria-hidden="true">→</span>
@@ -154,7 +168,6 @@ function onKey(event: KeyboardEvent) {
   position: absolute;
   top: -1px;
   left: -1px;
-  width: 56px;
   height: 40px;
   color: var(--el-color-white);
   cursor: grab;

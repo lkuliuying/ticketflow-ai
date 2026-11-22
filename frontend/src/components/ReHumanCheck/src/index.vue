@@ -21,7 +21,8 @@ const { visible, loading, challenge, obtain, submit, refresh, cancel } =
     scene: () => props.scene,
     action: () => props.action,
     types: () => props.types,
-    unsupportedMessage: () => t("captcha.unsupported")
+    unsupportedMessage: () => t("captcha.unsupported"),
+    failedMessage: () => t("captcha.failed")
   });
 
 watch(
@@ -62,7 +63,7 @@ defineExpose({ obtain });
           :width="challenge.width"
           :height="challenge.height"
           :alt="t('captcha.imageAlt')"
-          class="cursor-pointer"
+          :class="loading ? 'cursor-wait' : 'cursor-pointer'"
           @click="refresh"
         />
         <el-input

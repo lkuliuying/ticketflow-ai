@@ -1,12 +1,11 @@
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useSendVerifyCode } from "./hooks";
 import Motion from "@/views/login/utils/motion";
 import type { FormInstance } from "element-plus";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import ReHumanCheck from "@/components/ReHumanCheck/src/index.vue";
-import type { CaptchaScene } from "@/api/identity/captcha";
-import { CAPTCHA_ACTIONS } from "@/utils/captcha/flow";
+import { asCaptchaScene, CAPTCHA_ACTIONS } from "@/utils/captcha/flow";
 import PhoneInput from "@/components/RePlusPage/src/components/PhoneInput.vue";
 import Email from "~icons/ep/message";
 import Keyhole from "~icons/ri/shield-keyhole-line";
@@ -48,6 +47,8 @@ const emit = defineEmits<{
 }>();
 const formDataRef = ref<FormInstance>();
 const humanCheckRef = ref<InstanceType<typeof ReHumanCheck>>();
+/** 发码场景即后端 captcha 场景；未知取值不渲染校验组件，发码时提示失败 */
+const captchaScene = computed(() => asCaptchaScene(props.category));
 
 function getRef() {
   return formDataRef.value;
@@ -117,10 +118,10 @@ const phone = ref({ code: "+86", phone: "" });
     </Motion>
 
     <ReHumanCheck
-      v-if="verifyCodeConfig.access && verifyCodeConfig.captcha"
+      v-if="verifyCodeConfig.access && verifyCodeConfig.captcha && captchaScene"
       ref="humanCheckRef"
-      :scene="props.category as CaptchaScene"
-      :action="CAPTCHA_ACTIONS.verifyCodeSend(props.category as CaptchaScene)"
+      :scene="captchaScene"
+      :action="CAPTCHA_ACTIONS.verifyCodeSend(captchaScene)"
       :types="verifyCodeConfig.captcha_types"
     />
 

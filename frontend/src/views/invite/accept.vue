@@ -87,7 +87,9 @@ async function submit() {
       ?.obtain()
       .catch((error: unknown) => {
         if (!(error instanceof HumanCheckCancelled)) {
-          message(t("captcha.failed"), { type: "warning" });
+          message((error as Error)?.message || t("captcha.failed"), {
+            type: "warning"
+          });
         }
         return "";
       });

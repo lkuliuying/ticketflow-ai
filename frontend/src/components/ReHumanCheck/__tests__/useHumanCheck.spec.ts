@@ -23,7 +23,8 @@ function setup(types: string[] = ["slide", "image"]) {
     scene: () => "login",
     action: () => "identity.login.basic",
     types: () => types,
-    unsupportedMessage: () => "unsupported"
+    unsupportedMessage: () => "unsupported",
+    failedMessage: () => "failed"
   });
 }
 
@@ -116,5 +117,84 @@ describe("useHumanCheck", () => {
 
     await expect(check.obtain()).rejects.toThrow("unsupported");
     expect(mocks.verify).not.toHaveBeenCalled();
+  });
+
+  it("ignores a verify result that arrives after the dialog was closed", async () => {
+    mocks.challenge.mockResolvedValue(
+      ok({ challenge_id: "c1", type: "slide", ttl: 60 })
+    );
+    let answer: (value: unknown) => void = () => undefined;
+    mocks.verify.mockReturnValue(new Promise(resolve => (answer = resolve)));
+    const check = setup();
+
+    const ticket = check.obtain();
+    const outcome = ticket.catch((error: unknown) => error);
+    await flushPromises();
+    const submitting = check.submit({ x: 10 });
+    check.cancel();
+    answer(ok({ passed: false }));
+    await submitting;
+    await flushPromises();
+
+    expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
+    expect(mocks.challenge).toHaveBeenCalledTimes(1);
+    expect(check.visible.value).toBe(false);
+    expect(check.loading.value).toBe(false);
+  });
+
+  it("settles quietly when the image PoW is aborted by closing the dialog", async () => {
+    const slowPow = { ...pow, difficulty_bits: 30 };
+    mocks.challenge.mockResolvedValue(
+      ok({ challenge_id: "c1", type: "image", ttl: 60, pow: slowPow })
+    );
+    const check = setup(["image"]);
+
+    const ticket = check.obtain();
+    const outcome = ticket.catch((error: unknown) => error);
+    await flushPromises();
+    const submitting = check.submit("ab12");
+    check.cancel();
+    await expect(submitting).resolves.toBeUndefined();
+    expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
+    expect(mocks.verify).not.toHaveBeenCalled();
+    expect(check.loading.value).toBe(false);
+  });
+
+  it("sends image answers as an object even without an attached PoW", async () => {
+    mocks.challenge.mockResolvedValue(
+      ok({ challenge_id: "c1", type: "image", ttl: 60, length: 4 })
+    );
+    mocks.verify.mockResolvedValue(ok({ passed: true, ticket: "T-4" }));
+    const check = setup(["image"]);
+
+    const ticket = check.obtain();
+    await flushPromises();
+    await check.submit("ab12", { input: "keyboard" });
+    await expect(ticket).resolves.toBe("T-4");
+    expect(mocks.verify.mock.calls[0][0].answer).toEqual({ code: "ab12" });
+  });
+
+  it("gives up after repeated wrong answers but not after manual refreshes", async () => {
+    let n = 0;
+    mocks.challenge.mockImplementation(async () =>
+      ok({ challenge_id: `c${(n += 1)}`, type: "slide", ttl: 60 })
+    );
+    mocks.verify.mockResolvedValue(ok({ passed: false }));
+    const check = setup();
+
+    const ticket = check.obtain();
+    ticket.catch(() => undefined);
+    await flushPromises();
+    for (let i = 0; i < 6; i += 1) {
+      check.refresh();
+      await flushPromises();
+    }
+    expect(check.visible.value).toBe(true);
+    for (let i = 0; i < 5; i += 1) {
+      await check.submit({ x: i });
+      await flushPromises();
+    }
+    await expect(ticket).rejects.toThrow("failed");
+    expect(mocks.verify).toHaveBeenCalledTimes(5);
   });
 });

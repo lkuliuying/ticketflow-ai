@@ -77,6 +77,24 @@ export function buildVerifyRequest(
   return request;
 }
 
+const SCENES: readonly CaptchaScene[] = [
+  "login",
+  "register",
+  "reset",
+  "bind_email",
+  "bind_phone",
+  "invite"
+];
+
+/** 把发码类别等外部字符串收窄为合法场景，未知取值返回 undefined */
+export function asCaptchaScene(
+  value: string | undefined
+): CaptchaScene | undefined {
+  return SCENES.includes(value as CaptchaScene)
+    ? (value as CaptchaScene)
+    : undefined;
+}
+
 /** 后端各入口的人机校验动作常量（`captcha/const.py`） */
 export const CAPTCHA_ACTIONS = {
   login: "identity.login.basic",

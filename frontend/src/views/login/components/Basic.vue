@@ -75,7 +75,9 @@ const prepareCaptcha = async (): Promise<boolean> => {
     return Boolean(ruleForm.captcha_ticket);
   } catch (error) {
     if (!(error instanceof HumanCheckCancelled)) {
-      message(t("captcha.failed"), { type: "warning" });
+      message((error as Error)?.message || t("captcha.failed"), {
+        type: "warning"
+      });
     }
     return false;
   }

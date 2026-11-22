@@ -5,7 +5,8 @@ import { solvePow } from "@/utils/captcha/protocol";
 import {
   fetchChallenge,
   HumanCheckCancelled,
-  MAX_ROUNDS,
+  isAbort,
+  MAX_FAILURES,
   verifyAnswer,
   type HumanCheckOptions
 } from "./humanCheckSteps";
@@ -14,7 +15,8 @@ export { HumanCheckCancelled, type HumanCheckOptions };
 
 /**
  * 出题 → 作答 → 换取一次性 ticket。PoW 题不弹窗，后台算完直接校验；
- * 图片题附带的 PoW 在用户输入期间并行计算；校验失败自动换题。
+ * 图片题附带的 PoW 在用户输入期间并行计算；答错自动换题，连续答错达上限才放弃。
+ * 每一轮挑战有自己的 AbortController：关闭弹窗、换题都会让在途的出题、PoW 与校验结果作废。
  */
 export function useHumanCheck(options: HumanCheckOptions) {
   const visible = ref(false);
@@ -26,11 +28,13 @@ export function useHumanCheck(options: HumanCheckOptions) {
   } | null = null;
   let controller: AbortController | null = null;
   let powTask: Promise<number> | null = null;
-  let rounds = 0;
+  let failures = 0;
 
   function settle(ticket: string | null, error?: Error) {
     controller?.abort();
+    controller = null;
     visible.value = false;
+    loading.value = false;
     challenge.value = null;
     const current = pending;
     pending = null;
@@ -42,12 +46,10 @@ export function useHumanCheck(options: HumanCheckOptions) {
     controller?.abort();
     const own = new AbortController();
     controller = own;
-    rounds += 1;
-    if (rounds > MAX_ROUNDS) return settle(null, new Error("too many rounds"));
     loading.value = true;
     try {
       const next = await fetchChallenge(options, fallback);
-      if (own.signal.aborted) return;
+      if (controller !== own) return;
       challenge.value = next;
       const pow = next.pow;
       powTask = pow
@@ -57,7 +59,7 @@ export function useHumanCheck(options: HumanCheckOptions) {
       if (next.type === "pow") await submit({ nonce: await powTask });
       else visible.value = true;
     } catch (error) {
-      if (own.signal.aborted || (error as Error)?.name === "AbortError") return;
+      if (controller !== own || isAbort(error)) return;
       settle(null, error instanceof Error ? error : new Error(String(error)));
     } finally {
       if (controller === own) loading.value = false;
@@ -66,22 +68,42 @@ export function useHumanCheck(options: HumanCheckOptions) {
 
   async function submit(answer: unknown, extra: VerifyExtra = {}) {
     const current = challenge.value;
-    if (!current || !pending) return;
+    const own = controller;
+    if (!current || !pending || !own) return;
     loading.value = true;
-    const ticket = await verifyAnswer(current, options, answer, extra, powTask);
+    let ticket: string | null = null;
+    try {
+      ticket = await verifyAnswer(current, options, answer, extra, powTask);
+    } catch (error) {
+      if (!isAbort(error)) throw error;
+    } finally {
+      if (controller === own) loading.value = false;
+    }
+    // 弹窗已关闭或用户已换题：这一轮的结果作废
+    if (!pending || controller !== own) return;
+    if (ticket) return settle(ticket);
+    failures += 1;
+    if (failures >= MAX_FAILURES) {
+      return settle(null, new Error(options.failedMessage()));
+    }
     // 失败的挑战已在服务端作废，直接换一题
-    if (ticket) settle(ticket);
-    else await load(current.type === "image");
+    await load(current.type === "image");
   }
 
   /** 取得一张一次性 ticket；用户关闭弹窗时以 HumanCheckCancelled 拒绝 */
   function obtain(): Promise<string> {
     settle(null);
-    rounds = 0;
+    failures = 0;
     return new Promise<string>((resolve, reject) => {
       pending = { resolve, reject };
       void load();
     });
+  }
+
+  /** 用户主动换题，不计入失败次数；加载或校验中忽略 */
+  function refresh() {
+    if (loading.value || !pending) return;
+    void load(challenge.value?.type === "image");
   }
 
   return {
@@ -90,7 +112,7 @@ export function useHumanCheck(options: HumanCheckOptions) {
     challenge,
     obtain,
     submit,
-    refresh: () => load(challenge.value?.type === "image"),
+    refresh,
     cancel: () => settle(null)
   };
 }

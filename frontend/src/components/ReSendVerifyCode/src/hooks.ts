@@ -15,6 +15,8 @@ import { $t, transformI18n } from "@/plugins/i18n";
 import { AesEncrypted } from "@/utils/aes";
 import { handleOperation } from "@/components/RePlusPage/src/utils/handle";
 import { useI18n } from "vue-i18n";
+import { message } from "@/utils/message";
+import { HumanCheckCancelled } from "@/components/ReHumanCheck/src/humanCheckSteps";
 
 /** 验证码表单数据（发送流程读写；索引签名兼容按 form_type 动态取 target） */
 export interface SendVerifyFormData {
@@ -141,6 +143,24 @@ export const useSendVerifyCode = (
     callback(results);
   };
 
+  /** 换取人机校验票据；失败时提示原因（用户主动关闭弹窗除外）并返回空串 */
+  const obtainTicket = async (): Promise<string> => {
+    if (!humanCheckRef.value) {
+      message(t("captcha.failed"), { type: "warning" });
+      return "";
+    }
+    try {
+      return await humanCheckRef.value.obtain();
+    } catch (error) {
+      if (!(error instanceof HumanCheckCancelled)) {
+        message((error as Error)?.message || t("captcha.failed"), {
+          type: "warning"
+        });
+      }
+      return "";
+    }
+  };
+
   const formatSendData = () => {
     return {
       form_type: formData.value.form_type,
@@ -162,7 +182,7 @@ export const useSendVerifyCode = (
         const data = formatSendData();
         if (verifyCodeConfig.captcha) {
           // 人机校验失败或用户关闭弹窗：不发码，也不进入倒计时
-          const ticket = await humanCheckRef.value?.obtain().catch(() => "");
+          const ticket = await obtainTicket();
           if (!ticket) return;
           data.captcha_ticket = ticket;
         }

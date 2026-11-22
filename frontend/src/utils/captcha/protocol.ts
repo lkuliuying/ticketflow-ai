@@ -70,13 +70,13 @@ export async function solvePow(
   const batch = options.batch ?? 4000;
   let nonce = 0;
   for (;;) {
+    if (options.signal?.aborted) {
+      throw new DOMException("PoW aborted", "AbortError");
+    }
     for (let i = 0; i < batch; i += 1, nonce += 1) {
       if (leadingZeroBits(SHA256(`${challenge}${nonce}`).toString()) >= bits) {
         return nonce;
       }
-    }
-    if (options.signal?.aborted) {
-      throw new DOMException("PoW aborted", "AbortError");
     }
     await new Promise(resolve => setTimeout(resolve, 0));
   }
