@@ -1,4 +1,8 @@
 import { isSuccess } from "@/api/types";
+import {
+  carriesCaptchaTicket,
+  clientFingerprint
+} from "@/utils/captcha/protocol";
 import Axios, {
   type AxiosInstance,
   type AxiosRequestConfig,
@@ -297,6 +301,10 @@ class PureHttp {
         config: PureHttpRequestConfig
       ): Promise<InternalAxiosRequestConfig> => {
         setApiLanguage(config);
+        // 人机校验票据与客户端指纹强绑定：携带 captcha_ticket 的请求同时回传指纹
+        if (carriesCaptchaTicket(config.data)) {
+          config.headers!["X-Captcha-Fp"] = clientFingerprint();
+        }
         // 开启进度条动画
         NProgress.start();
         // 敏感操作审批重发：同指纹请求携带暂存的审批令牌（审批通过后重发即消费）。

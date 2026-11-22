@@ -341,6 +341,16 @@ sliderRotateCaptcha:
 sliderTranslateCaptcha:
   text: Drag to fit the puzzle piece
 
+captcha:
+  title: Security check
+  slideHint: Drag the slider to fit the puzzle
+  imageAlt: Image captcha, click to refresh
+  imagePlaceholder: Enter the characters shown
+  refresh: Try another
+  confirm: Verify
+  unsupported: A stronger security check is required. Please try again later
+  failed: Security check failed. Please try again
+
 backTop:
   text: Back to top
 
@@ -1020,7 +1030,6 @@ invite:
   invalid: The invitation link is invalid or has expired. Please contact the administrator to resend it.
   accepted: The account is already activated, please sign in directly
   toLogin: Go to sign in
-  captchaRequired: Please complete the puzzle verification first
 
 oauth:
   title: Third-party login

@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useSendVerifyCode } from "./hooks";
 import Motion from "@/views/login/utils/motion";
 import type { FormInstance } from "element-plus";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
-import ReImageVerify from "@/components/ReImageVerify/src/index.vue";
+import ReHumanCheck from "@/components/ReHumanCheck/src/index.vue";
+import { asCaptchaScene, CAPTCHA_ACTIONS } from "@/utils/captcha/flow";
 import PhoneInput from "@/components/RePlusPage/src/components/PhoneInput.vue";
 import Email from "~icons/ep/message";
 import Keyhole from "~icons/ri/shield-keyhole-line";
@@ -15,6 +16,7 @@ defineOptions({ name: "ReSendVerifyCode" });
 interface VerifyCodeConfig {
   access: boolean;
   captcha: boolean;
+  captcha_types: string[];
   token: boolean;
   encrypted: boolean;
   email: boolean;
@@ -44,7 +46,9 @@ const emit = defineEmits<{
   configReqEnd: [];
 }>();
 const formDataRef = ref<FormInstance>();
-const captchaRef = ref();
+const humanCheckRef = ref<InstanceType<typeof ReHumanCheck>>();
+/** 发码场景即后端 captcha 场景；未知取值不渲染校验组件，发码时提示失败 */
+const captchaScene = computed(() => asCaptchaScene(props.category));
 
 function getRef() {
   return formDataRef.value;
@@ -59,7 +63,7 @@ const {
   verifyCodeConfig,
   handleSendCode,
   fetchSuggestions
-} = useSendVerifyCode(formDataRef, captchaRef, formData, props, emit);
+} = useSendVerifyCode(formDataRef, humanCheckRef, formData, props, emit);
 
 defineExpose({ getRef, handleSendCode });
 
@@ -113,23 +117,13 @@ const phone = ref({ code: "+86", phone: "" });
       </el-tabs>
     </Motion>
 
-    <Motion
-      v-if="verifyCodeConfig.access && verifyCodeConfig.captcha"
-      :delay="200"
-    >
-      <el-form-item prop="captcha_code">
-        <el-input
-          v-model="formData.captcha_code"
-          :placeholder="t('login.verifyCode')"
-          :prefix-icon="useRenderIcon(Keyhole)"
-          clearable
-        >
-          <template #append>
-            <ReImageVerify ref="captchaRef" v-model="formData.captcha_key" />
-          </template>
-        </el-input>
-      </el-form-item>
-    </Motion>
+    <ReHumanCheck
+      v-if="verifyCodeConfig.access && verifyCodeConfig.captcha && captchaScene"
+      ref="humanCheckRef"
+      :scene="captchaScene"
+      :action="CAPTCHA_ACTIONS.verifyCodeSend(captchaScene)"
+      :types="verifyCodeConfig.captcha_types"
+    />
 
     <Motion v-if="['email', 'phone'].includes(formData.form_type)" :delay="100">
       <el-form-item prop="verify_code">

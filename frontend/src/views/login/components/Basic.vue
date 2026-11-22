@@ -9,12 +9,12 @@ import type { FormInstance } from "element-plus";
 import { LOGIN_PAGE, operates } from "../utils/enums";
 import { useUserStoreHook } from "@/store/modules/user";
 import { useLoginPageStoreHook } from "@/store/modules/loginPage";
-import { ReImageVerify } from "@/components/ReImageVerify";
+import { HumanCheckCancelled, ReHumanCheck } from "@/components/ReHumanCheck";
+import { CAPTCHA_ACTIONS } from "@/utils/captcha/flow";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import Lock from "~icons/ri/lock-fill";
 import User from "~icons/ri/user-3-fill";
 import Info from "~icons/ri/information-line";
-import Keyhole from "~icons/ri/shield-keyhole-line";
 import {
   AuthInfoResult,
   getTempTokenApi,
@@ -35,7 +35,7 @@ defineOptions({
   name: "BasicLogin"
 });
 
-const captchaRef = ref();
+const humanCheckRef = ref<InstanceType<typeof ReHumanCheck>>();
 const configLoading = ref(false);
 const ruleFormRef = ref<FormInstance>();
 const { t } = useI18n();
@@ -51,6 +51,7 @@ const {
 const authInfo = reactive<AuthInfoResult["data"]>({
   access: false,
   captcha: false,
+  captcha_types: [],
   token: false,
   encrypted: false,
   basic: false,
@@ -62,9 +63,25 @@ const ruleForm = reactive({
   username: "",
   password: "",
   token: "",
-  captcha_key: "",
-  captcha_code: ""
+  captcha_ticket: ""
 });
+
+/** 开启登录人机校验时先换取一次性 ticket；用户关闭弹窗返回 false */
+const prepareCaptcha = async (): Promise<boolean> => {
+  ruleForm.captcha_ticket = "";
+  if (!authInfo.captcha) return true;
+  try {
+    ruleForm.captcha_ticket = (await humanCheckRef.value?.obtain()) ?? "";
+    return Boolean(ruleForm.captcha_ticket);
+  } catch (error) {
+    if (!(error instanceof HumanCheckCancelled)) {
+      message((error as Error)?.message || t("captcha.failed"), {
+        type: "warning"
+      });
+    }
+    return false;
+  }
+};
 
 /**
  * 临时 Token 首次获取的进行中 Promise：登录提交前 await 它，避免「首帧 token 尚未
@@ -98,10 +115,9 @@ const {
   afterTokenIssued,
   handleMfaBack
 } = useLoginFlow({
-  // MFA 步骤返回重新登录：刷新一次性临时 token 与图形验证码
+  // MFA 步骤返回重新登录：刷新一次性临时 token（人机 ticket 每次提交时重新换取）
   onMfaBack: () => {
     void initToken(true);
-    captchaRef.value?.getImgCode();
   }
 });
 
@@ -114,6 +130,10 @@ const onLogin = async (formEl: FormInstance | undefined) => {
       // 空 token 打后端，命中「临时Token校验失败」的 400 且不会自动重试。
       // 提交前等 token 就绪（就绪后瞬时返回；失败重试路径见下方 catch 的强制刷新）。
       await initToken();
+      if (!(await prepareCaptcha())) {
+        loading.value = false;
+        return;
+      }
       useUserStoreHook()
         .loginByUsername(cloneDeep(ruleForm), authInfo.encrypted)
         .then(res => {
@@ -136,7 +156,6 @@ const onLogin = async (formEl: FormInstance | undefined) => {
         })
         .catch(() => {
           void initToken(true);
-          captchaRef.value?.getImgCode();
         })
         .finally(() => {
           loading.value = false;
@@ -210,23 +229,13 @@ onMounted(() => {
             </el-form-item>
           </Motion>
 
-          <Motion v-if="authInfo.access && authInfo.captcha" :delay="200">
-            <el-form-item prop="captcha_code">
-              <el-input
-                v-model="ruleForm.captcha_code"
-                :placeholder="t('login.verifyCode')"
-                :prefix-icon="useRenderIcon(Keyhole)"
-                clearable
-              >
-                <template v-slot:append>
-                  <ReImageVerify
-                    ref="captchaRef"
-                    v-model="ruleForm.captcha_key"
-                  />
-                </template>
-              </el-input>
-            </el-form-item>
-          </Motion>
+          <ReHumanCheck
+            v-if="authInfo.captcha"
+            ref="humanCheckRef"
+            scene="login"
+            :action="CAPTCHA_ACTIONS.login"
+            :types="authInfo.captcha_types"
+          />
         </div>
         <Motion :delay="250">
           <el-form-item>
