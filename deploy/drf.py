@@ -19,6 +19,7 @@ def write_config() -> None:
     if mode not in {"true", "false"}:
         raise SystemExit("TICKETFLOW_DEMO must be true or false")
     demo = mode == "true"
+    login_rate = env.get("LOGIN_THROTTLE_RATE", "").strip()
     hosts = [host.strip() for host in env["TF_ALLOWED_HOSTS"].split(",") if host.strip()]
     config = {
         "SECRET_KEY": env["SECRET_KEY"],
@@ -36,7 +37,7 @@ def write_config() -> None:
         "REDIS_HOST": "redis",
         "REDIS_PASSWORD": env["REDIS_PASSWORD"],
         "DEFAULT_CACHE_ID": 1,
-        "DEFAULT_THROTTLE_RATES": {"login": env.get("LOGIN_THROTTLE_RATE") or ("1000/h" if demo else "50/h")},
+        "DEFAULT_THROTTLE_RATES": {"login": login_rate or ("1000/h" if demo else "50/h")},
         "SECURITY_LOGIN_CAPTCHA_ENABLED": not demo,
         "SECURITY_LOGIN_TEMP_TOKEN_ENABLED": not demo,
         "SECURITY_LOGIN_ENCRYPTED_ENABLED": not demo,

@@ -24,6 +24,7 @@ CALLS = "calls"
 @pytest.mark.parametrize("compute_fails", [False, True])
 def test_expired_lock_preserves_computation_outcome(monkeypatch, caplog, compute_fails):
     lock = cache.lock("test_expired_lock")
+    state, incr = _make_counter()
 
     def release():
         raise LockNotOwnedError("Cannot release a lock that's no longer owned")
@@ -33,6 +34,7 @@ def test_expired_lock_preserves_computation_outcome(monkeypatch, caplog, compute
 
     @MagicCacheData.make_cache(key_func=lambda: "expired")
     def compute():
+        incr()
         if compute_fails:
             raise ValueError("query failed")
         return {"fields": ["title"]}
@@ -44,6 +46,7 @@ def test_expired_lock_preserves_computation_outcome(monkeypatch, caplog, compute
     else:
         assert compute() == {"fields": ["title"]}
         assert compute() == {"fields": ["title"]}
+        assert state["count"] == 1
         assert "expired while computing" in caplog.text
 
 
