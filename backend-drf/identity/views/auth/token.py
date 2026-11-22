@@ -9,7 +9,7 @@ from typing import Any
 from django.conf import settings
 from drf_spectacular.plumbing import build_basic_type
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_serializer
 from rest_framework.generics import GenericAPIView
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -43,6 +43,7 @@ class TempTokenAPIView(GenericAPIView):
         return ApiResponse(token=token)
 
 
+@extend_schema_serializer(component_name="TokenRefresh")
 class ServerTokenRefreshSerializer(TokenRefreshSerializer):
     token_class = ServerRefreshToken
 
