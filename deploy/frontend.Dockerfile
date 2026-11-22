@@ -7,12 +7,6 @@ RUN --mount=type=cache,id=ticketflow-pnpm-store,target=/root/.local/share/pnpm/s
     npm pkg delete scripts.preinstall scripts.postinstall scripts.prepare \
     && pnpm install --frozen-lockfile --prefer-offline
 COPY . .
-ENV VITE_HIDE_HOME=false \
-    VITE_PUBLIC_PATH=/ \
-    VITE_ROUTER_HISTORY=hash \
-    VITE_COMPRESSION=gzip \
-    VITE_API_DOMAIN="" \
-    VITE_WSS_DOMAIN=""
 RUN pnpm run prebuild
 RUN pnpm build
 

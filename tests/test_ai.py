@@ -57,7 +57,7 @@ def test_reply_stream_arrives_incrementally(gateway, agent, ticket):
     start = monotonic()
     with gateway.stream("POST", STREAM, headers=headers, json={"ticket_id": ticket["pk"]}) as response:
         assert response.status_code == 200, response.read().decode()
-        assert response.headers["content-type"].split(";")[0] == "text/event-stream"
+        assert response.headers["content-type"].split(";", 1)[0].strip().lower() == "text/event-stream"
         assert "gzip" not in response.headers.get("content-encoding", "").lower()
         for line in response.iter_lines():
             if line:

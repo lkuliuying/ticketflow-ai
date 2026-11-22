@@ -117,7 +117,7 @@ REST_FRAMEWORK_EXTENSIONS = {
 }
 
 JWT_LEEWAY_SECONDS = CONFIG.JWT_LEEWAY_SECONDS
-if not isinstance(JWT_LEEWAY_SECONDS, int) or JWT_LEEWAY_SECONDS < 0:
+if isinstance(JWT_LEEWAY_SECONDS, bool) or not isinstance(JWT_LEEWAY_SECONDS, int) or JWT_LEEWAY_SECONDS < 0:
     raise ImproperlyConfigured("JWT_LEEWAY_SECONDS must be a non-negative integer")
 
 SIMPLE_JWT = {

@@ -1,12 +1,25 @@
+import runpy
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.state import token_backend
 
 from common.cache.storage import BlackAccessTokenCache, SessionTokenRevokedCache, UserTokenRevokedCache
 from common.core.auth.authentication import ServerAccessToken, ServerRefreshToken
+from server.conf import Config
+from server.settings import libs
+
+
+@pytest.mark.parametrize("value", [True, False, -1, "30"])
+def test_jwt_leeway_rejects_invalid_config(monkeypatch, value):
+    config = Config(libs.CONFIG)
+    config["JWT_LEEWAY_SECONDS"] = value
+    monkeypatch.setattr("server.const.CONFIG", config)
+    with pytest.raises(ImproperlyConfigured, match="JWT_LEEWAY_SECONDS must be a non-negative integer"):
+        runpy.run_path(libs.__file__, run_name="server.settings._jwt_config_probe")
 
 
 @pytest.mark.django_db

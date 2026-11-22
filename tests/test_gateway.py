@@ -39,9 +39,9 @@ def test_ticket_access_control(gateway, requester, other_agent, ticket):
     assert_failure(gateway.get(path, headers=other_agent.headers), 404)
 
 
-def test_concurrent_ticket_transition(gateway, agent, ticket):
-    path = f"/api/tickets/{ticket['pk']}"
-    payload = {"target_status": "IN_PROGRESS", "version": ticket["version"]}
+def test_concurrent_ticket_transition(gateway, agent, transition_ticket):
+    path = f"/api/tickets/{transition_ticket['pk']}"
+    payload = {"target_status": "IN_PROGRESS", "version": transition_ticket["version"]}
     start = Barrier(2, timeout=10)
 
     def transition():
@@ -57,7 +57,7 @@ def test_concurrent_ticket_transition(gateway, agent, ticket):
     envelope = success.json()
     assert envelope["code"] == 1000 and isinstance(envelope["detail"], str)
     assert envelope["data"]["status"] == "IN_PROGRESS"
-    assert envelope["data"]["version"] == ticket["version"] + 1
+    assert envelope["data"]["version"] == transition_ticket["version"] + 1
     stored = gateway.get(path, headers=agent.headers)
     assert stored.status_code == 200, stored.text
     assert stored.json()["data"]["version"] == envelope["data"]["version"]

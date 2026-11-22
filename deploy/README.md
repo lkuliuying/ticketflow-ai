@@ -20,6 +20,10 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps -a
 
 交付栈也为 DRF 和 FastAPI 共用 `JWT_LEEWAY_SECONDS`，默认 30 秒。签发时间的超前量和到期时间的宽限期都受此值限制。可在 `deploy/.env` 中设置为非负整数，设为 0 时严格按当前时钟验证。
 
+`LOGIN_THROTTLE_RATE` 控制登录与登录能力查询共用的每 IP 额度。新生成的 `.env` 将该项留空，演示模式使用 `1000/h`，生产模式使用 `50/h`。填写明确的速率可覆盖默认值，修改后执行 `up -d` 重建服务。
+
+网关镜像用 Vite 生产模式加载 `frontend/.env` 与 `frontend/.env.production` 中的公开构建参数。构建上下文只纳入这两个环境文件。请将密钥留在部署侧的 `deploy/.env`。
+
 默认入口是 `http://127.0.0.1:8080`，可以用 `TF_PORT` 改端口。需要监听其他地址时同时配置 `TF_BIND_HOST` 和 `TF_ALLOWED_HOSTS`（逗号分隔的访问主机名，不带端口），并在生产入口配置 HTTPS。交付栈的 Compose 项目名为 `ticketflow`，网关是唯一发布宿主端口的服务。数据库、Redis 和上传文件分别存放在三个命名卷。
 
 短生命周期的 `init` 服务等待 PostgreSQL 和 Redis 健康后执行 `migrate` 和 `load_init_json`。内置种子在空库上使用一个不可登录的审计用户。等 `init` 以状态码 0 退出后，DRF Web、Worker 和 Beat 才会启动。首次启动后可访问以下地址确认就绪：

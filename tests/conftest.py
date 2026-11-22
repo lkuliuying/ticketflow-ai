@@ -65,8 +65,7 @@ def other_agent(login):
     return login("tf_agent_other")
 
 
-@pytest.fixture(scope="session")
-def ticket(gateway, requester):
+def create_ticket(gateway, requester):
     unique_id = uuid4().hex
     response = gateway.post(
         "/api/tickets",
@@ -84,3 +83,13 @@ def ticket(gateway, requester):
     data = envelope["data"]
     assert data["status"] == "OPEN"
     return data
+
+
+@pytest.fixture(scope="session")
+def ticket(gateway, requester):
+    return create_ticket(gateway, requester)
+
+
+@pytest.fixture
+def transition_ticket(gateway, requester):
+    return create_ticket(gateway, requester)

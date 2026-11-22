@@ -12,12 +12,39 @@ import time
 
 import pytest
 from django.core.cache import cache
+from redis.exceptions import LockNotOwnedError
 
 from common.decorators import MagicCacheData
 
 pytestmark = pytest.mark.django_db
 
 CALLS = "calls"
+
+
+@pytest.mark.parametrize("compute_fails", [False, True])
+def test_expired_lock_preserves_computation_outcome(monkeypatch, caplog, compute_fails):
+    lock = cache.lock("test_expired_lock")
+
+    def release():
+        raise LockNotOwnedError("Cannot release a lock that's no longer owned")
+
+    monkeypatch.setattr(lock, "release", release)
+    monkeypatch.setattr(cache, "lock", lambda *args, **kwargs: lock)
+
+    @MagicCacheData.make_cache(key_func=lambda: "expired")
+    def compute():
+        if compute_fails:
+            raise ValueError("query failed")
+        return {"fields": ["title"]}
+
+    if compute_fails:
+        with pytest.raises(ValueError, match="query failed"):
+            compute()
+        assert cache.get("magic_cache_data_compute_expired") is None
+    else:
+        assert compute() == {"fields": ["title"]}
+        assert compute() == {"fields": ["title"]}
+        assert "expired while computing" in caplog.text
 
 
 def _make_counter():
