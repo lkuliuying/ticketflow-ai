@@ -15,7 +15,8 @@ export function openTicketDetail(
 ) {
   addDrawer({
     title: row.number,
-    size: deviceDetection() ? drawerSize("full") : drawerSize("md"),
+    // 处理人的详情右侧有 AI 面板，桌面端用宽抽屉
+    size: deviceDetection() ? drawerSize("full") : drawerSize("xl"),
     destroyOnClose: true,
     closeOnClickModal: true,
     hideFooter: true,
