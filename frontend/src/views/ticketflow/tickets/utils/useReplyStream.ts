@@ -43,11 +43,15 @@ export function useReplyStream(ticketId: () => string | undefined) {
       );
     } catch (error) {
       const code = Number((error as { code?: number })?.code ?? 0);
-      if (code === 401 && !retried && (await ensureSession(id))) {
-        if (controller === own) await open(id, own, true);
+      const restored =
+        code === 401 && !retried ? await ensureSession(id) : false;
+      if (controller !== own) return;
+      // 恢复会话期间用户点了停止：按停止收尾，不再重试也不报错
+      if (own.signal.aborted) {
+        reply.value = { ...reply.value, status: "stopped" };
         return;
       }
-      if (controller !== own) return;
+      if (restored) return open(id, own, true);
       reply.value = {
         ...reply.value,
         status: "error",

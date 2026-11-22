@@ -245,4 +245,21 @@ describe("useReplyStream", () => {
     expect(signals[0].aborted).toBe(true);
     expect(reply.value).toMatchObject({ status: "idle", text: "" });
   });
+
+  it("ends as stopped when stopped while recovering the session after a 401", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    mocks.retrieve.mockReturnValue(new Promise(resolve => (finish = resolve)));
+    mocks.streamReply.mockRejectedValue(
+      Object.assign(new Error("令牌失效"), { code: 401 })
+    );
+    const { generate, stop, reply } = useReplyStream(() => PK);
+
+    const pending = generate();
+    await flushPromises();
+    stop();
+    finish({ code: 1000 });
+    await pending;
+    expect(mocks.streamReply).toHaveBeenCalledTimes(1);
+    expect(reply.value.status).toBe("stopped");
+  });
 });
