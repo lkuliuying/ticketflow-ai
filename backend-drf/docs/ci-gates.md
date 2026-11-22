@@ -26,12 +26,26 @@
 | `lint.yml` | Tutorial mirror gate | 教程中的 manage.py 命令 / CLI 参数 / demo 路径与代码一致 | `scripts/check_tutorial_mirror.py` | `python scripts/check_tutorial_mirror.py` |
 | `lint.yml` | ADR status gate | ADR 生命周期：状态行归一且取值落闭集 / supersede 链（目标存在·无环·双向一致）/ 触发制项登记 / `adr/README.md` 状态列锁步 | `scripts/check_adr_status.py` | `python scripts/check_adr_status.py` |
 | `lint.yml` | Doc size gate | 文档体积预算（单篇 >40 KB 新增即失败；`plans/archive/` 前缀豁免——当前归档区已清空，规则保留；单篇豁免只减不增） | `scripts/check_doc_size.py` | `python scripts/check_doc_size.py` |
+| `test.yml` | Check OpenAPI contract is in sync | 校验当前视图、序列化器和内置字典生成的 OpenAPI 与前端类型生成真源一致 | `docs/schema/openapi.json` | 见 [OpenAPI 契约检查](#openapi-契约检查) |
 | `test.yml` | pytest（真 PG + 真 Redis） | 全量单测 + 集成测试 + 守护测试；覆盖率阈值门禁（`--cov-fail-under`，值见 workflow 注释） | `tests/` 全树 | `pytest -n auto`（先 `docker compose -f compose.test.yml up -d`） |
 | `test.yml` | Django system check | 数据库标记检查（索引名超长 / GinIndex 前置条件等仅 `check --database` 可见的模型缺陷） | `manage.py check --database default` | 同左（需真 PG） |
 | `security.yml` | pip-audit | 生产依赖已知漏洞（requirements.txt 口径，PR + 每周定时） | `pip-audit -r requirements.txt` | 同左 |
 | `docs-build.yml`（xadmin-docs） | VitePress build | 对外站点构建：**页级**死链与构建错误（vitepress 不校验 `#fragment`，锚点级由下一行守护） | `xadmin-docs` 全站 markdown | `cd ../xadmin-docs && pnpm docs:build` |
 | `docs-build.yml`（xadmin-docs） | Site links & references | 站点内链接**锚点级**可达性（对构建产物的 `id=` 核对，slug 以产物为准）+ 正文反引号里的跨仓路径引用（`docs/` `ops/` 服务端、`scripts/` 安装器） | `scripts/check_docs_site_links.py` | `cd ../xadmin-docs && pnpm docs:build && python ../xadmin-server/scripts/check_docs_site_links.py` |
 | `docs-build.yml`（xadmin-docs） | Doc facts / Site nav | 跨仓"当前事实"防漂移（含安装器 `scripts/7_upgrade.sh` 的升级基线 `required_version`）+ 站点导航覆盖（防孤儿页面） | `scripts/check_doc_facts.py` · `scripts/check_docs_site_nav.py` | `python scripts/check_doc_facts.py` · `python scripts/check_docs_site_nav.py` |
+
+## OpenAPI 契约检查
+
+在 `backend-drf/` 的 Linux 环境运行以下命令。使用隔离的 PostgreSQL 和 Redis 测试库，内置种子会写入该数据库。
+
+```bash
+docker compose -f compose.test.yml up -d --wait
+export DJANGO_SETTINGS_MODULE=tests.settings_real
+uv run --no-sync python manage.py compilemessages
+uv run --no-sync python manage.py migrate --noinput
+uv run --no-sync python manage.py load_init_json
+uv run --no-sync python manage.py dump_openapi --check
+```
 
 ## 随 pytest 全量进 CI 的守护测试（专项产出的结构性回归点）
 
