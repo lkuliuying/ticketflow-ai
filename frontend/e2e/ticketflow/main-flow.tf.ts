@@ -12,7 +12,8 @@ import {
  * 工单主流程冒烟：建单 → 接单 → AI 分析采纳与回复建议 → 提交验收 → 确认解决 → 转存知识库草稿。
  * 每次运行用唯一标题，互不干扰；只读写本次新建的工单与草稿。
  */
-const title = `冒烟工单 ${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`;
+// 毫秒时间戳加随机后缀，同一秒内连续或并行运行也不会撞标题
+const title = `冒烟工单 ${new Date().toISOString().replace(/\D/g, "").slice(0, 17)}-${Math.random().toString(36).slice(2, 6)}`;
 const description = "E2E 冒烟：月度报表权限同步后无法打开，请协助排查。";
 
 test.describe.configure({ mode: "serial" });

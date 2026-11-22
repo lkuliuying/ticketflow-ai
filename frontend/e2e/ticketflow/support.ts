@@ -6,9 +6,10 @@ export type Role = "tf_requester" | "tf_agent" | "tf_admin";
 
 /** 演示账号口令：由部署的种子脚本生成在本机文件里，用例只读取、不打印 */
 function loadAccounts(): Record<string, string> {
-  const file = resolve(
-    process.env.TF_E2E_ACCOUNTS ?? "../deploy/.accounts.local.json"
-  );
+  // 默认路径相对本文件而不是执行目录，从仓库根目录用 -c 指定配置运行时也能找到
+  const file =
+    process.env.TF_E2E_ACCOUNTS ||
+    resolve(import.meta.dirname, "../../../deploy/.accounts.local.json");
   const raw = JSON.parse(readFileSync(file, "utf-8")) as Record<
     string,
     string | { password?: string }
