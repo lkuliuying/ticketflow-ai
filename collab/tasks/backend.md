@@ -375,6 +375,17 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
 4. 网关规则：`ai-context` 404；`/ws/` 能完成握手；`/` 与任意前端路由返回 index.html；安全响应头存在。
 5. 用 `tests/README.md` 写明运行方式；新增 `.github/workflows/` 工作流仅做 `uv lock --check` 与 ruff（黑盒测试需要运行中的栈，CI 不跑）。
 
+附加（来自 DP-01 评审与 E2E 联调，同一分支一并完成）：
+
+6. **JWT 时钟容差**：本机 Docker Desktop 的 VM 时钟在两个值之间跳变（容器内连续读 `time.time()`，与宿主差值在 -10.7 s 和 +0.1 s 间交替），
+   导致刚签发的 token 的 `iat` 落在“未来”，PyJWT 拒绝（`Token is invalid`），浏览器登录后数秒内随机 401 并被踢回登录页。
+   给 DRF（simplejwt `LEEWAY`）和 FastAPI 的 JWT 校验加同一个可配置容差（环境变量，交付栈默认 30 秒，`.env.example` 写明），
+   补单测覆盖“`iat` 略超前仍通过、超出容差仍拒绝”。不放宽 `exp` 之外的任何校验。
+7. **beat pidfile**：`drf-beat` 启动前清理残留 pidfile（或改为不写 pidfile），避免非正常退出后容器重启陷入循环。
+8. **前端镜像缓存层**：`deploy/frontend.Dockerfile` 先只复制 `package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`（及 install 需要的其他清单）
+   执行 `pnpm install --frozen-lockfile`，再复制源码；确认构建上下文排除 `node_modules`、`dist`、`.env*`（`.dockerignore`）。
+9. 网关 `Upgrade`/`Connection` 头只在 `location /ws/` 设置；确认 `/api-docs/` 在交付栈（`DEBUG=False`）的行为，若公开则网关不转发。
+
 完成标准：在 DP-01 的交付栈上全部通过，报告贴 pytest 输出。
 
 ## DP-03 压测

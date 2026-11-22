@@ -40,7 +40,9 @@ def task_brief(task: str) -> str:
     """从任务书中截取该任务的小节。"""
     texts = [read(COLLAB / "tasks" / name) for name in ("backend.md", "frontend.md")]
     for text in texts:
-        match = re.search(rf"^## {re.escape(task)}\b.*?(?=^## |^# |^---|\Z)", text, re.S | re.M)
+        # 同一编号可能在后续迭代复用（如 FE-05），取最后一节，即当前迭代的任务
+        matches = list(re.finditer(rf"^## {re.escape(task)}\b.*?(?=^## |^# |^---|\Z)", text, re.S | re.M))
+        match = matches[-1] if matches else None
         if match:
             # 迭代小节（“# 迭代 N”到第一个任务之间）写的是通用要求，评审也需要看到
             preamble = re.search(r"^# 迭代.*?(?=^## )", text[: match.start()], re.S | re.M)
