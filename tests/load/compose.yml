@@ -1,0 +1,25 @@
+# Layer after deploy/docker-compose.yml, with a dedicated Compose project and data volumes.
+services:
+  drf-web:
+    command: ["gunicorn", "drf_app:application", "-b", "0.0.0.0:8896", "-k", "uvicorn_worker.UvicornWorker", "-w", "1"]
+    environment:
+      PYTHONPATH: /data/xadmin-server/packages/xadmin-common:/opt/ticketflow-load
+      TICKETFLOW_LOAD_FIXTURES: "true"
+      TF_LOAD_ORM: ${TF_LOAD_ORM:-optimized}
+      TF_LOAD_DASHBOARD: ${TF_LOAD_DASHBOARD:-hot}
+    volumes:
+      - ../tests/load:/opt/ticketflow-load:ro
+
+  ai:
+    command: ["/app/.venv/bin/uvicorn", "ai_app:app", "--app-dir", "/opt/ticketflow-load", "--host", "0.0.0.0", "--port", "8897"]
+    environment:
+      PYTHONPATH: /app
+      MOCK_LLM: "true"
+      MOCK_LLM_MODE: normal
+      MOCK_FIRST_DELAY: "0.35"
+      MOCK_CHUNK_DELAY: "0.18"
+      MOCK_CHUNKS: "8"
+      UPSTREAM_CONCURRENCY: "4"
+      UPSTREAM_SLOT_TIMEOUT: "1"
+    volumes:
+      - ../tests/load:/opt/ticketflow-load:ro

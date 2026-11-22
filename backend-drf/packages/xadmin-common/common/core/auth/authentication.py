@@ -14,7 +14,7 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
 
 from common.cache.storage import BlackAccessTokenCache, SessionTokenRevokedCache, UserTokenRevokedCache
 from common.contracts import emit_webhook_event, publish_api_quota_warning
@@ -152,6 +152,18 @@ def check_api_application_rate_limit(application: Any) -> None:
         raise ReadableThrottled(detail=_("Rate limit exceeded for this application"))
 
 
+def _verify_not_before(token: Token) -> None:
+    # PyJWT 的通用容差也作用于 nbf。只容忍签发和到期时间的时钟偏差。
+    if "nbf" in token.payload and int(token.payload["nbf"]) > token.current_time.timestamp():
+        raise TokenError(_("Token is invalid or expired"))
+
+
+class ServerRefreshToken(RefreshToken):
+    def verify(self) -> None:
+        _verify_not_before(self)
+        super().verify()
+
+
 class ServerAccessToken(AccessToken):
     """
     自定义的token方法是为了登出的时候，将 access token 禁用
@@ -175,6 +187,7 @@ class ServerAccessToken(AccessToken):
         return cast(dict[str, Any], cache.get_many(keys))
 
     def verify(self) -> None:
+        _verify_not_before(self)
         # 认证热路径：黑名单 / 用户级失效 / 会话级失效三处键值一次 get_many 取回
         # （原先三次独立 GET = 每个已认证请求 3 次 Redis 往返，合并后 1 次；
         # django-redis 下 get_many 走单次管线，语义与逐个 cache.get 完全一致）
@@ -208,6 +221,10 @@ class ServerAccessToken(AccessToken):
 
 class GetUserFromAccessToken(AccessToken):
     token_type = "refresh"
+
+    def verify(self) -> None:
+        _verify_not_before(self)
+        super().verify()
 
 
 class CookieJWTAuthentication(JWTAuthentication):

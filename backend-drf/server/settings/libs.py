@@ -116,6 +116,10 @@ REST_FRAMEWORK_EXTENSIONS = {
     "DEFAULT_USE_CACHE": "default",
 }
 
+JWT_LEEWAY_SECONDS = CONFIG.JWT_LEEWAY_SECONDS
+if isinstance(JWT_LEEWAY_SECONDS, bool) or not isinstance(JWT_LEEWAY_SECONDS, int) or JWT_LEEWAY_SECONDS < 0:
+    raise ImproperlyConfigured("JWT_LEEWAY_SECONDS must be a non-negative integer")
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(seconds=CONFIG.ACCESS_TOKEN_LIFETIME),
     "REFRESH_TOKEN_LIFETIME": timedelta(seconds=CONFIG.REFRESH_TOKEN_LIFETIME),
@@ -133,7 +137,7 @@ SIMPLE_JWT = {
     "AUDIENCE": "x",
     "ISSUER": "server",
     "JWK_URL": None,
-    "LEEWAY": 0,
+    "LEEWAY": JWT_LEEWAY_SECONDS,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",

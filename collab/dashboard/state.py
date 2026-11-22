@@ -80,9 +80,9 @@ def _board() -> list[dict]:
     rows = []
     for line in _read(COLLAB / "README.md").splitlines():
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if len(cells) == 5 and re.fullmatch(r"[A-Z]{2}-\d{2}", cells[0]):
+        if len(cells) == 5 and re.fullmatch(r"[A-Z]{2,3}-\d{2}", cells[0]):
             task_id, title, executor, depends, status = cells
-            deps = [] if depends in ("—", "-", "") else re.findall(r"[A-Z]{2}-\d{2}(?:\.\.\d{2})?", depends)
+            deps = [] if depends in ("—", "-", "") else re.findall(r"[A-Z]{2,3}-\d{2}(?:\.\.\d{2})?", depends)
             rows.append({"id": task_id, "title": title, "executor": executor, "depends": deps, "board_status": status})
     return rows
 
@@ -90,7 +90,7 @@ def _board() -> list[dict]:
 def _expand(deps: list[str]) -> list[str]:
     result = []
     for dep in deps:
-        match = re.fullmatch(r"([A-Z]{2})-(\d{2})\.\.(\d{2})", dep)
+        match = re.fullmatch(r"([A-Z]{2,3})-(\d{2})\.\.(\d{2})", dep)
         if match:
             prefix, start, end = match.group(1), int(match.group(2)), int(match.group(3))
             result.extend(f"{prefix}-{n:02d}" for n in range(start, end + 1))
@@ -104,7 +104,7 @@ def _briefs() -> dict[str, dict]:
     briefs: dict[str, dict] = {}
     for path in TASKS.glob("*.md"):
         text = _read(path)
-        for match in re.finditer(r"^## ([A-Z]{2}-\d{2}) (.+?)$(.*?)(?=^## |\Z)", text, re.S | re.M):
+        for match in re.finditer(r"^## ([A-Z]{2,3}-\d{2}) (.+?)$(.*?)(?=^## |\Z)", text, re.S | re.M):
             body = match.group(3)
             branch = re.search(r"分支：`([^`]+)`", body)
             points = [p.strip("- ").strip() for p in re.findall(r"^(?:- |\d+\. )(.+)$", body, re.M)]

@@ -314,3 +314,103 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
    - 停掉联调 Redis 或改错地址时 health 与鉴权返回 503（验证后恢复）。
 
 完成标准：上述测试与门禁通过，联调常驻可用；报告附帧序样例与自检输出，写明前端需要的接口细节（地址、事件字段）。
+
+---
+
+# 迭代 4：交付（Phase 5）
+
+三个任务在同一分支 `be/deploy`（从最新 `main` 切出）上顺序完成，每个任务评审通过后再开始下一个。
+本迭代允许改动：仓库根目录的 `deploy/`、`tests/`（均为新目录）、`service-fastapi/`、`backend-drf/` 中为部署所必需的最小改动，
+以及根目录 `.github/workflows/` 中新增的工作流。**不改 `frontend/` 的源码**；前端镜像的 Dockerfile 放在 `deploy/` 下，以 `frontend/` 为构建上下文。
+
+通用要求：
+
+- 不提交任何密钥：口令、`SECRET_KEY`、`JWT_SIGNING_KEY`、数据库与 Redis 口令一律来自 Git 忽略的 `deploy/.env`，
+  仓库里只放 `deploy/.env.example`（占位值）和一个生成 `.env` 的脚本（随机生成密钥，已存在则不覆盖）。
+- 不影响现有环境：联调栈 `ticketflow-local`（:8896）、常驻 AI 服务 `ticketflow-local-ai`（:8897）、测试栈 `xadmin-test` 保持运行，
+  端口不冲突；交付栈用独立的 Compose 项目名与卷。
+- 报告照例写清命令、实际输出、失败原文与未验证部分。
+
+## DP-01 统一部署：一条命令起全栈
+
+分支：`be/deploy`
+
+1. `deploy/docker-compose.yml`，Compose 项目名 `ticketflow`，一条命令启动：
+   `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build`。服务：
+   - `postgres`、`redis`（内网，不发布端口，带健康检查与持久卷）；
+   - `drf-web`（ASGI，承载 `/api` 与 `/ws`）、`drf-worker`、`drf-beat`，使用同一个后端镜像；
+   - `ai`（`service-fastapi/` 镜像，`MOCK_LLM=true` 默认）；
+   - `frontend`：用 `deploy/frontend.Dockerfile` 以 `frontend/` 为上下文构建静态产物（Node 24 + pnpm 11，`pnpm install --frozen-lockfile`、
+     `pnpm run prebuild`、`pnpm build`），由网关直接提供静态文件或单独的静态容器，二选一；
+   - `gateway`：Nginx，**唯一对外端口**，默认 `127.0.0.1:8080`（可在 `.env` 改）。
+2. 网关路由（`deploy/nginx/`）按 Phase 1 设计：`/api/` → DRF；`/ai/` → FastAPI（`proxy_http_version 1.1`、`proxy_buffering off`、
+   关闭缓存与 gzip、`proxy_read_timeout` 大于心跳间隔）；`/ws/` → DRF ASGI（Upgrade 头）；`/media/` 按后端约定；`/` → 前端静态（SPA 回退 index.html）。
+   **网关拒绝 `/api/tickets/{id}/ai-context`**（返回 404），FastAPI 走内网直连 DRF。补安全响应头（与 `frontend/nginx.conf` 一致）。
+3. 后端镜像：优先复用 `backend-drf/Dockerfile`；若依赖的基础镜像在本机无法拉取，在 `deploy/` 下提供可本机构建的替代 Dockerfile
+   或复用本机已有的 `nineaiyu/xadmin-server:5.0.2` 并以仓库代码覆盖，报告写明选择与原因。`config.yml` 由启动时从环境变量生成，
+   `XADMIN_APPS` 含 `tickets`、`knowledge`；DRF 与 FastAPI 显式注入同一个 `JWT_SIGNING_KEY`，`SECRET_KEY` 独立。
+4. 初始化：一次性 `init` 服务（或 `drf-web` 启动前置）执行 `migrate`、`load_init_json`，可重复执行（幂等）。另提供演示数据命令
+   `deploy/seed.sh`（或 Compose 的一次性 profile）：创建 `tf_requester`、`tf_agent`、`tf_agent_other`、`tf_admin` 四个账号
+   （角色、部门、指派权限同 IT-01）与约 12 张样例工单、3 篇文章，口令随机生成后**只写入 Git 忽略的 `deploy/.accounts.local.json`**。
+   可参考联调环境的 `backend-drf/tmp/local-integration/seed.py`（在 `F:\Program\ticketflow-ai-be` worktree 中）。
+   演示环境关闭登录验证码与临时令牌（与联调一致），在 README 说明生产应打开。
+5. `deploy/README.md`：前置条件、生成 `.env`、启动、初始化、演示数据、查看日志、停止与清理卷、升级（重建镜像 + migrate）、常见故障。
+6. 自检（贴输出）：从零（删除卷后）启动到全部健康的耗时；经网关访问 `/`（返回 index.html）、`/api/common/api/health`、`/ai/v1/health`；
+   `tf_agent` 经网关登录后调用工单列表、分析与 SSE（`curl -N` 帧序）；`/ws/` 握手成功（101）；`ai-context` 经网关 404；
+   `docker compose ps` 只有网关发布端口；重启全栈后数据仍在。
+
+完成标准：上述自检通过；报告给出访问地址、启停命令和镜像体积。
+
+## DP-02 网关验收测试
+
+分支：`be/deploy`（接着 DP-01）
+
+在仓库根目录新建 `tests/`（独立 `pyproject.toml` + `uv.lock`，pytest + httpx，可选 websockets），针对**运行中的网关**做黑盒验收，
+目标地址与账号口令从环境变量 / `deploy/.accounts.local.json` 读取：
+
+1. JSON 接口：信封 `{code, detail, data}`、成功码 1000；未登录 401；越权 403 / 不可见 404；版本冲突 409（并发流转同一工单）。
+2. SSE：`/ai/v1/tickets/suggest-reply/stream` 帧序 `meta → (ping)* → delta+ → done`；**未被网关缓冲**：首个 `delta` 到达时间明显早于流结束
+   （断言首帧时间 < 总时长的一半，并记录实际值）；响应头 `Content-Type: text/event-stream`、无 `Content-Encoding: gzip`。
+3. 鉴权拒绝：无 token、refresh token、篡改签名、登出后的 access 调用 AI 接口均 401；`tf_requester` 调分析 403。
+4. 网关规则：`ai-context` 404；`/ws/` 能完成握手；`/` 与任意前端路由返回 index.html；安全响应头存在。
+5. 用 `tests/README.md` 写明运行方式；新增 `.github/workflows/` 工作流仅做 `uv lock --check` 与 ruff（黑盒测试需要运行中的栈，CI 不跑）。
+
+附加（来自 DP-01 评审与 E2E 联调，同一分支一并完成）：
+
+6. **JWT 时钟容差**：本机 Docker Desktop 的 VM 时钟在两个值之间跳变（容器内连续读 `time.time()`，与宿主差值在 -10.7 s 和 +0.1 s 间交替），
+   导致刚签发的 token 的 `iat` 落在“未来”，PyJWT 拒绝（`Token is invalid`），浏览器登录后数秒内随机 401 并被踢回登录页。
+   给 DRF（simplejwt `LEEWAY`）和 FastAPI 的 JWT 校验加同一个可配置容差（环境变量，交付栈默认 30 秒，`.env.example` 写明），
+   补单测覆盖“`iat` 略超前仍通过、超出容差仍拒绝”。不放宽 `exp` 之外的任何校验。
+7. **beat pidfile**：`drf-beat` 启动前清理残留 pidfile（或改为不写 pidfile），避免非正常退出后容器重启陷入循环。
+8. **前端镜像缓存层**：`deploy/frontend.Dockerfile` 先只复制 `package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`（及 install 需要的其他清单）
+   执行 `pnpm install --frozen-lockfile`，再复制源码；确认构建上下文排除 `node_modules`、`dist`、`.env*`（`.dockerignore`）。
+9. 网关 `Upgrade`/`Connection` 头只在 `location /ws/` 设置；确认 `/api-docs/` 在交付栈（`DEBUG=False`）的行为，若公开则网关不转发。
+
+完成标准：在 DP-01 的交付栈上全部通过，报告贴 pytest 输出。
+
+## DP-03 压测
+
+分支：`be/deploy`（接着 DP-02）
+
+在 `tests/load/` 用 Locust（同 `tests/` 依赖锁），产出可复现的数据与报告 `docs/development/压测报告.md`（中文，含环境、数据量、并发、
+指标表与结论；原始 CSV 放 `tests/load/results/`，可提交）：
+
+1. **DRF 工单列表与详情**：同一数据集（建议 ≥ 5000 张工单，生成脚本可重复）、同一账号与筛选，对比
+   ① 去掉 `select_related` / 预取的 N+1 基线（只在压测配置中可切换，不改默认行为）与 ② 当前优化查询；再对比看板接口的冷 / 热缓存。
+   记录 RPS、错误率、P50 / P95 / P99。
+2. **FastAPI**：Mock 固定上游延迟，分别测并发低于与高于信号量容量（`UPSTREAM_CONCURRENCY`）时的分析吞吐与排队时间、
+   SSE 首字时间与完成时间；客户端中途断开后槽位释放（压测后 `health` 或指标显示槽位恢复）。
+3. 压测经网关进行（与真实部署一致）；如需直连对比，单独列出。
+4. 报告写明每组的命令，结论只写数据支持的判断。
+
+前置修复（来自 DP-02 联调，先做再压测）：
+
+5. **演示栈登录限流可配**：`LoginThrottle`（50/h，登录页的 `auth/capabilities` 与登录共用）经网关后所有本机流量同一 IP，
+   E2E、网关验收与压测互相耗尽额度（实测 429、`Retry-After` 二十多分钟）。交付栈用环境变量覆盖该速率，
+   演示 `.env` 默认放宽（如 `1000/h`），生产保持 50/h，`deploy/README.md` 说明。压测每个虚拟用户只登录一次并复用 token，
+   不为压测关闭限流。
+6. **缓存锁释放失败不应拒绝请求**：`MagicCacheData.make_cache` 的 Redis 锁在计算超过锁 TTL（或 VM 时钟前跳导致键提前过期）后
+   `__exit__` 抛 `LockNotOwnedError`，`_load_field_permission` 把它转成 403（DP-02 报告中的字段权限锁 403、FE-05 联调的瞬时 403 同源）。
+   计算已成功时只记告警并返回结果；补单测（模拟锁释放抛 `LockNotOwnedError`）。不改变计算本身失败时 fail-closed 的行为。
+
+完成标准：报告与原始数据齐全，命令可复现。

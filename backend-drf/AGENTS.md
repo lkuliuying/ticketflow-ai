@@ -136,9 +136,13 @@ python scripts/check_captcha_assets.py
 python scripts/check_tutorial_mirror.py                # 教程命令/参数与代码一致（example 四篇）
 python manage.py makemigrations --check --dry-run      # 迁移漂移（纯本地门禁，CI 不跑）
 python manage.py load_init_json --check                # 种子 0 error
+DJANGO_SETTINGS_MODULE=tests.settings_real uv run --no-sync python manage.py dump_openapi --check
 python scripts/check_doc_facts.py && python scripts/check_doc_index.py && python scripts/check_doc_paths.py
 python scripts/check_adr_status.py && python scripts/check_doc_size.py && python scripts/check_docs_site_nav.py
 ```
+
+OpenAPI 检查在隔离的真实 PostgreSQL + Redis 测试栈执行。检查前按 CI 顺序编译翻译、迁移并导入种子。
+完整命令见 [OpenAPI 契约检查](docs/ci-gates.md#openapi-契约检查)。
 
 门禁归属三种，别混淆：**① 纯本地**（`check_cache_keys`、迁移漂移——CI 不跑）；**② 本仓 CI**
 （`.github/workflows/lint.yml` / `test.yml`：上述 check_*、`uv lock --check`、覆盖率

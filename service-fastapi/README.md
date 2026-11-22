@@ -24,6 +24,7 @@ uv run uvicorn app.main:app --port 8897
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
 | `JWT_SIGNING_KEY` | 必填 | 与 DRF 共享的 HS256 签名密钥 |
+| `JWT_LEEWAY_SECONDS` | `0` | 与 DRF 使用同一签发和到期时间容差，单位秒。交付栈默认 30 |
 | `AUTH_REDIS_URL` | `redis://127.0.0.1:6379/1` | 包含 DRF `DEFAULT_CACHE_ID` 的认证 Redis URL。默认逻辑库是 1，覆盖时请在 URL 中显式写出库号 |
 | `AUTH_REDIS_TIMEOUT` | `0.5` | 认证 Redis 单次操作的总预算，单位秒 |
 | `DRF_BASE_URL` | `http://127.0.0.1:8896` | DRF 内网地址，须能访问 `/api/tickets/{id}/ai-context` |

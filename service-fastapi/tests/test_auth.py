@@ -1,4 +1,5 @@
 import os
+import time
 from hashlib import md5
 from unittest.mock import AsyncMock
 
@@ -60,6 +61,32 @@ def test_invalid_claims_are_rejected_before_redis(client, signing_key, claims, m
     assert response.json() == {"code": 401, "error": "UNAUTHORIZED", "detail": "需要有效的 Bearer access token"}
     assert response.headers["WWW-Authenticate"] == "Bearer"
     mget.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("leeway", "claim", "offset", "status"),
+    [
+        (0, "iat", 20, 401),
+        (30, "iat", 15, 200),
+        (30, "iat", 120, 401),
+        (30, "exp", -15, 200),
+        (30, "exp", -120, 401),
+        (30, "nbf", 15, 401),
+    ],
+)
+def test_clock_leeway_applies_to_issue_and_expiration_times(
+    application, monkeypatch, signing_key, claims, leeway, claim, offset, status
+):
+    monkeypatch.setenv("JWT_LEEWAY_SECONDS", str(leeway))
+    claims[claim] = int(time.time()) + offset
+    token = jwt.encode(claims, signing_key, algorithm="HS256")
+    with TestClient(application) as client:
+        mget = AsyncMock(return_value=[None, None, None])
+        monkeypatch.setattr(client.app.state.resources.redis, "mget", mget)
+        response = client.get("/ai/v1/protected", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == status
+    assert mget.await_count == (1 if status == 200 else 0)
 
 
 @pytest.mark.parametrize("claim", ["aud", "iss", "jti", "exp", "iat", "user_id", "token_type"])

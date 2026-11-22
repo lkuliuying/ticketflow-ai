@@ -7,6 +7,9 @@
 
 import logging
 from collections.abc import Iterable
+from datetime import timedelta
+from math import ceil
+from time import time
 from typing import Any
 
 from django.core.cache import cache
@@ -134,6 +137,23 @@ class BlackAccessTokenCache(RedisCacheBase):
         self.cache_key = f"{_key_template().get('black_access_token_key')}_{user_id}_{access_key}"
         super().__init__(self.cache_key)
 
+    def revoke_until(self, expires_at: int) -> None:
+        leeway = _leeway_seconds(kernel_required_setting("SIMPLE_JWT"))
+        self.set_storage_cache(1, max(1, ceil(expires_at + leeway - time())))
+
+
+def _leeway_seconds(jwt_settings: dict[str, Any]) -> float:
+    leeway = jwt_settings.get("LEEWAY") or 0
+    return leeway.total_seconds() if isinstance(leeway, timedelta) else float(leeway)
+
+
+def _revocation_timeout() -> int:
+    jwt_settings = kernel_required_setting("SIMPLE_JWT")
+    lifetime = jwt_settings.get("ACCESS_TOKEN_LIFETIME")
+    # 签发时钟可能领先，验签时也会容忍到期偏差。
+    buffer = max(60, ceil(2 * _leeway_seconds(jwt_settings)))
+    return (int(lifetime.total_seconds()) if lifetime else 3600) + buffer
+
 
 class UserTokenRevokedCache(RedisCacheBase):
     """用户级令牌失效时间戳：强制下线时写入，iat 早于该值的 access token 一律拒绝。
@@ -145,9 +165,7 @@ class UserTokenRevokedCache(RedisCacheBase):
 
     def __init__(self, user_id: Any) -> None:
         self.cache_key = f"{_key_template().get('user_token_revoked_key')}_{user_id}"
-        lifetime = kernel_required_setting("SIMPLE_JWT").get("ACCESS_TOKEN_LIFETIME")
-        timeout = int(lifetime.total_seconds()) + 60 if lifetime else 3660
-        super().__init__(self.cache_key, timeout=timeout)
+        super().__init__(self.cache_key, timeout=_revocation_timeout())
 
     @classmethod
     def revoke_many(cls, user_ids: Iterable[Any], revoked_at: Any) -> Any:
@@ -173,9 +191,7 @@ class SessionTokenRevokedCache(RedisCacheBase):
 
     def __init__(self, session_pk: Any) -> None:
         self.cache_key = f"{_key_template().get('session_token_revoked_key')}_{session_pk}"
-        lifetime = kernel_required_setting("SIMPLE_JWT").get("ACCESS_TOKEN_LIFETIME")
-        timeout = int(lifetime.total_seconds()) + 60 if lifetime else 3660
-        super().__init__(self.cache_key, timeout=timeout)
+        super().__init__(self.cache_key, timeout=_revocation_timeout())
 
 
 class UserSystemConfigCache(RedisCacheBase):

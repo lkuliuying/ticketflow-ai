@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,sse complete,"CatchResponseError('HTTP 503: {""code"":503,""error"":""UPSTREAM_BUSY"",""detail"":""上游并发额度已用完""}')",113,2026-11-22T08:18:20Z,2026-11-22T08:18:39Z
