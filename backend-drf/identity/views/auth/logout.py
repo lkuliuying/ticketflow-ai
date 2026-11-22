@@ -5,7 +5,6 @@
 # author : ly_13
 # date : 8/8/2024
 import hashlib
-import time
 from typing import Any
 
 from django.contrib.auth import logout
@@ -43,11 +42,9 @@ class LogoutAPIView(GenericAPIView):
         exp = payload.get("exp") if isinstance(payload, dict) else None
         if payload and exp is not None:
             user_id = payload.get("user_id")
-            timeout = int(exp - time.time())
             # 黑名单键派生用 MD5 仅作定长缓存键（非安全用途，usedforsecurity=False）
-            BlackAccessTokenCache(
-                user_id, hashlib.md5(auth.token, usedforsecurity=False).hexdigest()
-            ).set_storage_cache(1, timeout)
+            digest = hashlib.md5(auth.token, usedforsecurity=False).hexdigest()
+            BlackAccessTokenCache(user_id, digest).revoke_until(exp)
             # 会话级撤销：仅置 OFFLINE 不阻止 refresh 续期，必须写 sid 失效标记
             sid = payload.get("sid")
             if sid:

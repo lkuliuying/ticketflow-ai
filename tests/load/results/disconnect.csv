@@ -1,0 +1,4 @@
+phase,elapsed_ms,capacity,in_use,available,waiting,released_after_ms
+before,5.867,4,0,4,0,
+after_first_delta,498.596,4,4,0,0,
+after_disconnect,509.721,4,0,4,0,11.149

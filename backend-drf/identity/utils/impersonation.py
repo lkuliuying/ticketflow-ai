@@ -13,7 +13,6 @@
 
 import hashlib
 import json
-import time
 from typing import Any
 
 from django.utils import timezone
@@ -102,11 +101,9 @@ def stop_impersonation(request: Any) -> Any:
     auth = request.auth
     if auth is not None:
         exp = int(auth.payload.get("exp") or 0)
-        timeout = max(exp - int(time.time()), 0)
         # 黑名单键派生用 MD5 仅作定长缓存键（非安全用途，usedforsecurity=False）
-        BlackAccessTokenCache(
-            request.user.pk, hashlib.md5(auth.token, usedforsecurity=False).hexdigest()
-        ).set_storage_cache(1, timeout)
+        digest = hashlib.md5(auth.token, usedforsecurity=False).hexdigest()
+        BlackAccessTokenCache(request.user.pk, digest).revoke_until(exp)
         sid = auth.payload.get("sid")
         if sid:
             SessionTokenRevokedCache(sid).set_storage_cache(1)

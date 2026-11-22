@@ -6,17 +6,32 @@ MagicCacheData / MagicCacheResponse 是跨进程 Redis 缓存装饰器（占位�
 """
 
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from functools import WRAPPER_ASSIGNMENTS, wraps
 from typing import Any
 
 from django.core.cache import cache
 from django.http.response import HttpResponse
-from redis.exceptions import LockError
+from redis.exceptions import LockError, LockNotOwnedError
 
 from common.utils import get_logger
 
 logger = get_logger(__name__)
+
+
+@contextmanager
+def _cache_data_lock(cache_key: str, ttl: int) -> Iterator[None]:
+    lock = cache.lock(f"locker_{cache_key}", timeout=ttl, blocking_timeout=ttl + 5)
+    if not lock.acquire():
+        raise LockError(f"Unable to acquire lock for {cache_key}")
+    try:
+        yield
+    finally:
+        try:
+            lock.release()
+        except LockNotOwnedError:
+            logger.warning("Cache lock expired while computing %s", cache_key)
 
 
 def _record_cache_metric(cache_name: str, result: str) -> None:
@@ -86,7 +101,7 @@ class MagicCacheData:
                     _record_cache_metric(func_name, "hit")
                     return res["data"]
 
-                with cache.lock(f"locker_{cache_key}", timeout=placeholder_ttl, blocking_timeout=placeholder_ttl + 5):
+                with _cache_data_lock(cache_key, placeholder_ttl):
                     # 双重检查：等待锁期间可能已有其他进程完成计算并写入缓存
                     n_time = time.time()
                     res = cache.get(cache_key)

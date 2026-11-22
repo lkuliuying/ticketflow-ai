@@ -1,0 +1,167 @@
+name: ticketflow
+
+x-drf: &drf
+  image: ticketflow-drf:local
+  entrypoint: ["python", "/opt/ticketflow/drf.py"]
+  environment:
+    DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in deploy/.env}
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}
+    SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in deploy/.env}
+    JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in deploy/.env}
+    JWT_LEEWAY_SECONDS: ${JWT_LEEWAY_SECONDS:-30}
+    LOGIN_THROTTLE_RATE: ${LOGIN_THROTTLE_RATE:-}
+    CAPTCHA_TICKET_SECRET: ${CAPTCHA_TICKET_SECRET:?set CAPTCHA_TICKET_SECRET in deploy/.env}
+    CAPTCHA_TICKET_AUDIENCE: ${CAPTCHA_TICKET_AUDIENCE:-ticketflow}
+    TF_ALLOWED_HOSTS: ${TF_ALLOWED_HOSTS:-127.0.0.1,localhost}
+    TICKETFLOW_DEMO: ${TICKETFLOW_DEMO:-false}
+  stop_signal: SIGTERM
+  configs:
+    - source: drf_bootstrap
+      target: /opt/ticketflow/drf.py
+  volumes:
+    - app-data:/data/xadmin-server/data
+  depends_on:
+    init:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ticketflow
+      POSTGRES_USER: ticketflow
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in deploy/.env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "ticketflow", "-d", "ticketflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.10.2
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -qx PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  init:
+    <<: *drf
+    pull_policy: never
+    build:
+      context: ../backend-drf
+    command: ["init"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  drf-web:
+    <<: *drf
+    pull_policy: never
+    command: ["gunicorn", "server.asgi:application", "-b", "0.0.0.0:8896", "-k", "uvicorn_worker.UvicornWorker", "-w", "1"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8896/api/common/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  drf-worker:
+    <<: *drf
+    pull_policy: never
+    command: ["celery", "-A", "server", "worker", "-l", "INFO", "-Q", "celery,heavy", "-c", "2", "--hostname=worker@%h"]
+    stop_grace_period: 2m
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A server inspect --timeout 4 -d worker@$$HOSTNAME ping"]
+      interval: 20s
+      timeout: 8s
+      retries: 6
+      start_period: 20s
+
+  drf-beat:
+    <<: *drf
+    pull_policy: never
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        rm -f /tmp/ticketflow-beat.pid
+        exec celery -A server beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler --max-interval 60 --pidfile /tmp/ticketflow-beat.pid
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /tmp/ticketflow-beat.pid && kill -0 $$(cat /tmp/ticketflow-beat.pid)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  ai:
+    image: ticketflow-ai:local
+    pull_policy: never
+    build:
+      context: ../service-fastapi
+    environment:
+      DRF_BASE_URL: http://drf-web:8896
+      AUTH_REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}@redis:6379/1
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in deploy/.env}
+      JWT_LEEWAY_SECONDS: ${JWT_LEEWAY_SECONDS:-30}
+      MOCK_LLM: ${MOCK_LLM:-true}
+      MOCK_CHUNK_DELAY: ${MOCK_CHUNK_DELAY:-0.12}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+      drf-web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8897/ai/v1/health', timeout=3).close()"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
+  gateway:
+    image: ticketflow-gateway:local
+    pull_policy: never
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/frontend.Dockerfile
+    configs:
+      - source: gateway_nginx
+        target: /etc/nginx/conf.d/default.conf
+    ports:
+      - "${TF_BIND_HOST:-127.0.0.1}:${TF_PORT:-8080}:80"
+    depends_on:
+      drf-web:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    restart: unless-stopped
+
+configs:
+  drf_bootstrap:
+    file: ./drf.py
+  gateway_nginx:
+    file: ./nginx/gateway.conf
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-data:

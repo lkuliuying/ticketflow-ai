@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
     jwt_signing_key: SecretStr = Field(min_length=1)
+    jwt_leeway_seconds: int = Field(default=0, ge=0)
     auth_redis_url: RedisDsn = RedisDsn("redis://127.0.0.1:6379/1")
     auth_redis_timeout: PositiveFloat = 0.5
     drf_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8896")

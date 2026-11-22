@@ -117,7 +117,7 @@ FastAPI 建流前的错误响应统一为 `{code, error, detail}`。`code` 是�
 
 ## JWT 联合鉴权
 
-底座已有 `/api/identity/login/basic`、`/api/identity/refresh` 和 `/api/identity/logout`。部署为两服务显式注入同一个 `JWT_SIGNING_KEY`，Django `SECRET_KEY` 独立。前端延续底座登录与刷新，调用 AI 时发送 `Authorization: Bearer <access>`。依赖 `get_current_user` 固定校验 `HS256`、`aud=x`、`iss=server`、`exp`、`iat`、`jti`、`user_id` 与 `token_type=access`，时钟偏差延用 0 秒。旧 access token 可无 `sid`。
+底座已有 `/api/identity/login/basic`、`/api/identity/refresh` 和 `/api/identity/logout`。部署为两服务显式注入同一个 `JWT_SIGNING_KEY`，Django `SECRET_KEY` 独立。前端延续底座登录与刷新，调用 AI 时发送 `Authorization: Bearer <access>`。依赖 `get_current_user` 固定校验 `HS256`、`aud=x`、`iss=server`、`exp`、`iat`、`jti`、`user_id` 与 `token_type=access`。两服务使用同一个 `JWT_LEEWAY_SECONDS` 容忍 `iat` 和 `exp` 的时钟偏差，独立启动时默认 0 秒，交付栈默认 30 秒。旧 access token 可无 `sid`。
 
 FastAPI 读 DRF 同一个认证 Redis 逻辑库（由 `DEFAULT_CACHE_ID` 指定，默认 1）。底座 `KEY_FUNCTION` 原样返回键，`redis.asyncio` 用一次 `MGET` 按同样语义读取三个键。
 
