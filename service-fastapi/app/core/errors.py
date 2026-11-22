@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from http import HTTPStatus
 
@@ -7,6 +8,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.schemas.http import ErrorResponse
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceError(HTTPException):
@@ -18,6 +21,20 @@ class ServiceError(HTTPException):
 class AuthRedisUnavailable(ServiceError):
     def __init__(self) -> None:
         super().__init__(503, "AUTH_REDIS_UNAVAILABLE", "认证 Redis 不可用")
+
+
+class ProviderError(ServiceError):
+    def __init__(self, status_code: int, error: str, detail: str, *, retryable: bool = False) -> None:
+        super().__init__(status_code, error, detail)
+        self.retryable = retryable
+
+
+def invalid_output() -> ProviderError:
+    return ProviderError(502, "LLM_INVALID_OUTPUT", "模型返回了无效的结果")
+
+
+def provider_timeout(*, retryable: bool = False) -> ProviderError:
+    return ProviderError(504, "LLM_TIMEOUT", "模型生成超时", retryable=retryable)
 
 
 def error_response(status_code: int, error: str, detail: str, headers: Mapping[str, str] | None = None) -> JSONResponse:
@@ -40,4 +57,5 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unexpected FastAPI request failure", exc_info=exc)
         return error_response(500, "INTERNAL_SERVER_ERROR", "服务内部错误")

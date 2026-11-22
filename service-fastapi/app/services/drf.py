@@ -6,7 +6,7 @@ from uuid import UUID
 import httpx
 
 from app.core.errors import ServiceError
-from app.core.resources import Resources
+from app.core.resources import Resources, upstream_slot
 from app.schemas.context import DrfContextResponse, TicketContext
 
 FORWARDED_ERRORS = {
@@ -18,16 +18,8 @@ FORWARDED_ERRORS = {
 
 
 async def _request(resources: Resources, url: str, raw_token: str) -> httpx.Response:
-    try:
-        async with timeout(resources.settings.upstream_slot_timeout):
-            await resources.upstream_slots.acquire()
-    except TimeoutError as exc:
-        raise ServiceError(503, "UPSTREAM_BUSY", "上游并发额度已用完") from exc
-
-    try:
+    async with upstream_slot(resources):
         return await resources.http.get(url, headers={"Authorization": f"Bearer {raw_token}"})
-    finally:
-        resources.upstream_slots.release()
 
 
 async def _request_with_retries(resources: Resources, url: str, raw_token: str) -> httpx.Response:

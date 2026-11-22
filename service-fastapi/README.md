@@ -1,10 +1,12 @@
 # TicketFlow AI 服务
 
-服务使用 Python 3.14 和 uv 0.12.5 或更高版本。当前提供 `GET /ai/v1/health`、可供路由注入的联合鉴权依赖，以及调用 DRF 工单上下文的客户端。健康检查无需 token。Redis 正常时返回 `200` 和 `{"status":"ok","redis":"ok"}`，故障时返回 `503` 和 `{"code":503,"error":"AUTH_REDIS_UNAVAILABLE","detail":"认证 Redis 不可用"}`。
+服务使用 Python 3.14 和 uv 0.12.5 或更高版本。健康检查 `GET /ai/v1/health` 无需 token。Redis 正常时返回 `200` 和 `{"status":"ok","redis":"ok"}`，故障时返回 `503` 和 `{"code":503,"error":"AUTH_REDIS_UNAVAILABLE","detail":"认证 Redis 不可用"}`。
+
+`POST /ai/v1/tickets/analyze` 和 `POST /ai/v1/tickets/suggest-reply/stream` 共用 `{"ticket_id":"UUID"}` 请求和 Bearer access token。每次调用由 DRF 检查工单可见性与处理权限。分析成功返回工单 ID、版本、分类、建议优先级、摘要与标签。流式回复按顺序发出 `meta`、`delta` 和 `done`，等待增量时发出 `ping`（`{}`）。生成的内容由客服确认后在工单页采纳或发送。
 
 HTTP 错误统一返回 `{code, error, detail}`。`code` 是与 HTTP 状态码一致的整数，`error` 是机器可读标识，`detail` 是可读说明。例如令牌无效时返回 `{"code":401,"error":"UNAUTHORIZED","detail":"需要有效的 Bearer access token"}`。
 
-后续 SSE 建流失败沿用同一 HTTP 错误信封。建流后以 `error` 事件携带 `{code, error, detail, retryable}`，其中 `code` 取该错误对应的整数状态码。
+SSE 建流前的失败沿用 HTTP 错误信封。建流后的失败以 `error` 事件结束，携带 `{code, error, detail, retryable}`。分析与 SSE 字段见 [工单 AI 契约](../backend-drf/docs/schema/ticketflow-ai.schema.json)。分析缓存使用 `ticketflow:ai:analysis:` 前缀。缓存读写异常时回源，鉴权 Redis 故障时拒绝请求。
 
 ## 本地启动
 
@@ -32,6 +34,18 @@ uv run uvicorn app.main:app --port 8897
 | `UPSTREAM_CONCURRENCY` | `16` | 每个进程同时执行的上游请求上限 |
 | `UPSTREAM_SLOT_TIMEOUT` | `1.0` | 等待上游并发额度或 HTTP 池连接的超时，单位秒 |
 | `DRF_MAX_RETRIES` | `2` | 连接失败、连接超时和 5xx 的额外尝试次数，范围 0–5。退避期间释放并发额度 |
+| `LLM_TIMEOUT` | `30` | 分析模型调用总预算及兼容提供方的 HTTP 读写超时，单位秒 |
+| `STREAM_TIMEOUT` | `90` | 整条流式生成的总预算，单位秒 |
+| `STREAM_PING_INTERVAL` | `10` | 流式心跳间隔，单位秒 |
+| `ANALYSIS_CACHE_TTL` | `600` | 分析结果 TTL，单位秒 |
+| `MOCK_LLM` | `true` | 使用确定性的 Mock 提供方 |
+| `MOCK_LLM_MODE` | `normal` | 支持 `normal`、`slow`、`timeout`、`error`。慢模式等待至少两个心跳间隔 |
+| `MOCK_FIRST_DELAY` | `0.15` | Mock 分析和流式首段延迟，单位秒 |
+| `MOCK_CHUNK_DELAY` | `0.05` | Mock 段间延迟，单位秒 |
+| `MOCK_CHUNKS` | `8` | Mock 回复分段数，范围 1–100 |
+| `LLM_BASE_URL` | `https://api.openai.com/v1` | 兼容服务 API 根地址，服务追加 `/chat/completions` |
+| `LLM_MODEL` | `gpt-4o-mini` | 兼容服务模型名 |
+| `LLM_API_KEY` | — | 关闭 Mock 时必填 |
 
 ## 容器
 

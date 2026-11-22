@@ -8,10 +8,11 @@ from redis.asyncio import Redis
 from redis.asyncio.retry import Retry
 from redis.backoff import NoBackoff
 
-from app.api.health import router
+from app.api import health, tickets
 from app.core.config import Settings
 from app.core.errors import register_error_handlers
 from app.core.resources import Resources
+from app.services.providers import build_provider
 
 
 @asynccontextmanager
@@ -38,14 +39,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             retry=Retry(NoBackoff(), 0),
         ) as redis,
     ):
-        app.state.resources = Resources(settings, http, redis, Semaphore(settings.upstream_concurrency))
+        provider = build_provider(settings, http)
+        app.state.resources = Resources(settings, http, redis, Semaphore(settings.upstream_concurrency), provider)
         yield
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="TicketFlow AI", lifespan=lifespan)
     register_error_handlers(app)
-    app.include_router(router, prefix="/ai/v1")
+    app.include_router(health.router, prefix="/ai/v1")
+    app.include_router(tickets.router, prefix="/ai/v1")
     return app
 
 

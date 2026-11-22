@@ -21,7 +21,7 @@ class KnowledgeReference(BaseModel):
 
 class TicketContext(BaseModel):
     ticket: ContextTicket
-    categories: list[str]
+    categories: Annotated[list[str], Field(min_length=1)]
     references: list[KnowledgeReference]
 
 

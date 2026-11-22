@@ -1,4 +1,6 @@
-from pydantic import AnyHttpUrl, Field, PositiveFloat, PositiveInt, RedisDsn, SecretStr
+from typing import Literal, Self
+
+from pydantic import AnyHttpUrl, Field, PositiveFloat, PositiveInt, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,3 +18,21 @@ class Settings(BaseSettings):
     upstream_concurrency: PositiveInt = 16
     upstream_slot_timeout: PositiveFloat = 1.0
     drf_max_retries: int = Field(default=2, ge=0, le=5)
+    llm_timeout: PositiveFloat = 30.0
+    stream_timeout: PositiveFloat = 90.0
+    stream_ping_interval: PositiveFloat = 10.0
+    analysis_cache_ttl: PositiveInt = 600
+    mock_llm: bool = True
+    mock_llm_mode: Literal["normal", "slow", "timeout", "error"] = "normal"
+    mock_first_delay: float = Field(default=0.15, ge=0)
+    mock_chunk_delay: float = Field(default=0.05, ge=0)
+    mock_chunks: int = Field(default=8, ge=1, le=100)
+    llm_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")
+    llm_api_key: SecretStr | None = None
+    llm_model: str = "gpt-4o-mini"
+
+    @model_validator(mode="after")
+    def require_provider_key(self) -> Self:
+        if not self.mock_llm and (not self.llm_api_key or not self.llm_api_key.get_secret_value().strip()):
+            raise ValueError("LLM_API_KEY is required when MOCK_LLM=false")
+        return self
