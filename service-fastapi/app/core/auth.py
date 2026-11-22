@@ -1,6 +1,7 @@
 from asyncio import timeout
 from dataclasses import dataclass, field
 from hashlib import md5
+from time import time
 from typing import Annotated, Literal
 
 import jwt
@@ -35,7 +36,7 @@ def _unauthorized() -> ServiceError:
     return ServiceError(401, "UNAUTHORIZED", "需要有效的 Bearer access token", {"WWW-Authenticate": "Bearer"})
 
 
-def _decode_access_token(raw_token: str, signing_key: str) -> AccessClaims:
+def _decode_access_token(raw_token: str, signing_key: str, leeway: int) -> AccessClaims:
     try:
         payload = jwt.decode(
             raw_token,
@@ -43,9 +44,12 @@ def _decode_access_token(raw_token: str, signing_key: str) -> AccessClaims:
             algorithms=["HS256"],
             audience="x",
             issuer="server",
-            leeway=0,
+            leeway=leeway,
             options={"require": ["exp", "iat", "jti", "user_id", "token_type"]},
         )
+        # PyJWT applies its leeway to nbf too. Keep the original not-before boundary.
+        if leeway and "nbf" in payload and int(payload["nbf"]) > time():
+            raise jwt.ImmatureSignatureError("The token is not yet valid (nbf)")
         return AccessClaims.model_validate(payload)
     except (jwt.InvalidTokenError, TypeError, ValueError, OverflowError) as exc:
         raise _unauthorized() from exc
@@ -71,7 +75,8 @@ async def get_current_user(credentials: BearerCredentials, resources: AppResourc
     if credentials is None:
         raise _unauthorized()
     raw_token = credentials.credentials.strip()
-    claims = _decode_access_token(raw_token, resources.settings.jwt_signing_key.get_secret_value())
+    settings = resources.settings
+    claims = _decode_access_token(raw_token, settings.jwt_signing_key.get_secret_value(), settings.jwt_leeway_seconds)
     if await _is_revoked(resources, claims, raw_token):
         raise _unauthorized()
     return AuthenticatedUser(claims.user_id, raw_token)

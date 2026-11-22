@@ -12,8 +12,10 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import GenericAPIView
 from rest_framework.throttling import AnonRateThrottle
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from common.core.auth.authentication import ServerRefreshToken
 from common.core.response import ApiResponse
 from common.core.throttle import TempTokenThrottle
 from common.swagger.utils import get_default_response_schema
@@ -41,8 +43,14 @@ class TempTokenAPIView(GenericAPIView):
         return ApiResponse(token=token)
 
 
+class ServerTokenRefreshSerializer(TokenRefreshSerializer):
+    token_class = ServerRefreshToken
+
+
 class RefreshTokenAPIView(TokenRefreshView):
     """刷新Token"""
+
+    serializer_class = ServerTokenRefreshSerializer
 
     def post(self, request: Any, *args: Any, **kwargs: Any) -> Any:
         data = super().post(request, *args, **kwargs).data

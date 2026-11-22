@@ -18,6 +18,8 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps -a
 
 首条命令按 `.env.example` 生成 `deploy/.env`，并填入随机密钥。已有 `.env` 时直接使用它。保留这份文件，以便重启后继续访问数据库和现有会话。`SECRET_KEY` 与 `JWT_SIGNING_KEY` 分开，DRF 和 FastAPI 共用 `JWT_SIGNING_KEY`。自定义 `REDIS_PASSWORD` 时使用字母、数字、下划线和连字符，以便在 Redis 连接 URL 中使用。
 
+交付栈也为 DRF 和 FastAPI 共用 `JWT_LEEWAY_SECONDS`，默认 30 秒。签发时间的超前量和到期时间的宽限期都受此值限制。可在 `deploy/.env` 中设置为非负整数，设为 0 时严格按当前时钟验证。
+
 默认入口是 `http://127.0.0.1:8080`，可以用 `TF_PORT` 改端口。需要监听其他地址时同时配置 `TF_BIND_HOST` 和 `TF_ALLOWED_HOSTS`（逗号分隔的访问主机名，不带端口），并在生产入口配置 HTTPS。交付栈的 Compose 项目名为 `ticketflow`，网关是唯一发布宿主端口的服务。数据库、Redis 和上传文件分别存放在三个命名卷。
 
 短生命周期的 `init` 服务等待 PostgreSQL 和 Redis 健康后执行 `migrate` 和 `load_init_json`。内置种子在空库上使用一个不可登录的审计用户。等 `init` 以状态码 0 退出后，DRF Web、Worker 和 Beat 才会启动。首次启动后可访问以下地址确认就绪：
@@ -27,6 +29,8 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps -a
 - FastAPI 健康接口 `http://127.0.0.1:8080/ai/v1/health`
 
 网关提供 SPA 回退，经 DRF 转发 `/api/`、`/ws/` 和受鉴权的 `/media/`，经 FastAPI 转发 `/ai/`。FastAPI 经 Compose 内网直连 DRF 的工单上下文，网关对该路径返回 404。AI 默认开启 `MOCK_LLM`，需要实际模型时将其设为 `false`，并配置 `LLM_BASE_URL`、`LLM_MODEL` 和 `LLM_API_KEY`。
+
+网关对 `/api-docs` 和 `/api-docs/` 下的路径返回 404。Mock 回复默认每隔 0.12 秒发送一段，可通过 `MOCK_CHUNK_DELAY` 调整。
 
 ## 演示数据
 

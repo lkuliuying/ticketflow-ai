@@ -8,6 +8,7 @@ x-drf: &drf
     REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}
     SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in deploy/.env}
     JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in deploy/.env}
+    JWT_LEEWAY_SECONDS: ${JWT_LEEWAY_SECONDS:-30}
     CAPTCHA_TICKET_SECRET: ${CAPTCHA_TICKET_SECRET:?set CAPTCHA_TICKET_SECRET in deploy/.env}
     CAPTCHA_TICKET_AUDIENCE: ${CAPTCHA_TICKET_AUDIENCE:-ticketflow}
     TF_ALLOWED_HOSTS: ${TF_ALLOWED_HOSTS:-127.0.0.1,localhost}
@@ -91,7 +92,12 @@ services:
   drf-beat:
     <<: *drf
     pull_policy: never
-    command: ["celery", "-A", "server", "beat", "-l", "INFO", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler", "--max-interval", "60", "--pidfile", "/tmp/ticketflow-beat.pid"]
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        rm -f /tmp/ticketflow-beat.pid
+        exec celery -A server beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler --max-interval 60 --pidfile /tmp/ticketflow-beat.pid
     healthcheck:
       test: ["CMD-SHELL", "test -s /tmp/ticketflow-beat.pid && kill -0 $$(cat /tmp/ticketflow-beat.pid)"]
       interval: 10s
@@ -107,7 +113,9 @@ services:
       DRF_BASE_URL: http://drf-web:8896
       AUTH_REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}@redis:6379/1
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in deploy/.env}
+      JWT_LEEWAY_SECONDS: ${JWT_LEEWAY_SECONDS:-30}
       MOCK_LLM: ${MOCK_LLM:-true}
+      MOCK_CHUNK_DELAY: ${MOCK_CHUNK_DELAY:-0.12}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_API_KEY: ${LLM_API_KEY:-}
