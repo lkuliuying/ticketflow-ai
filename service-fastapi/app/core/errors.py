@@ -10,9 +10,9 @@ from app.schemas.http import ErrorResponse
 
 
 class ServiceError(HTTPException):
-    def __init__(self, status_code: int, code: str, detail: str, headers: dict[str, str] | None = None) -> None:
+    def __init__(self, status_code: int, error: str, detail: str, headers: dict[str, str] | None = None) -> None:
         super().__init__(status_code, detail, headers)
-        self.code = code
+        self.error = error
 
 
 class AuthRedisUnavailable(ServiceError):
@@ -20,8 +20,8 @@ class AuthRedisUnavailable(ServiceError):
         super().__init__(503, "AUTH_REDIS_UNAVAILABLE", "认证 Redis 不可用")
 
 
-def error_response(status_code: int, code: str, detail: str, headers: Mapping[str, str] | None = None) -> JSONResponse:
-    payload = ErrorResponse(code=code, detail=detail)
+def error_response(status_code: int, error: str, detail: str, headers: Mapping[str, str] | None = None) -> JSONResponse:
+    payload = ErrorResponse(code=status_code, error=error, detail=detail)
     return JSONResponse(payload.model_dump(), status_code=status_code, headers=headers)
 
 
@@ -29,9 +29,9 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         status = HTTPStatus(exc.status_code)
-        code = exc.code if isinstance(exc, ServiceError) else status.name
+        error = exc.error if isinstance(exc, ServiceError) else status.name
         detail = exc.detail if isinstance(exc.detail, str) else status.phrase
-        return error_response(status, code, detail, exc.headers)
+        return error_response(status, error, detail, exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

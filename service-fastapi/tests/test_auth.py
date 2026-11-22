@@ -57,17 +57,19 @@ def test_invalid_claims_are_rejected_before_redis(client, signing_key, claims, m
     response = client.get("/ai/v1/protected", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 401
-    assert response.json() == {"code": "UNAUTHORIZED", "detail": "需要有效的 Bearer access token"}
+    assert response.json() == {"code": 401, "error": "UNAUTHORIZED", "detail": "需要有效的 Bearer access token"}
     assert response.headers["WWW-Authenticate"] == "Bearer"
     mget.assert_not_awaited()
 
 
-@pytest.mark.parametrize("claim", ["jti", "exp", "iat", "user_id", "token_type"])
+@pytest.mark.parametrize("claim", ["aud", "iss", "jti", "exp", "iat", "user_id", "token_type"])
 def test_required_claims(client, signing_key, claims, mget, claim):
     del claims[claim]
     token = jwt.encode(claims, signing_key, algorithm="HS256")
 
-    assert client.get("/ai/v1/protected", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    response = client.get("/ai/v1/protected", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == response.json()["code"] == 401
+    assert response.json()["error"] == "UNAUTHORIZED"
     mget.assert_not_awaited()
 
 
@@ -113,7 +115,7 @@ def test_auth_redis_error_returns_503(client, signing_key, claims, mget, error):
     response = client.get("/ai/v1/protected", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 503
-    assert response.json() == {"code": "AUTH_REDIS_UNAVAILABLE", "detail": "认证 Redis 不可用"}
+    assert response.json() == {"code": 503, "error": "AUTH_REDIS_UNAVAILABLE", "detail": "认证 Redis 不可用"}
 
 
 def test_corrupt_redis_value_fails_closed(client, signing_key, claims, mget):
@@ -139,7 +141,9 @@ def test_health_and_auth_with_real_redis(application, monkeypatch, signing_key, 
         for key, value in zip(keys, [1, claims["iat"], 1], strict=True):
             redis.set(key, value, ex=60)
             try:
-                assert client.get("/ai/v1/protected", headers=headers).status_code == 401
+                response = client.get("/ai/v1/protected", headers=headers)
+                assert response.status_code == response.json()["code"] == 401
+                assert response.json()["error"] == "UNAUTHORIZED"
             finally:
                 redis.delete(key)
             assert client.get("/ai/v1/protected", headers=headers).status_code == 200

@@ -64,7 +64,7 @@ async def test_context_forwards_original_bearer_and_parses_drf_envelope(context_
 
 
 @pytest.mark.parametrize(
-    ("status", "code", "headers"),
+    ("status", "error", "headers"),
     [
         (401, "UNAUTHORIZED", {"WWW-Authenticate": "Bearer"}),
         (403, "FORBIDDEN", {}),
@@ -72,7 +72,7 @@ async def test_context_forwards_original_bearer_and_parses_drf_envelope(context_
         (429, "RATE_LIMITED", {"Retry-After": "17"}),
     ],
 )
-async def test_drf_errors_are_not_retried(status, code, headers):
+async def test_drf_errors_are_not_retried(status, error, headers):
     calls = []
 
     def transport(request):
@@ -83,7 +83,7 @@ async def test_drf_errors_are_not_retried(status, code, headers):
         with pytest.raises(ServiceError) as raised:
             await drf.fetch_ticket_context(resources, TICKET, TOKEN)
 
-    assert (raised.value.status_code, raised.value.code, raised.value.detail) == (status, code, "工单授权错误")
+    assert (raised.value.status_code, raised.value.error, raised.value.detail) == (status, error, "工单授权错误")
     assert raised.value.headers == headers
     assert len(calls) == 1
 
@@ -120,7 +120,7 @@ async def test_drf_retries_connections_and_5xx_with_slot_released(monkeypatch, c
 
 
 @pytest.mark.parametrize(
-    ("failure", "attempts", "status", "code"),
+    ("failure", "attempts", "status", "error"),
     [
         (503, 3, 503, "DRF_UNAVAILABLE"),
         (httpx.ConnectError, 3, 503, "DRF_UNAVAILABLE"),
@@ -129,7 +129,7 @@ async def test_drf_retries_connections_and_5xx_with_slot_released(monkeypatch, c
         (httpx.WriteError, 1, 503, "DRF_UNAVAILABLE"),
     ],
 )
-async def test_drf_exhaustion_and_timeout_mapping(monkeypatch, failure, attempts, status, code):
+async def test_drf_exhaustion_and_timeout_mapping(monkeypatch, failure, attempts, status, error):
     calls = []
 
     def transport(request):
@@ -143,7 +143,7 @@ async def test_drf_exhaustion_and_timeout_mapping(monkeypatch, failure, attempts
         with pytest.raises(ServiceError) as raised:
             await drf.fetch_ticket_context(resources, TICKET, TOKEN)
 
-    assert (raised.value.status_code, raised.value.code) == (status, code)
+    assert (raised.value.status_code, raised.value.error) == (status, error)
     assert "private upstream failure" not in raised.value.detail
     assert len(calls) == attempts
 
@@ -157,7 +157,7 @@ async def test_total_budget_cancels_request_and_releases_slot():
             await drf.fetch_ticket_context(resources, TICKET, TOKEN)
         assert not resources.upstream_slots.locked()
 
-    assert (raised.value.status_code, raised.value.code) == (504, "DRF_TIMEOUT")
+    assert (raised.value.status_code, raised.value.error) == (504, "DRF_TIMEOUT")
 
 
 async def test_wait_for_slot_has_its_own_budget():
@@ -169,7 +169,7 @@ async def test_wait_for_slot_has_its_own_budget():
             with pytest.raises(ServiceError) as raised:
                 await drf.fetch_ticket_context(resources, TICKET, TOKEN)
 
-    assert (raised.value.status_code, raised.value.code) == (503, "UPSTREAM_BUSY")
+    assert (raised.value.status_code, raised.value.error) == (503, "UPSTREAM_BUSY")
 
 
 @pytest.mark.parametrize("invalid", ["envelope", "wrong_ticket", "missing_reference_field", "not_json"])
@@ -189,4 +189,4 @@ async def test_malformed_drf_context_is_rejected(context_response, invalid):
         with pytest.raises(ServiceError) as raised:
             await drf.fetch_ticket_context(resources, TICKET, TOKEN)
 
-    assert (raised.value.status_code, raised.value.code) == (503, "DRF_INVALID_CONTEXT")
+    assert (raised.value.status_code, raised.value.error) == (503, "DRF_INVALID_CONTEXT")

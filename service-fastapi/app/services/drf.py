@@ -52,7 +52,7 @@ def _drf_error(response: httpx.Response) -> ServiceError:
     if status not in FORWARDED_ERRORS:
         return ServiceError(503, "DRF_UNAVAILABLE", "DRF 上下文服务不可用")
 
-    code, detail = FORWARDED_ERRORS[status]
+    error, detail = FORWARDED_ERRORS[status]
     try:
         payload = response.json()
     except ValueError:
@@ -64,7 +64,7 @@ def _drf_error(response: httpx.Response) -> ServiceError:
         headers["WWW-Authenticate"] = "Bearer"
     if status == 429 and "Retry-After" in response.headers:
         headers["Retry-After"] = response.headers["Retry-After"]
-    return ServiceError(status, code, detail, headers)
+    return ServiceError(status, error, detail, headers)
 
 
 async def fetch_ticket_context(resources: Resources, ticket_id: UUID, raw_token: str) -> TicketContext:

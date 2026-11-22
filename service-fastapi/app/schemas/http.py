@@ -4,7 +4,8 @@ from pydantic import BaseModel
 
 
 class ErrorResponse(BaseModel):
-    code: str
+    code: int
+    error: str
     detail: str
 
 

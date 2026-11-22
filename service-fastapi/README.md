@@ -1,10 +1,14 @@
 # TicketFlow AI 服务
 
-服务使用 Python 3.14。当前提供 `GET /ai/v1/health`、可供路由注入的联合鉴权依赖，以及调用 DRF 工单上下文的客户端。健康检查无需 token。Redis 正常时返回 `200` 和 `{"status":"ok","redis":"ok"}`，故障时返回 `503` 和 `{"code":"AUTH_REDIS_UNAVAILABLE","detail":"认证 Redis 不可用"}`。
+服务使用 Python 3.14 和 uv 0.12.5 或更高版本。当前提供 `GET /ai/v1/health`、可供路由注入的联合鉴权依赖，以及调用 DRF 工单上下文的客户端。健康检查无需 token。Redis 正常时返回 `200` 和 `{"status":"ok","redis":"ok"}`，故障时返回 `503` 和 `{"code":503,"error":"AUTH_REDIS_UNAVAILABLE","detail":"认证 Redis 不可用"}`。
+
+HTTP 错误统一返回 `{code, error, detail}`。`code` 是与 HTTP 状态码一致的整数，`error` 是机器可读标识，`detail` 是可读说明。例如令牌无效时返回 `{"code":401,"error":"UNAUTHORIZED","detail":"需要有效的 Bearer access token"}`。
+
+后续 SSE 建流失败沿用同一 HTTP 错误信封。建流后以 `error` 事件携带 `{code, error, detail, retryable}`，其中 `code` 取该错误对应的整数状态码。
 
 ## 本地启动
 
-在本目录准备 `.env` 或等效的环境变量，其中 `JWT_SIGNING_KEY` 使用 DRF 的 `SIMPLE_JWT.SIGNING_KEY`，部署时向两边显式注入同一个密钥。使用 `backend-drf/compose.test.yml` 的 Redis 时，将 `AUTH_REDIS_URL` 设为 `redis://127.0.0.1:56379/1`。
+从 [`.env.example`](.env.example) 复制出 `.env`，或直接设置同名环境变量。将 `JWT_SIGNING_KEY` 填为 DRF 的 `SIMPLE_JWT.SIGNING_KEY`，部署时向两边显式注入同一个密钥。使用 `backend-drf/compose.test.yml` 的 Redis 时，将 `AUTH_REDIS_URL` 设为 `redis://127.0.0.1:56379/1`。
 
 ```sh
 uv sync --locked

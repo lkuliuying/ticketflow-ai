@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Annotated
 from uuid import UUID, uuid4
@@ -7,6 +8,7 @@ from fastapi import Depends
 from fastapi.testclient import TestClient
 
 from app.core.auth import AuthenticatedUser, get_current_user
+from app.core.config import Settings
 from app.main import create_app
 
 SIGNING_KEY = "test-only-signing-key-for-ticketflow-ai-with-enough-bytes"
@@ -19,6 +21,10 @@ def anyio_backend():
 
 @pytest.fixture(autouse=True)
 def signing_key(monkeypatch):
+    for name in tuple(os.environ):
+        if name.lower() in Settings.model_fields:
+            monkeypatch.delenv(name)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     monkeypatch.setenv("JWT_SIGNING_KEY", SIGNING_KEY)
     return SIGNING_KEY
 
