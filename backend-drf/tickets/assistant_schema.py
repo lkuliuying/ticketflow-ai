@@ -1,4 +1,8 @@
-from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, inline_serializer
+from typing import Any
+
+from drf_spectacular.extensions import OpenApiSerializerExtension
+from drf_spectacular.openapi import AutoSchema
+from drf_spectacular.utils import Direction, OpenApiParameter, OpenApiTypes, inline_serializer
 
 from tickets.api_schema import envelope, page, ticket_error_result
 from tickets.assistant_serializers import (
@@ -12,7 +16,19 @@ from tickets.assistant_serializers import (
     DownvoteSerializer,
     HandoffSessionSerializer,
     QuestionContextSerializer,
+    SessionTitleSerializer,
 )
+
+
+class SessionTitleSchema(OpenApiSerializerExtension):
+    target_class = SessionTitleSerializer
+
+    def map_serializer(self, auto_schema: AutoSchema, direction: Direction) -> dict[str, Any]:
+        schema = auto_schema._map_serializer(self.target, direction, bypass_extensions=True)
+        # Renaming always requires a title, even for this PATCH action.
+        schema["required"] = ["title"]
+        return schema
+
 
 page_parameters = [OpenApiParameter("page", int), OpenApiParameter("size", int)]
 date_parameters = [

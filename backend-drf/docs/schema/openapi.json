@@ -15445,9 +15445,13 @@
         "properties": {
           "title": {
             "maxLength": 200,
+            "minLength": 1,
             "type": "string"
           }
         },
+        "required": [
+          "title"
+        ],
         "type": "object"
       },
       "PatchedSkillGroup": {
@@ -16799,6 +16803,7 @@
         "properties": {
           "message": {
             "maxLength": 4000,
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -19030,6 +19035,7 @@
           "title": {
             "default": "新对话",
             "maxLength": 200,
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -19863,6 +19869,7 @@
         "properties": {
           "assistant_session_id": {
             "format": "uuid",
+            "nullable": true,
             "title": "助手会话",
             "type": "string",
             "writeOnly": true
@@ -34993,7 +35000,8 @@
                 "$ref": "#/components/schemas/PatchedSessionTitle"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

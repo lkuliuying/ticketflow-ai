@@ -72,7 +72,7 @@ class TicketCreateSerializer(BaseModelSerializer):
     description = serializers.CharField(max_length=20000)
     category = serializers.ChoiceField(choices=Category.choices)
     priority = serializers.ChoiceField(choices=Priority.choices)
-    assistant_session_id = serializers.UUIDField(required=False, write_only=True, label="助手会话")
+    assistant_session_id = serializers.UUIDField(required=False, allow_null=True, write_only=True, label="助手会话")
 
     class Meta:
         model = Ticket

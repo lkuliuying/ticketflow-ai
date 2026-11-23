@@ -121,7 +121,7 @@ class TicketViewSet(
         check_rate(self.actor.pk, "create", 30)
         values = dict(self._values(request))
         session_id = values.pop("assistant_session_id", None)
-        if session_id is None and "assistant_session_id" in request.data:
+        if session_id is None and request.data.get("assistant_session_id") is not None:
             raise PermissionDenied("无权关联助手会话")
         ticket, created = services.create_ticket(
             self.actor, key, cast(services.NewTicket, values), assistant_session_id=session_id

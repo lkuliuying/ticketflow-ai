@@ -7,11 +7,11 @@ from tickets.models import AssistantFeedback, AssistantMessage, AssistantSession
 
 
 class SessionTitleSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=200)
+    title = serializers.CharField(min_length=1, max_length=200)
 
 
 class SessionCreateSerializer(SessionTitleSerializer):
-    title = serializers.CharField(max_length=200, default="新对话")
+    title = serializers.CharField(min_length=1, max_length=200, default="新对话")
 
 
 class AssistantSessionSerializer(BaseModelSerializer):
@@ -119,7 +119,7 @@ class AssistantStatsSerializer(serializers.Serializer):
 
 
 class QuestionInputSerializer(serializers.Serializer):
-    message = serializers.CharField(max_length=4000)
+    message = serializers.CharField(min_length=1, max_length=4000)
 
 
 class HistoryEntrySerializer(serializers.Serializer):

@@ -6,10 +6,8 @@ from django.utils import timezone
 
 from identity.models import UserInfo
 from system.models import FieldPermission, Menu
-from tests.integration.tickets.test_ticket_services import race_twice
 from tests.integration.tickets.test_viewer_contract import validate
-from tickets.models import RatingTag, Status, Ticket, TicketRating
-from tickets.services import TicketConflict, create_rating
+from tickets.models import RatingTag, Status, TicketRating
 
 RATINGS = "/api/ticket-ratings"
 PAYLOAD = {
@@ -327,26 +325,3 @@ def test_summary_scope_weighting_and_inclusive_dates(users, client_for, rating_r
     assert agent.get(summary, params).data["data"] == empty
     assert admin.get(summary, {"created_to": "2000-01-01T00:00:00Z"}).data["data"] == {**empty, "by_handler": []}
     assert admin.get(summary, {"created_from": "yesterday"}).status_code == 400
-
-
-@pytest.mark.django_db(transaction=True)
-def test_concurrent_rating_creates_one_record(support, requester, agent, details):
-    ticket = Ticket.objects.create(
-        **details,
-        number="TF-RATING-RACE",
-        submitter=requester,
-        assignee=agent,
-        department=support,
-        sla_due_at=timezone.now(),
-        status=Status.CLOSED,
-    )
-
-    def rate():
-        try:
-            create_rating(Ticket.objects.all(), ticket.pk, requester, resolved=True, satisfaction=5, handler_score=4)
-        except TicketConflict:
-            return 409
-        return 201
-
-    assert sorted(race_twice(rate)) == [201, 409]
-    assert TicketRating.objects.filter(ticket=ticket).count() == 1

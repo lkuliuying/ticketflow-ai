@@ -66,7 +66,7 @@
         "description": {"type": "string", "minLength": 1, "maxLength": 20000},
         "category": {"$ref": "#/$defs/category"},
         "priority": {"$ref": "#/$defs/priority"},
-        "assistant_session_id": {"type": "string", "format": "uuid", "description": "可选。仅普通员工可提交本人未删除且尚未关联工单的会话。关联与建单同事务，参与幂等请求摘要。"}
+        "assistant_session_id": {"type": ["string", "null"], "format": "uuid", "description": "可选，null 等同省略。仅普通员工可提交本人未删除且尚未关联工单的会话。关联与建单同事务，参与幂等请求摘要。"}
       }
     },
     "ticketDetailAssistant": {

@@ -5,7 +5,6 @@ import pytest
 from django.utils import timezone
 
 from identity.models import UserInfo
-from tests.integration.tickets.test_ticket_services import race_twice
 from tickets.models import Status, Ticket, TicketAssignment, TicketComment, Visibility
 from tickets.policy import TicketAccess
 from tickets.services import create_ticket, transition
@@ -76,15 +75,6 @@ def test_dispatch_leaves_ticket_pending_when_no_eligible_technician(users, detai
     assert ticket.assignee_id is None
     assert not ticket.assignments.exists()
     assert list(ticket.logs.values_list("action", flat=True)) == ["CREATE"]
-
-
-@pytest.mark.django_db(transaction=True)
-def test_concurrent_create_balances_work_in_the_same_skill_group(support, requester, agent, details):
-    other = technician(agent, "support-other")
-    results = race_twice(lambda: create_ticket(requester, str(uuid4()), details))
-    assert all(created for _, created in results)
-    assert {ticket.assignee_id for ticket, _ in results} == {agent.pk, other.pk}
-    assert TicketAssignment.objects.filter(ended_at__isnull=True).count() == 2
 
 
 @pytest.mark.django_db

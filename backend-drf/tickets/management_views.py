@@ -125,6 +125,7 @@ class AccountViewSet(BusinessManagementViewSet):
     search_columns_serializer_class = AccountCreateSerializer
     filterset_class = AccountFilter
     table_fields = AccountSerializer.Meta.table_fields
+    ordering_fields = ("pk", "username", "nickname", "phone", "email", "dept", "is_active")
     ordering = ["username", "pk"]
     select_related_fields = ("dept",)
     prefetch_related_fields = ("roles",)

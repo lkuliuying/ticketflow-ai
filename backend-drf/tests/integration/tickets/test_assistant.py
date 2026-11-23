@@ -15,7 +15,15 @@ from knowledge.models import ArticleStatus, KnowledgeArticle
 from tests.integration.tickets.test_ticket_api import assert_error, authenticated
 from tests.integration.tickets.test_viewer_contract import validate
 from tickets.cache import TICKET_CACHE_KEY_PREFIX
-from tickets.models import AssistantFeedback, AssistantMessage, AssistantSession, Category, Ticket, TicketAssignment
+from tickets.models import (
+    AssistantFeedback,
+    AssistantMessage,
+    AssistantSession,
+    Category,
+    Status,
+    Ticket,
+    TicketAssignment,
+)
 
 pytestmark = pytest.mark.django_db
 SESSIONS = "/api/assistant/sessions"
@@ -77,7 +85,10 @@ def test_employee_session_scope_rename_and_soft_delete(users, employee, teammate
     renamed = data(employee.patch(path, {"title": " 网络故障 "}, format="json"))
     assert renamed["title"] == "网络故障"
     assert_error(employee.patch(path, {}, format="json"), 400)
+    assert_error(employee.patch(path, {"title": ""}, format="json"), 400)
+    assert_error(employee.post(SESSIONS, {"title": ""}, format="json"), 400)
     assert_error(employee.post(SESSIONS, {"title": "a" * 201}, format="json"), 400)
+    assert_error(employee.post(f"{INTERNAL}/{session_id}/question", {"message": ""}, format="json"), 400)
     assert data(employee.get(SESSIONS, {"size": 1})) == {"total": 1, "results": [renamed]}
     user_message_id = ask(employee, session_id, "VPN 无法连接")["user_message_id"]
 
@@ -282,3 +293,65 @@ def test_assistant_rate_limits_and_fails_closed(employee, users, monkeypatch):
 
     monkeypatch.setattr("tickets.cache.get_redis_connection", unavailable)
     assert_error(employee.get(f"{path}/context"), 503)
+
+
+@pytest.mark.parametrize("role", ["requester", "agent"])
+def test_ticket_create_treats_null_assistant_session_as_absent(users, client_for, details, settings, role):
+    settings.PERMISSION_FIELD_ENABLED = True
+    api = client_for(users[role])
+    headers = {"HTTP_IDEMPOTENCY_KEY": str(uuid4())}
+    payload = {**details, "assistant_session_id": None}
+    validate(payload, "ticketCreate")
+    ticket = data(api.post("/api/tickets", payload, format="json", **headers), 201)
+    assert data(api.post("/api/tickets", details, format="json", **headers)) == ticket
+    assert data(api.get(f"/api/tickets/{ticket['pk']}"))["assistant_session_id"] is None
+
+
+def test_ticket_create_rejects_deleted_assistant_session(employee, details):
+    session_id = new_session(employee)["pk"]
+    assert employee.delete(f"{SESSIONS}/{session_id}").status_code == 204
+    assert_error(
+        employee.post(
+            "/api/tickets",
+            {**details, "assistant_session_id": session_id},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        ),
+        404,
+    )
+    assert not Ticket.objects.exists()
+
+
+def test_ticket_without_assistant_session_returns_not_found(employee, make_ticket):
+    ticket = make_ticket()
+    assert_error(employee.get(f"/api/tickets/{ticket.pk}/assistant-session"), 404)
+
+
+def test_closed_ticket_retains_assistant_transcript_for_submitter_assignee_and_admin(
+    employee, users, client_for, details, settings
+):
+    settings.PERMISSION_FIELD_ENABLED = True
+    session_id = new_session(employee)["pk"]
+    question_id = ask(employee, session_id, "VPN")["user_message_id"]
+    ticket = data(
+        employee.post(
+            "/api/tickets",
+            {**details, "assistant_session_id": session_id},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        ),
+        201,
+    )
+    path = f"/api/tickets/{ticket['pk']}"
+    assignee = client_for(users["agent"])
+    for api, target in ((assignee, Status.IN_PROGRESS), (assignee, Status.PENDING_VERIFY), (employee, Status.CLOSED)):
+        ticket = data(
+            api.post(f"{path}/transition", {"version": ticket["version"], "target_status": target}, format="json")
+        )
+    assert ticket["status"] == Status.CLOSED
+    assert Ticket.objects.get(pk=ticket["pk"]).assignee_id == users["agent"].pk
+    for api in (employee, assignee, client_for(users["admin"])):
+        assert data(api.get(path))["assistant_session_id"] == session_id
+        transcript = data(api.get(f"{path}/assistant-session"))
+        assert transcript["session"]["pk"] == session_id
+        assert [message["pk"] for message in transcript["messages"]["results"]] == [question_id]

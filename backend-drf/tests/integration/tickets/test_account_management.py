@@ -3,15 +3,16 @@ from importlib import import_module
 from uuid import uuid4
 
 import pytest
-from django.db import connection
+from django.db import connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from audit.models import OperationLog
 from common.base.crypto import AESCipherV2
+from common.cache.storage import UserTokenRevokedCache
 from common.core.auth.authentication import ServerRefreshToken
-from identity.models import DeptInfo, UserInfo, UserRole
+from identity.models import DeptInfo, UserInfo, UserRole, UserSession
 from tickets.models import Category, CategoryRoute, Status, TicketAssignment
 from tickets.policy import AGENT_ROLE, REQUESTER_ROLE
 from tickets.services import create_ticket
@@ -124,6 +125,33 @@ def test_management_rejects_non_business_admins_and_protects_platform_targets(us
     assert api.patch(path, {"is_active": False}, format="json").status_code == 403
 
 
+@pytest.mark.parametrize("field", ["pk", "username", "nickname", "phone", "email", "dept", "is_active"])
+def test_account_list_orders_by_supported_fields(users, client_for, field):
+    requester = users["requester"]
+    requester.is_active = False
+    requester.dept = None
+    requester.nickname = "A"
+    requester.phone = "13800001234"
+    requester.email = "a@example.com"
+    requester.save(update_fields=["is_active", "dept", "nickname", "phone", "email"])
+    accounts = UserInfo.objects.filter(pk__in=[user.pk for user in users.values()])
+    api = management_client(users, client_for)
+    for ordering in (field, f"-{field}"):
+        response = api.get(ACCOUNTS, {"ordering": f"{ordering},pk"})
+        assert response.status_code == 200, response.data
+        assert [row["pk"] for row in response.data["data"]["results"]] == list(
+            accounts.order_by(ordering, "pk").values_list("pk", flat=True)
+        )
+
+
+@pytest.mark.parametrize("ordering", ["role", "-role", "unknown"])
+def test_account_list_ignores_unsupported_ordering(users, client_for, ordering):
+    api = management_client(users, client_for)
+    response = api.get(ACCOUNTS, {"ordering": ordering})
+    assert response.status_code == 200, response.data
+    assert response.data["data"] == api.get(ACCOUNTS).data["data"]
+
+
 @pytest.mark.parametrize("change", [{"is_active": False}, {"role": "requester"}])
 def test_technician_removal_releases_only_open_tickets(users, client_for, make_ticket, details, change):
     agent = users["agent"]
@@ -150,9 +178,13 @@ def test_technician_removal_releases_only_open_tickets(users, client_for, make_t
 
 
 @pytest.mark.parametrize("operation", ["reset", "deactivate", "change-role"])
-def test_admin_account_changes_revoke_signed_access_and_refresh(users, client_for, settings, operation):
+def test_admin_account_changes_revoke_credentials_after_commit(
+    users, client_for, settings, operation, django_capture_on_commit_callbacks
+):
     settings.SECURITY_USER_PASSWORD_ENCRYPTED_ENABLED = False
     agent = users["agent"]
+    session = UserSession.objects.create(creator=agent)
+    password_updated = agent.date_password_updated
     refresh = ServerRefreshToken.for_user(agent)
     # Stable across subsecond clock skew in virtualized test runners.
     refresh["iat"] -= 60
@@ -162,14 +194,34 @@ def test_admin_account_changes_revoke_signed_access_and_refresh(users, client_fo
     assert old_session.get("/api/tickets").status_code == 200
     path = f"{ACCOUNTS}/{agent.pk}"
     api = management_client(users, client_for)
+
+    def change_account():
+        if operation == "reset":
+            return api.post(f"{path}/reset-password", {"password": NEW_PASSWORD}, format="json")
+        change = {"is_active": False} if operation == "deactivate" else {"role": "requester"}
+        return api.patch(path, change, format="json")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        with transaction.atomic():
+            assert change_account().status_code == 200
+            transaction.set_rollback(True)
+    agent.refresh_from_db()
+    assert agent.date_password_updated == password_updated
+    assert old_session.get("/api/tickets").status_code == 200
+
+    with django_capture_on_commit_callbacks(execute=True):
+        started_at = timezone.now()
+        response = change_account()
+        assert response.status_code == 200, response.data
+        session.refresh_from_db()
+        assert session.status == UserSession.Status.ONLINE
+        assert UserTokenRevokedCache(agent.pk).get_storage_cache() is None
     if operation == "reset":
-        response = api.post(f"{path}/reset-password", {"password": NEW_PASSWORD}, format="json")
         agent.refresh_from_db()
         assert agent.check_password(NEW_PASSWORD)
-    else:
-        data = {"is_active": False} if operation == "deactivate" else {"role": "requester"}
-        response = api.patch(path, data, format="json")
-    assert response.status_code == 200, response.json()
+        assert agent.date_password_updated is not None and agent.date_password_updated >= started_at
+    session.refresh_from_db()
+    assert session.status == UserSession.Status.OFFLINE
     assert old_session.get("/api/tickets").status_code == 401
     assert APIClient().post("/api/identity/refresh", {"refresh": str(refresh)}, format="json").status_code == 401
 
