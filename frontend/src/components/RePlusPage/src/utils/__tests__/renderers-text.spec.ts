@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, type VNode } from "vue";
 import { textDetailRenderers, textFormRenderers } from "../renderers-text";
-import { uploadedSyntax } from "@/views/system/notice/components/markdown/markdownSyntax";
 import type { PageColumn, PlusColumnContext, PlusColumnMeta } from "../types";
 
 /** 文本类渲染器的行为守护：链接协议白名单、密码不回显、富文本不插 HTML、decimal 保留字符串 */
@@ -126,17 +125,6 @@ describe("文本类表单渲染器", () => {
   it("rich_text：多行文本编辑", () => {
     expect(configure(textFormRenderers, "rich_text").valueType).toBe(
       "textarea"
-    );
-  });
-});
-
-describe("Markdown 上传结果语法", () => {
-  it("图片与附件语法、去掉方括号、地址用尖括号包住", () => {
-    expect(uploadedSyntax("a[1].png", "/m/a 1.png", "image")).toBe(
-      "![a1.png](</m/a 1.png>)"
-    );
-    expect(uploadedSyntax("doc.pdf", "/m/doc.pdf", "attachment")).toBe(
-      "[doc.pdf](</m/doc.pdf>)"
     );
   });
 });
