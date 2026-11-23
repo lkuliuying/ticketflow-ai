@@ -18776,12 +18776,14 @@
             "type": "boolean"
           },
           "can_comment_internal": {
+            "description": "持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。",
             "type": "boolean"
           },
           "can_handle": {
             "type": "boolean"
           },
           "can_reply": {
+            "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。",
             "type": "boolean"
           }
         },

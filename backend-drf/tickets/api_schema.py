@@ -39,8 +39,13 @@ class TimelineEntrySerializer(serializers.Serializer):
 class TicketViewerSerializer(serializers.Serializer):
     can_handle = serializers.BooleanField()
     can_assign = serializers.BooleanField()
-    can_reply = serializers.BooleanField()
-    can_comment_internal = serializers.BooleanField()
+    can_reply = serializers.BooleanField(
+        help_text="持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。"
+        "超级用户免菜单权限检查。工单状态不影响此能力。"
+    )
+    can_comment_internal = serializers.BooleanField(
+        help_text="持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"
+    )
     can_archive = serializers.BooleanField()
 
 

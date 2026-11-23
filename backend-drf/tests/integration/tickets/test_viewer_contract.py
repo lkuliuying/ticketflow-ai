@@ -10,7 +10,7 @@ from identity.models import DeptInfo, UserInfo, UserRole
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from system.models import Menu
 from tests.integration.tickets.test_ticket_api import authenticated
-from tickets.models import Category, Priority, Status, Ticket
+from tickets.models import Category, Priority, Status, Ticket, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE
 
 pytestmark = pytest.mark.django_db
@@ -84,6 +84,25 @@ def test_ticket_viewer_assignment_requires_both_menu_permissions(users, ticket, 
     assert detail.data["data"]["viewer"]["can_handle"] is True
     assert detail.data["data"]["viewer"]["can_assign"] is is_superuser
     assert api_client.get(f"{resource}/assignees").status_code == (200 if is_superuser else 403)
+
+
+@pytest.mark.parametrize("role", ["requester", "agent"])
+def test_ticket_viewer_comment_capabilities_require_menu_permission(users, ticket, role):
+    user = users[role]
+    user.roles.get().menu.remove(Menu.objects.get(name="comments:TicketFlowTickets"))
+    api = authenticated(user)
+    resource = f"/api/tickets/{ticket.pk}"
+
+    detail = api.get(resource)
+    assert detail.status_code == 200, detail.data
+    viewer = detail.data["data"]["viewer"]
+    assert viewer["can_handle"] is (role == "agent")
+    assert (viewer["can_reply"], viewer["can_comment_internal"]) == (False, False)
+
+    for visibility in (Visibility.PUBLIC, Visibility.INTERNAL):
+        response = api.post(f"{resource}/comments", {"body": "工单跟进", "visibility": visibility}, format="json")
+        assert response.status_code == 403, response.data
+    assert not ticket.comments.exists()
 
 
 def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ticket):
