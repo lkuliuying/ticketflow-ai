@@ -8,6 +8,7 @@ import pytest
 from django.core.cache import cache
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -17,7 +18,16 @@ from system.models import FieldPermission, Menu
 from system.tasks import async_export_data_task
 from task.models.export import ExportRecord
 from tickets.cache import TICKET_CACHE_KEY_PREFIX, WINDOW_SECONDS, request_key
-from tickets.models import Priority, Status, Ticket, TicketComment, TicketCreateRequest, TicketLog, Visibility
+from tickets.models import (
+    Priority,
+    Status,
+    Ticket,
+    TicketAssignment,
+    TicketComment,
+    TicketCreateRequest,
+    TicketLog,
+    Visibility,
+)
 
 pytestmark = pytest.mark.django_db
 TICKETS = "/api/tickets"
@@ -291,6 +301,53 @@ def test_export_task_replays_submitted_filter_with_current_ticket_scope(
     assert len(rows) == 1
     assert {visible.number, visible.title} <= set(rows[0])
     assert_error(client_for(users["requester"]).get(url), 403)
+
+
+@pytest.mark.parametrize("assignment", ["current", "history", "unassigned"])
+def test_export_task_replays_assignment_as_submitter(
+    users, make_ticket, client_for, settings, django_capture_on_commit_callbacks, assignment
+):
+    settings.CELERY_TASK_ALWAYS_EAGER = False
+    agent, admin = users["agent"], users["admin"]
+    current = make_ticket(assignee=agent)
+    history = make_ticket()
+    waiting = make_ticket()
+    make_ticket(status=Status.CLOSED)
+    now = timezone.now()
+    TicketAssignment.objects.create(ticket=history, assignee=agent, started_at=now, ended_at=now, end_reason="RETURNED")
+
+    if assignment != "unassigned":
+        agent.roles.get().menu.add(
+            *admin.roles.get().menu.filter(
+                name__in=(
+                    "exportAsync:TicketFlowTickets",
+                    "exportData:TicketFlowTickets",
+                    "download:SystemExportRecord",
+                )
+            )
+        )
+    submitter = admin if assignment == "unassigned" else agent
+    expected = {"current": [current], "history": [history], "unassigned": [history, waiting]}[assignment]
+    api = client_for(submitter)
+    params = {"type": "csv", "assignment": assignment}
+    with (
+        patch.object(async_export_data_task, "apply_async") as dispatch,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        response = api.post(f"{TICKETS}/export-async", params, format="json")
+    assert response.status_code == 200, response.data
+    record = ExportRecord.objects.get(pk=response.data["data"]["record_id"])
+    assert dispatch.call_args.kwargs["args"][2:] == [params, submitter.pk]
+    assert async_export_data_task.apply(**dispatch.call_args.kwargs, throw=True).get() == len(expected)
+    record.refresh_from_db()
+    assert record.status == ExportRecord.Status.SUCCESS
+    assert record.rows == len(expected)
+    download = api.get(f"/api/task/exports/{record.pk}/download")
+    assert download.status_code == 200, download.data
+    _, *rows = csv.reader(io.StringIO(b"".join(download.streaming_content).decode("utf-8-sig")))
+    assert len(rows) == len(expected)
+    numbers = {value for row in rows for value in row if value.startswith("TF-")}
+    assert numbers == {ticket.number for ticket in expected}
 
 
 def test_ai_context_requires_handling_scope_and_exposes_only_published_references(users, make_ticket, client_for):

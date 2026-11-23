@@ -100,14 +100,14 @@ class TicketAccess:
     def can_return(self, ticket: Ticket) -> bool:
         return not self.admin and self.can_handle(ticket) and ticket.status != Status.CLOSED
 
-    def can_archive(self, ticket: Ticket) -> bool:
-        return self.can_handle(ticket) or self.read_only(ticket)
+    def can_archive(self, ticket: Ticket, *, read_only: bool | None = None) -> bool:
+        return self.can_handle(ticket) or (self.read_only(ticket) if read_only is None else read_only)
 
     def can_reply(self, ticket: Ticket) -> bool:
-        return self.can_handle(ticket) or (self.user_id == ticket.submitter_id and not self.read_only(ticket))
+        return self.user_id == ticket.submitter_id or self.can_handle(ticket)
 
     def targets(self, ticket: Ticket) -> tuple[str, ...]:
         allowed = self.can_handle(ticket)
         if ticket.status in VERIFY_STATES:
-            allowed = self.admin or (ticket.submitter_id == self.user_id and not self.read_only(ticket))
+            allowed = self.admin or ticket.submitter_id == self.user_id
         return TRANSITIONS.get(ticket.status, ()) if allowed else ()

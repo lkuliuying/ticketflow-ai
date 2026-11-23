@@ -71,7 +71,7 @@ stateDiagram-v2
 | 身份 | 工单范围 | 动作 |
 | --- | --- | --- |
 | 普通员工 | 本人提交 | 建单、查阅、对外回复、验收确认、验收退回、重开 |
-| 技术员 | 当前指派、曾指派及本人提交 | 当前可接单、回复、写内部备注、提交验收、退回重派和使用 AI。历史工单提供完整时间线并关闭全部工单动作。以提交人身份可回复、验收和重开。 |
+| 技术员 | 当前指派、曾指派及本人提交 | 当前可接单、回复、写内部备注、提交验收、退回重派和使用 AI。历史工单提供完整时间线，处理人动作关闭。本人提交的历史工单仍可对外回复、验收确认、验收退回和重开。 |
 | 管理员 | 全部，含待分配 | 处理、指派、知识库编辑与发布、导出，仍经状态机校验 |
 
 API 动作复用底座 RBAC 和字段权限。列表、详情、时间线、看板、导出以及 AI 上下文统一应用工单可见范围。仅以提交人身份查看工单时只显示对外内容。技术员可通过知识库创建接口将经手过的已关闭工单转为草稿，每张工单最多转存一次。已发布文章对已登录用户开放，草稿对作者及管理员开放，归档对管理员开放。管理员负责审阅发布。
@@ -96,7 +96,7 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | `GET /api/tickets/{id}/timeline` | 分页 | 200，合并排序的流转记录与评论分页 |
 | `POST /api/tickets/{id}/transition` | `{target_status, version, note?}` | 200，更新后的工单 |
 | `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单。已关闭工单返回 409 |
-| `GET /api/tickets/{id}/assignees` | 管理员可传 `q` 搜索用户名或昵称、`department_id` 筛选技能组 | 200，最多 20 条在职技术员 `{pk, username, nickname, department_name}`，按用户名和主键排序 |
+| `GET /api/tickets/{id}/assignees` | 管理员可传 `q` 搜索用户名或昵称、`department_id` 筛选技能组。空值忽略，非法 UUID 返回 400 | 200，最多 20 条在职技术员 `{pk, username, nickname, department_name}`，按用户名和主键排序 |
 | `POST /api/tickets/{id}/return` | `{version, reason}`，原因长度 1–500 | 200，清空处理人、状态不变、版本递增 |
 | `POST /api/tickets/{id}/comments` | `{body, visibility}` | 201，新评论 |
 | `POST /api/tickets/{id}/ai-metadata` | `{version, summary, tags, category?, priority?}` | 200，采纳建议后的工单 |
@@ -109,6 +109,8 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | `GET /api/tickets/{id}/ai-context` | 内网接口，转发用户 Bearer token | 200，授权工单字段及已发布知识 Top-K 片段。网关拒绝该路径 |
 
 工单可见范围外返回 404，可见但缺少动作权限返回 403。契约校验失败返回 400，状态或版本冲突返回 409。Top-K 默认 5，按工单标题、描述和分类在 DRF 中检索，使用 PostgreSQL 关键词排序并为中文子串提供匹配。片段包含 `article_id`、`title` 和有长度上限的 `excerpt`。模型输入只包含当前用户获准的工单文本和知识片段。
+
+历史技术员的 `viewer.read_only` 为 `true`。本人提交时，`can_reply` 和 `available_transitions` 仍反映提交人的能力。管理员或经手过该工单的技术员可用 `viewer.can_archive` 判断是否能将已关闭工单转存为草稿。
 
 | FastAPI 接口 | 请求 | 成功响应 |
 | --- | --- | --- |

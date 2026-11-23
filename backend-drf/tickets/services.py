@@ -159,13 +159,14 @@ def transition(
     note: str = "",
 ) -> Ticket:
     ticket = _locked(queryset, ticket_id)
-    if access.read_only(ticket):
+    allowed_targets = access.targets(ticket)
+    if target_status not in allowed_targets and access.read_only(ticket):
         raise PermissionDenied("无权执行此流转")
     _check_version(ticket, version)
     previous = ticket.status
     if target_status not in TRANSITIONS.get(previous, ()):
         raise TicketConflict("当前状态不支持该流转")
-    if target_status not in access.targets(ticket):
+    if target_status not in allowed_targets:
         raise PermissionDenied("无权执行此流转")
     ticket.status = target_status
     fields = ["status"]

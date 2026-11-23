@@ -26,6 +26,7 @@ from tickets.api_schema import (
     comment_result,
     dashboard_result,
     ticket_detail_result,
+    ticket_error_result,
     ticket_list_result,
     ticket_result,
     timeline_result,
@@ -134,8 +135,8 @@ class TicketViewSet(
             "can_return": self.access.can_return(ticket) and "returnTicket:TicketFlowTickets" in permission_codes,
             "read_only": read_only,
             "can_archive": (
-                can_handle
-                and ticket.status == Status.CLOSED
+                ticket.status == Status.CLOSED
+                and self.access.can_archive(ticket, read_only=read_only)
                 and apps.is_installed("knowledge")
                 and (is_superuser or "create:TicketFlowKnowledge" in permission_codes)
                 and not Ticket.objects.filter(pk=ticket.pk, knowledge_article__isnull=False).exists()
@@ -146,8 +147,11 @@ class TicketViewSet(
         return ApiResponse(data=data)
 
     @extend_schema(
-        parameters=[OpenApiParameter("q", str), OpenApiParameter("department_id", UUID, description="技能组 ID")],
-        responses=assignees_result,
+        parameters=[
+            OpenApiParameter("q", str),
+            OpenApiParameter("department_id", UUID, description="技能组 UUID。省略或留空时忽略筛选，非法值返回 400。"),
+        ],
+        responses={200: assignees_result, 400: ticket_error_result},
     )
     @action(detail=True, methods=["get"], filterset_class=None)
     def assignees(self, request: Request, pk: UUID) -> ApiResponse:
@@ -156,12 +160,12 @@ class TicketViewSet(
         if not self.access.admin or not has_permission(self.actor, "assign:TicketFlowTickets"):
             raise PermissionDenied("无权指派此工单")
         queryset = assignment_candidates()
-        department = request.query_params.get("department_id")
-        if department is not None:
+        department = request.query_params.get("department_id", "").strip()
+        if department:
             try:
                 department_id = UUID(department)
             except ValueError as exc:
-                raise ValidationError({"department_id": "请输入有效的技能组 ID"}) from exc
+                raise ValidationError({"department_id": "请输入有效的技能组 UUID"}) from exc
             queryset = queryset.filter(dept_id=department_id)
         query = request.query_params.get("q", "").strip()
         if query:

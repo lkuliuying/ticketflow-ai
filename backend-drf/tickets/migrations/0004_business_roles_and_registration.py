@@ -41,6 +41,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(migrate_roles),
+        migrations.RunPython(migrate_roles, migrations.RunPython.noop),
         migrations.RunPython(close_registration, migrations.RunPython.noop),
     ]

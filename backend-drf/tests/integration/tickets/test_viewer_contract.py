@@ -174,6 +174,9 @@ def test_assignees_filter_skill_group_roles_activity_and_search(users, ticket):
     inherited_dept = DeptInfo.objects.create(code="inherited", name="部门授权")
     inherited_dept.roles.add(UserRole.objects.get(code=AGENT_ROLE))
     inherited = UserInfo.objects.create_user(username="candidate-inherited", dept=inherited_dept)
+    inactive_dept = DeptInfo.objects.create(code="inactive-team", name="停用技能组", is_active=False)
+    inactive_member = UserInfo.objects.create_user(username="candidate-inactive-team", dept=inactive_dept)
+    inactive_member.roles.add(UserRole.objects.get(code=AGENT_ROLE))
     users["agent"].nickname = "客服昵称"
     users["agent"].save(update_fields=["nickname"])
     api = authenticated(users["admin"])
@@ -188,7 +191,6 @@ def test_assignees_filter_skill_group_roles_activity_and_search(users, ticket):
     assert ids == {users["agent"].pk, external.pk, inherited.pk}
     filtered = api.get(resource, {"department_id": other.pk}).data["data"]
     assert [row["pk"] for row in filtered] == [external.pk]
-    assert api.get(resource, {"department_id": "invalid"}).status_code == 400
     searched = api.get(resource, {"q": "客服昵称"}).data["data"]
     assert searched == [
         {"pk": users["agent"].pk, "username": "viewer-agent", "nickname": "客服昵称", "department_name": "工单支持组"}
@@ -198,6 +200,21 @@ def test_assignees_filter_skill_group_roles_activity_and_search(users, ticket):
         f"/api/tickets/{ticket.pk}/assign", {"assignee_id": external.pk, "version": ticket.version}, format="json"
     )
     assert assigned.status_code == 200, assigned.data
+
+
+def test_assignees_accept_empty_skill_group_and_explain_invalid_uuid(users, ticket):
+    api = authenticated(users["admin"])
+    resource = f"/api/tickets/{ticket.pk}/assignees"
+    params = {"q": users["agent"].username}
+    unfiltered = api.get(resource, params)
+    empty = api.get(resource, {**params, "department_id": ""})
+    assert empty.status_code == 200, empty.data
+    assert empty.data["data"] == unfiltered.data["data"]
+    assert [row["pk"] for row in empty.data["data"]] == [users["agent"].pk]
+
+    invalid = api.get(resource, {**params, "department_id": "invalid"})
+    assert invalid.status_code == 400, invalid.data
+    assert invalid.data["detail"] == "department_id: 请输入有效的技能组 UUID"
 
 
 def test_assignees_are_unique_bounded_and_stably_ordered(users, ticket):
@@ -327,6 +344,10 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
         assert denied.status_code == expected, denied.data
     assert not KnowledgeArticle.objects.exists()
 
+    ticket_path = f"/api/tickets/{closed.pk}"
+    viewer = api.get(ticket_path).data["data"]["viewer"]
+    assert viewer["read_only"] is True
+    assert viewer["can_archive"] is True
     payload = {**values, "source_ticket_id": str(closed.pk)}
     created = api.post(ARTICLES, payload, format="json")
     assert created.status_code == 201, created.data
@@ -336,6 +357,7 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
     duplicate = api.post(ARTICLES, payload, format="json")
     assert duplicate.status_code == 409, duplicate.data
     assert KnowledgeArticle.objects.filter(source_ticket=closed).count() == 1
+    assert api.get(ticket_path).data["data"]["viewer"]["can_archive"] is False
 
     resource = f"{ARTICLES}/{article['pk']}"
     assert api.get(resource).data["data"]["source_ticket_id"] == str(closed.pk)

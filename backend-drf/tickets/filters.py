@@ -31,9 +31,11 @@ class TicketFilter(filters.FilterSet):
         fields = ("status", "priority", "category", "assignee_id", "department_id", "assignment", "sla", "q")
 
     def filter_assignment(self, queryset: QuerySet[Ticket], name: str, value: str) -> QuerySet[Ticket]:
-        if self.request is None or not self.request.user.is_authenticated:
+        # 异步导出重放视图时，任务请求携带执行时重新加载的提交者。
+        user = getattr(self.request, "user", None)
+        if user is None or not user.is_authenticated:
             return queryset.none()
-        return TicketAccess.for_user(self.request.user).assignment_filter(queryset, value)
+        return TicketAccess.for_user(user).assignment_filter(queryset, value)
 
     def filter_sla(self, queryset: QuerySet[Ticket], name: str, state: str) -> QuerySet[Ticket]:
         now = timezone.now()

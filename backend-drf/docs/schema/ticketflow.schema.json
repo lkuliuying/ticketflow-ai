@@ -18,16 +18,16 @@
       "properties": {
         "can_handle": {"type": "boolean"},
         "can_assign": {"type": "boolean", "description": "管理员在工单未关闭时，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
-        "can_reply": {"type": "boolean", "description": "非历史只读，持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。"},
+        "can_reply": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。"},
         "can_comment_internal": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"},
-        "can_archive": {"type": "boolean", "description": "已关闭、当前可处理、有知识库创建权限且尚未转存。经手过的历史工单可通过知识库创建草稿接口转存。"},
+        "can_archive": {"type": "boolean", "description": "已关闭且尚未转存时，管理员或当前及历史技术员持有知识库创建权限即可转存。"},
         "can_return": {"type": "boolean", "description": "仅当前处理工单且有退回权限的技术员，工单须未关闭。"},
-        "read_only": {"type": "boolean", "description": "技术员曾经处理、当前由他人处理或未指派的工单。所有动作位为 false，时间线包含内部内容。"}
+        "read_only": {"type": "boolean", "description": "技术员曾经处理但当前未指派给自己时为 true，时间线包含内部内容。提交人的 can_reply 和 available_transitions，以及转存能力 can_archive，按各自规则给出。"}
       }
     },
     "ticketAssignees": {
       "type": "array",
-      "description": "管理员可查询在职且启用的技术员。q 匹配用户名或昵称，可按 department_id（技能组 ID）筛选。按 username、pk 排序，不分页。",
+      "description": "管理员可查询在职且启用的技术员。q 匹配用户名或昵称，可按 department_id（技能组 UUID）筛选。省略或留空时查询所有技能组，非法 UUID 返回 400。按 username、pk 排序，不分页。",
       "maxItems": 20,
       "items": {
         "type": "object",
@@ -87,7 +87,7 @@
     },
     "ticketAssignmentFilter": {
       "enum": ["unassigned", "current", "history"],
-      "description": "列表与看板的 assignment 参数。unassigned 为仅管理员可筛选的未关闭、未指派工单；current 为当前指派给我；history 为曾指派给我且当前未指派给我。"
+      "description": "列表、看板和导出的 assignment 参数。unassigned 为仅管理员可筛选的未关闭、未指派工单；current 为当前指派给我；history 为曾指派给我且当前未指派给我。异步导出以任务执行时的提交者身份和权限回放筛选。"
     },
     "ticketDashboardAssignment": {
       "type": "object",

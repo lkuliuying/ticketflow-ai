@@ -98,7 +98,7 @@ class AssignmentSerializer(serializers.Serializer):
 
 class AssignmentReturnSerializer(serializers.Serializer):
     version = serializers.IntegerField(min_value=1)
-    reason = serializers.CharField(max_length=500)
+    reason = serializers.CharField(min_length=1, max_length=500)
 
 
 class CommentSerializer(serializers.Serializer):

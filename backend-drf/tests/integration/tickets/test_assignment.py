@@ -51,6 +51,18 @@ def test_dispatch_breaks_exact_ties_by_username_and_excludes_submitter(users, de
 
 
 @pytest.mark.django_db
+def test_automatic_assignment_names_the_system_actor_in_both_timelines(users, client_for, details):
+    ticket, _ = create_ticket(users["requester"], str(uuid4()), details)
+    api = client_for(users["agent"])
+    path = f"/api/tickets/{ticket.pk}"
+    detail, timeline = api.get(path), api.get(f"{path}/timeline")
+    assert detail.status_code == timeline.status_code == 200
+    for result in (detail.json()["data"]["timeline"], timeline.json()["data"]):
+        assigned = [item["actor"] for item in result["results"] if item["action"] == "AUTO_ASSIGN"]
+        assert assigned == ["系统"]
+
+
+@pytest.mark.django_db
 def test_dispatch_leaves_ticket_pending_when_no_eligible_technician(users, details):
     agent = users["agent"]
     expired = technician(agent, "expired")
@@ -151,6 +163,49 @@ def test_return_preserves_status_and_makes_the_previous_technician_read_only(
     assert changed.status_code == 200, changed.data
     assert ticket.assignments.get(assignee=replace).end_reason == TicketAssignment.EndReason.REASSIGNED
     assert operator.get(path).data["data"]["viewer"]["read_only"] is False
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("status", "target", "available"),
+    [
+        (Status.PENDING_VERIFY, Status.CLOSED, (Status.CLOSED, Status.IN_PROGRESS)),
+        (Status.PENDING_VERIFY, Status.IN_PROGRESS, (Status.CLOSED, Status.IN_PROGRESS)),
+        (Status.CLOSED, Status.REOPENED, (Status.REOPENED,)),
+    ],
+)
+def test_historical_technician_keeps_own_ticket_submitter_actions(
+    users, make_ticket, client_for, status, target, available
+):
+    author = users["agent"]
+    current = technician(author, "current-handler")
+    ticket = make_ticket(author, status=status, assignee=current)
+    now = timezone.now()
+    ticket.assignments.create(assignee=author, started_at=now, ended_at=now, end_reason="REASSIGNED")
+    api = client_for(author)
+    path = f"/api/tickets/{ticket.pk}"
+
+    detail = api.get(path)
+    assert detail.status_code == 200, detail.data
+    data = detail.data["data"]
+    assert data["viewer"] == {
+        "read_only": True,
+        "can_handle": False,
+        "can_assign": False,
+        "can_return": False,
+        "can_reply": True,
+        "can_comment_internal": False,
+        "can_archive": status == Status.CLOSED,
+    }
+    assert data["available_transitions"] == available
+    assert api.get(f"{path}/ai-context").status_code == 403
+
+    for visibility, expected in ((Visibility.PUBLIC, 201), (Visibility.INTERNAL, 403)):
+        result = api.post(f"{path}/comments", {"body": "验收说明", "visibility": visibility}, format="json")
+        assert result.status_code == expected, result.data
+    result = api.post(f"{path}/transition", {"version": ticket.version, "target_status": target}, format="json")
+    assert result.status_code == 200, result.data
+    assert result.data["data"]["status"] == target
 
 
 @pytest.mark.django_db

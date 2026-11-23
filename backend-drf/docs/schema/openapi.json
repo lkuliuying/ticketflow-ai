@@ -1841,6 +1841,7 @@
         "properties": {
           "reason": {
             "maxLength": 500,
+            "minLength": 1,
             "type": "string"
           },
           "version": {
@@ -18515,6 +18516,7 @@
             "type": "string"
           },
           "available_transitions": {
+            "description": "提交人的验收或重开动作在历史只读时仍可用。",
             "items": {
               "type": "string"
             },
@@ -18690,6 +18692,29 @@
         ],
         "type": "object"
       },
+      "TicketErrorResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
       "TicketFlowCategoryEnum": {
         "description": "* `ACCOUNT` - 账户\n* `ACCESS` - 权限\n* `NETWORK` - 网络\n* `SERVICE` - 服务\n* `OTHER` - 其他",
         "enum": [
@@ -18821,6 +18846,7 @@
       "TicketViewer": {
         "properties": {
           "can_archive": {
+            "description": "已关闭且尚未转存时，管理员或当前及历史技术员持有知识库创建权限即可转存。",
             "type": "boolean"
           },
           "can_assign": {
@@ -18835,7 +18861,7 @@
             "type": "boolean"
           },
           "can_reply": {
-            "description": "非历史只读，持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。",
+            "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。",
             "type": "boolean"
           },
           "can_return": {
@@ -18843,7 +18869,7 @@
             "type": "boolean"
           },
           "read_only": {
-            "description": "历史工单可看含内部备注的完整时间线，工单动作全部禁用。",
+            "description": "技术员曾经处理但当前未指派给自己时为 true，时间线包含内部内容。提交人的 can_reply 和 available_transitions，以及转存能力 can_archive，按各自规则给出。",
             "type": "boolean"
           }
         },
@@ -97827,7 +97853,7 @@
         "operationId": "api_tickets_assignees_retrieve",
         "parameters": [
           {
-            "description": "技能组 ID",
+            "description": "技能组 UUID。省略或留空时忽略筛选，非法值返回 400。",
             "in": "query",
             "name": "department_id",
             "schema": {
@@ -97858,6 +97884,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketAssigneesResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
                 }
               }
             },
