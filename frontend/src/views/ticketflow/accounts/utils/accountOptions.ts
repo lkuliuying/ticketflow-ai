@@ -3,7 +3,7 @@ import { isSuccess } from "@/api/types";
 import { rulesPasswordApi, type PasswordRule } from "@/api/auth";
 import { skillGroupApi, type SkillGroup } from "@/api/ticketflow/accounts";
 
-/** 账号表单依赖的选项：技能组（含停用，表单内按需过滤）与全局密码规则，挂载时加载一次 */
+/** 账号表单依赖的选项：技能组（含停用，表单内按需过滤）与全局密码规则：挂载时加载，打开弹窗前再刷新 */
 export function useAccountOptions() {
   const groups = ref<SkillGroup[]>([]);
   const passwordRules = ref<PasswordRule[]>([]);

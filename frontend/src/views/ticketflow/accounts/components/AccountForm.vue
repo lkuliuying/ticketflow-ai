@@ -65,7 +65,7 @@ const rules = computed<FormRules>(() => ({
         },
         {
           validator: (_rule, value: string, callback) =>
-            USERNAME_PATTERN.test(value)
+            USERNAME_PATTERN.test((value ?? "").trim())
               ? callback()
               : callback(new Error(t("ticketflow.account.usernameInvalid")))
         }

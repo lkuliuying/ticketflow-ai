@@ -37,16 +37,27 @@ export function useAccounts(tableRef: PageRef) {
 
   const { groups, passwordRules, loadOptions } = useAccountOptions();
   const reload = () => tableRef.value?.handleGetData?.();
-  /** 打开前重新拉取技能组与密码规则：页面被缓存或刚打开时都拿到最新选项 */
-  const openForm = async (initial?: BusinessAccount) => {
-    await loadOptions();
-    openAccountForm({
-      initial,
-      groups: groups.value,
-      passwordRules: passwordRules.value,
-      onSaved: reload
-    });
+  /** 打开前重新拉取技能组与密码规则；加载中重复点击直接忽略，避免叠出多个弹窗 */
+  let opening = false;
+  const withOptions = async (open: () => void) => {
+    if (opening) return;
+    opening = true;
+    try {
+      await loadOptions();
+      open();
+    } finally {
+      opening = false;
+    }
   };
+  const openForm = (initial?: BusinessAccount) =>
+    withOptions(() =>
+      openAccountForm({
+        initial,
+        groups: groups.value,
+        passwordRules: passwordRules.value,
+        onSaved: reload
+      })
+    );
 
   const operationButtonsProps = shallowRef<OperationProps>({
     hideEdit: true,
@@ -69,10 +80,7 @@ export function useAccounts(tableRef: PageRef) {
         "ticketflow.account.resetPassword",
         -9,
         Boolean(auth.resetPassword),
-        async row => {
-          await loadOptions();
-          openResetPassword(row, passwordRules.value);
-        }
+        row => withOptions(() => openResetPassword(row, passwordRules.value))
       ),
       rowButton(
         t,
