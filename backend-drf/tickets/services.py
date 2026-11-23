@@ -177,6 +177,8 @@ def assign(
     ticket = _locked(queryset, ticket_id, version)
     if not access.can_handle(ticket):
         raise PermissionDenied("无权指派此工单")
+    if ticket.status == Status.CLOSED:
+        raise TicketConflict("已关闭的工单不能指派")
     if assignee_id is not None:
         assignee = assignment_candidates(access).filter(pk=assignee_id).first()
         if assignee is None:
@@ -191,7 +193,8 @@ def add_comment(
 ) -> TicketComment:
     ticket = _locked(queryset, ticket_id)
     handler = access.can_handle(ticket)
-    if not handler and (visibility == Visibility.INTERNAL or user.pk != ticket.submitter_id):
+    allowed = handler if visibility == Visibility.INTERNAL else access.can_reply(ticket)
+    if not allowed:
         raise PermissionDenied("无权写入此评论")
     comment = TicketComment.objects.create(ticket=ticket, author=user, body=body, visibility=visibility)
     if (

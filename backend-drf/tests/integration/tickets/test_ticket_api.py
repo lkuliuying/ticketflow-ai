@@ -93,6 +93,38 @@ def test_transition_distinguishes_hidden_ticket_missing_action_and_stale_version
     assert list(ticket.logs.values_list("action", flat=True)) == ["TRANSITION"]
 
 
+@pytest.mark.parametrize("clear_assignee", [False, True], ids=["reassign", "unassign"])
+def test_closed_ticket_rejects_assignment(users, make_ticket, client_for, clear_assignee):
+    ticket = make_ticket(status=Status.PENDING_VERIFY, assignee=users["agent"])
+    resource = f"{TICKETS}/{ticket.pk}"
+    requester = client_for(users["requester"])
+    closed = requester.post(
+        f"{resource}/transition", {"target_status": Status.CLOSED, "version": ticket.version}, format="json"
+    )
+    assert closed.status_code == 200, closed.data
+    version = closed.data["data"]["version"]
+
+    admin = client_for(users["admin"])
+    assignee_id = None if clear_assignee else users["admin"].pk
+    response = admin.post(f"{resource}/assign", {"assignee_id": assignee_id, "version": version}, format="json")
+    assert_error(response, 409)
+    assert response.json()["detail"] == "已关闭的工单不能指派"
+    ticket.refresh_from_db()
+    assert ticket.assignee_id == users["agent"].pk
+    assert ticket.version == version
+    assert not ticket.logs.filter(action="ASSIGN").exists()
+
+
+@pytest.mark.parametrize("status", [Status.IN_PROGRESS, Status.CLOSED])
+def test_ticket_submitter_can_reply_at_either_status(users, make_ticket, client_for, status):
+    ticket = make_ticket(status=status)
+    requester = client_for(users["requester"])
+    endpoint = f"{TICKETS}/{ticket.pk}/comments"
+    response = requester.post(endpoint, {"body": "补充问题描述", "visibility": Visibility.PUBLIC}, format="json")
+    assert response.status_code == 201, response.data
+    assert ticket.comments.get().author_id == users["requester"].pk
+
+
 def test_comments_preserve_first_staff_response_and_hide_internal_activity(users, make_ticket, client_for):
     ticket = make_ticket()
     resource = f"{TICKETS}/{ticket.pk}"

@@ -10,7 +10,7 @@ from identity.models import DeptInfo, UserInfo, UserRole
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from system.models import Menu
 from tests.integration.tickets.test_ticket_api import authenticated
-from tickets.models import Category, Priority, Status, Ticket
+from tickets.models import Category, Priority, Status, Ticket, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE
 
 pytestmark = pytest.mark.django_db
@@ -39,29 +39,34 @@ def ticket(users: dict[str, UserInfo]) -> Ticket:
 
 
 @pytest.mark.parametrize(
-    ("role", "expected"),
+    ("role", "can_handle", "has_assignment_grants"),
     [
-        ("requester", (False, False, False, False)),
-        ("agent", (True, False, True, True)),
-        ("admin", (True, True, True, True)),
+        ("requester", False, False),
+        ("agent", True, False),
+        ("admin", True, True),
     ],
 )
-def test_ticket_viewer_matches_role_and_archive_state(users, ticket, role, expected):
+@pytest.mark.parametrize("status", [Status.IN_PROGRESS, Status.CLOSED])
+def test_ticket_viewer_matches_role_and_status(users, make_ticket, role, can_handle, has_assignment_grants, status):
+    ticket = make_ticket(status=status)
     api = authenticated(users[role])
     resource = f"/api/tickets/{ticket.pk}"
-    opened = api.get(resource)
-    assert opened.status_code == 200, opened.data
-    assert opened.data["data"]["viewer"]["can_archive"] is False
-    assert tuple(opened.data["data"]["available_transitions"]) == (() if role == "requester" else ("IN_PROGRESS",))
-    ticket.status = Status.CLOSED
-    ticket.save(update_fields=["status"])
-    data = api.get(resource).data["data"]
-    assert data["viewer"] == dict(
-        zip(("can_handle", "can_assign", "can_comment_internal", "can_archive"), expected, strict=True)
-    )
+    response = api.get(resource)
+    assert response.status_code == 200, response.data
+    data = response.data["data"]
+    assert data["viewer"] == {
+        "can_handle": can_handle,
+        "can_assign": has_assignment_grants and status != Status.CLOSED,
+        "can_reply": True,
+        "can_comment_internal": can_handle,
+        "can_archive": can_handle and status == Status.CLOSED,
+    }
     validate(data["viewer"], "ticketViewer")
-    KnowledgeArticle.objects.create(title="转存草稿", creator=users["agent"], source_ticket=ticket)
-    assert api.get(resource).data["data"]["viewer"]["can_archive"] is False
+    if status == Status.CLOSED:
+        KnowledgeArticle.objects.create(title="转存草稿", creator=users["agent"], source_ticket=ticket)
+        assert api.get(resource).data["data"]["viewer"]["can_archive"] is False
+    else:
+        assert tuple(data["available_transitions"]) == ((Status.PENDING_VERIFY,) if can_handle else ())
 
 
 @pytest.mark.parametrize("is_superuser", [False, True])
@@ -81,20 +86,53 @@ def test_ticket_viewer_assignment_requires_both_menu_permissions(users, ticket, 
     assert api_client.get(f"{resource}/assignees").status_code == (200 if is_superuser else 403)
 
 
+@pytest.mark.parametrize("role", ["requester", "agent"])
+def test_ticket_viewer_comment_capabilities_require_menu_permission(users, ticket, role):
+    user = users[role]
+    user.roles.get().menu.remove(Menu.objects.get(name="comments:TicketFlowTickets"))
+    api = authenticated(user)
+    resource = f"/api/tickets/{ticket.pk}"
+
+    detail = api.get(resource)
+    assert detail.status_code == 200, detail.data
+    viewer = detail.data["data"]["viewer"]
+    assert viewer["can_handle"] is (role == "agent")
+    assert (viewer["can_reply"], viewer["can_comment_internal"]) == (False, False)
+
+    for visibility in (Visibility.PUBLIC, Visibility.INTERNAL):
+        response = api.post(f"{resource}/comments", {"body": "工单跟进", "visibility": visibility}, format="json")
+        assert response.status_code == 403, response.data
+    assert not ticket.comments.exists()
+
+
 def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ticket):
     role = UserRole.objects.get(code=AGENT_ROLE)
     role.menu.remove(Menu.objects.get(name="create:TicketFlowKnowledge"))
     role.menu.add(*Menu.objects.filter(name__in=["assign:TicketFlowTickets", "assignees:TicketFlowTickets"]))
+    api = authenticated(users["agent"])
+    resource = f"/api/tickets/{ticket.pk}"
+    assert api.get(resource).data["data"]["viewer"]["can_assign"] is True
     ticket.status = Status.CLOSED
     ticket.save(update_fields=["status"])
-    api = authenticated(users["agent"])
-    viewer = api.get(f"/api/tickets/{ticket.pk}").data["data"]["viewer"]
-    assert viewer == {"can_handle": True, "can_assign": True, "can_comment_internal": True, "can_archive": False}
+    viewer = api.get(resource).data["data"]["viewer"]
+    assert viewer == {
+        "can_handle": True,
+        "can_assign": False,
+        "can_reply": True,
+        "can_comment_internal": True,
+        "can_archive": False,
+    }
     ticket.submitter = users["agent"]
     ticket.department = DeptInfo.objects.create(code="elsewhere", name="其他部门")
     ticket.save(update_fields=["submitter", "department"])
-    viewer = api.get(f"/api/tickets/{ticket.pk}").data["data"]["viewer"]
-    assert not any(viewer.values())
+    viewer = api.get(resource).data["data"]["viewer"]
+    assert viewer == {
+        "can_handle": False,
+        "can_assign": False,
+        "can_reply": True,
+        "can_comment_internal": False,
+        "can_archive": False,
+    }
 
 
 def test_ticket_viewer_cannot_archive_without_knowledge_app(users, ticket, settings):

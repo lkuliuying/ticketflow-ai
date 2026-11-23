@@ -17,6 +17,7 @@ from common.core.modelset.base import BaseViewSet
 from common.core.modelset.crud import DetailAction
 from common.core.modelset.import_export import OnlyExportDataAction
 from common.core.modelset.metadata import SearchColumnsAction, SearchFieldsAction
+from common.core.permission import get_user_permission_codes
 from common.core.response import ApiResponse
 from identity.models import UserInfo
 from tickets import services
@@ -117,16 +118,21 @@ class TicketViewSet(
         ticket = self.get_object()
         data = self.get_serializer(ticket).data
         can_handle = self.access.can_handle(ticket)
+        is_superuser = self.actor.is_superuser
+        permission_codes = set() if is_superuser else get_user_permission_codes(self.actor)
+        can_comment = is_superuser or "comments:TicketFlowTickets" in permission_codes
         data["viewer"] = {
             "can_handle": can_handle,
             "can_assign": can_handle
-            and has_permission(self.actor, "assign:TicketFlowTickets", "assignees:TicketFlowTickets"),
-            "can_comment_internal": can_handle,
+            and ticket.status != Status.CLOSED
+            and (is_superuser or {"assign:TicketFlowTickets", "assignees:TicketFlowTickets"} <= permission_codes),
+            "can_reply": can_comment and self.access.can_reply(ticket),
+            "can_comment_internal": can_comment and can_handle,
             "can_archive": (
                 can_handle
                 and ticket.status == Status.CLOSED
                 and apps.is_installed("knowledge")
-                and has_permission(self.actor, "create:TicketFlowKnowledge")
+                and (is_superuser or "create:TicketFlowKnowledge" in permission_codes)
                 and not Ticket.objects.filter(pk=ticket.pk, knowledge_article__isnull=False).exists()
             ),
         }
