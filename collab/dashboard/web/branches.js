@@ -43,7 +43,9 @@ export function updateYard(yard, git, pickables) {
   yard.sig = sig;
   for (const item of yard.items) {
     yard.group.remove(item.group);
+    // Object3D.remove 只对被移除的分组派发 removed，子级标签的 DOM 要自己删掉
     item.group.traverse(o => {
+      if (o.isCSS2DObject) o.element.remove();
       o.geometry?.dispose();
       o.material?.dispose();
       const i = pickables.indexOf(o);

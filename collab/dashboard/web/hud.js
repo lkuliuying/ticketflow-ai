@@ -263,7 +263,7 @@ function branchDetail(name, data) {
     </dl>
     <h4>关联任务</h4>
     ${tasks.length ? tasks.map(t => `<div class="mini-task">${stageChip(t.stage)} <code>${t.id}</code> ${esc(t.title)}</div>`).join("") : '<p class="muted">无</p>'}
-    ${commits.length ? `<h4>分支头提交</h4><ul class="commits">${commits.map(c => `<li style="--a:${AGENT_COLORS[c.author]}"><i></i><code>${esc(c.sha)}</code> ${esc(c.subject)}<em>${relTime(c.date)}</em></li>`).join("")}</ul>` : ""}`;
+    ${commits.length ? `<h4>分支头提交</h4><ul class="commits">${commits.map(c => `<li style="--a:${AGENT_COLORS[c.author] ?? "#9ca3af"}"><i></i><code>${esc(c.sha)}</code> ${esc(c.subject)}<em>${relTime(c.date)}</em></li>`).join("")}</ul>` : ""}`;
 }
 
 // ---------------------------------------------------------------- 右侧：Git

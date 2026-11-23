@@ -62,7 +62,11 @@ const crumb = document.getElementById("crumb");
 const AGENT_LABEL = { claude: "Claude", codex: "Codex", gemini: "Gemini" };
 
 // 进入或离开仓库内部：显示返回按钮与面包屑，切换视图会停止巡航
+let rotating = false;
+
 function onMode(mode, agent) {
+  // 切换视图时收起上一个视图的悬停提示
+  tooltip.style.opacity = 0;
   backButton.hidden = mode !== "interior";
   crumb.textContent = mode === "interior" ? `总览 / ${AGENT_LABEL[agent]} 仓库内部` : "总览";
   rotating = false;
@@ -173,7 +177,6 @@ document.querySelectorAll("[data-collapse]").forEach(b =>
     }
   })
 );
-let rotating = false;
 document.getElementById("reset-view").addEventListener("click", () => {
   // 复位同时停止巡航，按钮状态与 rotating 保持一致
   rotating = false;

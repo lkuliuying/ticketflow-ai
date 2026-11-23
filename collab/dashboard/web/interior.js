@@ -71,7 +71,8 @@ export class Interior {
         const col = k % 2;
         const level = Math.floor(k / 2) % LEVELS.length;
         const layer = Math.floor(k / (2 * LEVELS.length));
-        return new THREE.Vector3(x + (col - 0.5) * 2.25, LEVELS[level] + 0.66, -ROOM.d / 2 + 1.95 + layer * 0.3);
+        // 超过 6 张时往前叠一层，并错开半张卡，后排仍露出编号
+        return new THREE.Vector3(x + (col - 0.5) * 2.25 + layer * 0.45, LEVELS[level] + 0.66 - layer * 0.12, -ROOM.d / 2 + 1.95 + layer * 0.3);
       };
     });
 
@@ -114,7 +115,6 @@ export class Interior {
     floor.userData = { kind: "agent", id };
     this.pickables.push(floor);
     this.scene.add(group);
-    this.sig = "";
   }
 
   close() {
@@ -128,7 +128,6 @@ export class Interior {
       }
       if (o.isCSS2DObject) o.element.remove();
     });
-    for (const card of this.cards.values()) card.label?.element.remove();
     this.group = null;
     this.agent = null;
     this.cards.clear();
