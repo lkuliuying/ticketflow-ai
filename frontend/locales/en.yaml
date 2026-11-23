@@ -1136,6 +1136,8 @@ menus:
   ticketflowKnowledge: Ticket Knowledge Base
   ticketflowMyRatings: My Ratings
   ticketflowRatingStats: Rating Statistics
+  ticketflowAccounts: Accounts
+  ticketflowSkillGroups: Skill Groups
   searchData: Data search
   userOnline: Online users
   apiApp: API applications
@@ -4429,6 +4431,61 @@ codegen:
   planImported: Plans imported
   planImportFailed: Import failed
 ticketflow:
+  account:
+    create: New account
+    createTitle: New business account
+    editTitle: Edit {username}
+    edit: Edit
+    saved: Account saved
+    username: Username
+    name: Name
+    phone: Phone
+    email: Email
+    role: Role
+    skill_group: Skill group
+    skill_group_name: Skill group
+    skillGroup: Skill group
+    is_active: Status
+    q: Keyword
+    roleValue:
+      requester: Employee
+      agent: Technician
+      admin: Administrator
+    active: Active
+    inactive: Disabled
+    password: Initial password
+    newPassword: New password
+    generatePassword: Generate
+    usernameRequired: Please enter a username
+    usernameInvalid: "3-64 letters, digits or _ . {'@'} + -"
+    nameRequired: Please enter a name
+    emailInvalid: Invalid email address
+    roleRequired: Please choose a role
+    groupRequired: A technician must belong to a skill group
+    passwordRequired: Please enter a password
+    resetPassword: Reset password
+    resetTitle: Reset password for {username}
+    resetHint: All active sessions of {username} will be signed out. Share the new password with them
+    resetDone: Password reset
+    toggleActive: Enable / disable
+    enable: Enable account
+    disable: Disable account
+    enableConfirm: Enable {username}?
+    disableConfirm: "{username} will no longer be able to sign in and active sessions end immediately. Disable?"
+    disableAgentConfirm: "{username} will no longer be able to sign in, and their open tickets go back to the unassigned queue for reassignment. Disable?"
+    enabled: Account enabled
+    disabled: Account disabled
+  skillGroup:
+    name: Name
+    description: Description
+    is_active: Status
+    is_default: Default group
+    q: Keyword
+    default: Default
+    routes: Category routing
+    routesHint: New tickets go to the skill group for their category and are auto-assigned there; unconfigured categories go to the default group ({name})
+    useDefault: Use default group
+    routeSaved: Routing saved
   rating:
     section: Rating
     rate: Rate this ticket
