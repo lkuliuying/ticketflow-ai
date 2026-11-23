@@ -1,5 +1,7 @@
 # 前端任务书（Claude）
 
+FE-01~FE-07、DOC-01 已完成；**迭代 5 的 FE-08~FE-10 在文末。**
+
 工作目录 `frontend/`，遵循 `frontend/AGENTS.md`。菜单种子已指向
 `ticketflow/tickets/index` 和 `ticketflow/knowledge/index`，页面放在 `src/views/ticketflow/` 下。
 
@@ -98,3 +100,43 @@
   联合鉴权、可见的流式、查询优化与压测数据）、快速开始（指向 `deploy/README.md`）、多代理协作方式。
 - 运维手册要点汇总到 `deploy/README.md` 的链接；压测数据引用 `docs/development/压测报告.md`。
 - 迭代 4 验收说明 `docs/development/迭代4验收说明.md`。
+
+---
+
+# 迭代 5：遗留问题清零
+
+## FE-08 工单详情跟进后端契约、AI 面板引用与人机校验收尾（依赖 BE-05、SV-03）
+
+分支：`fe/viewer-fixes`
+
+- `pnpm sync:contract` 同步 BE-05 的 `viewer.can_reply`。回复框的显示条件改为只看 `viewer.can_reply`，删掉
+  `TicketDetail.vue` 里用 `submitter_id === 当前用户` 推断的逻辑。
+- 指派区只按 `viewer.can_assign` 显示；BE-05 之后已关闭工单不再显示指派区。确认对已关闭工单指派返回 409
+  时走现有“工单已变更”提示并重新加载。
+- AI 面板：SV-03 把流式 `meta.references` 改成 `[{article_id, title}]`。`TicketAiPanel.vue` 显示引用文章标题列表，
+  点击在知识库中打开对应文章，不再只显示“引用了 N 篇”。zh / en 词条对称。
+- `ReHumanCheck`：组件卸载时（例如在 PoW 计算过程中路由跳走）调用 `cancel`，中止正在进行的 PoW，补单测。
+- 联调环境验证：已关闭工单无指派区；提交人、处理人、无关用户三种身份下回复框的显示与后端一致；AI 面板显示引用标题。
+
+## FE-09 E2E 健壮性
+
+分支：`fe/e2e-hardening`。来自 FE-05 评审的不阻断建议：
+
+- `e2e/ticketflow/support.ts` 的 `choose`：现在在所有可见下拉框里按文字取第一个选项，页面上同时展开过多个
+  下拉框或有同名选项时会点错。改为定位当前 `el-select` 自己弹出的下拉层（通过 `aria-controls` 或 popper 的关联），
+  只在其中选择。
+- `openTicket`：只在列表第一屏按标题查找。改为先用列表关键字筛选（`q`）定位到该工单再打开，与列表数据量无关。
+- 在交付栈上跑 `main-flow.tf.ts` 连续 3 次全部通过（`TF_E2E_CHANNEL=chrome`，账号来自
+  `deploy/.accounts.local.json`）。注意登录限流：只登录必需的次数，不写循环探测。
+
+## FE-10 前端门禁清零
+
+分支：`fe/gates`
+
+- Windows 下全量 vitest 有 4 条既有失败：1 条路径分隔符，3 条是测试与后端 HEAD 的词表 / WebSocket 动作契约漂移。
+  逐条定位。路径分隔符问题修测试（用 `path.posix` 或统一 `/`）；契约漂移以后端 `openapi.json` 和词表为准修前端，
+  确实是上游底座的问题就从上游 xadmin-client 同步对应模块，报告逐条写明原因和修法。
+- `check:hook-length` 因上游文件 `useMarkdownUpload.ts` 失败：按 `scripts/check-hook-length.mjs` 的
+  “存量只减不增”规则，把它以当前行数登记进存量基线（它是上游文件，不在本项目里拆）。同步删掉 `collab/README.md`
+  本机环境备注里关于这条失败的说明。
+- 完成后 `frontend/AGENTS.md` 第六节门禁全部通过，Windows 下全量 vitest 0 失败，报告贴输出。

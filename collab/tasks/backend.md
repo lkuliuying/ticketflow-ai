@@ -1,6 +1,7 @@
 # 后端任务书（Codex）
 
-迭代 2 的任务（BE-01~BE-04、IT-01、CI-01、CI-03）已完成；迭代 3 的 SV-01、SV-02 在文末。
+迭代 2 的任务（BE-01~BE-04、IT-01、CI-01、CI-03）、迭代 3 的 SV-01、SV-02、迭代 4 的 DP-01~DP-03 已完成；
+**迭代 5 的 BE-05、SV-03、BE-06 在文末。**
 
 工作目录 `backend-drf/`，遵循 `backend-drf/AGENTS.md`。契约基线是
 [Phase 1 设计评审](../../backend-drf/docs/plans/ticketflow-phase-1.md)。顺序：BE-02 优先（阻塞前端），
@@ -414,3 +415,68 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
    计算已成功时只记告警并返回结果；补单测（模拟锁释放抛 `LockNotOwnedError`）。不改变计算本身失败时 fail-closed 的行为。
 
 完成标准：报告与原始数据齐全，命令可复现。
+
+---
+
+# 迭代 5：遗留问题清零
+
+迭代 2~4 验收说明第 6 节里，凡是有明确修法的遗留项都在本迭代处理，不加新功能。Codex 只有一个 worktree，
+按 **BE-05 → SV-03 → BE-06** 的顺序做，每个任务从最新 `main` 切一个分支。前端 FE-08 依赖 BE-05 和 SV-03
+的契约，所以这两个任务先做。
+
+## BE-05 工单权限补口：已关闭工单禁止指派、`viewer.can_reply`
+
+分支：`be/viewer-fixes`
+
+现状：`tickets/services.py` 的 `assign` 只校验 `can_handle` 和候选人范围，**不看工单状态**，所以已关闭的工单
+仍然可以通过接口改处理人。`views.py` 里 `viewer.can_assign` 同样没有考虑状态。前端判断提交人能否回复用的是
+`submitter_id === 当前用户`，这个规则应该由后端给出。
+
+1. `services.assign`：工单为 `CLOSED` 时抛 `TicketConflict`（409），`detail` 写明“已关闭的工单不能指派”。
+   用 409 是因为前端收到 409 会提示“工单已变更”并重新加载详情，跟“打开详情后工单被别人关闭”的处理一致。
+   先写复现用例（关闭后指派当前返回 200）。
+2. `viewer.can_assign` 增加 `ticket.status != Status.CLOSED`。
+3. `viewer` 新增 `can_reply`，规则与 `add_comment` 的对外回复校验一致：`can_handle` 或当前用户是提交人。
+   两处共用同一个判断函数，避免以后改了一处漏另一处。
+4. 先改 `docs/schema/`（`ticketflow.schema.json`、`openapi.json`，`dump_openapi --check` 通过），再改代码。
+5. 集成测试：三种角色 × {进行中, 已关闭} 下的 `can_assign` / `can_reply`；关闭后调指派接口返回 409 且处理人不变；
+   提交人对外回复、非提交人非处理人回复 403 保持不变。
+
+完成标准：报告给出关闭前后两份 `viewer` 示例响应。
+
+## SV-03 AI 服务鲁棒性
+
+分支：`be/ai-robustness`，工作目录 `service-fastapi/`。来自迭代 3 评审的不阻断建议，核实后仍然存在：
+
+1. **SSE 流尾丢帧**（缺陷）：`providers._sse_data` 只在遇到空行时吐出缓存的 `data`，上游最后一个事件后面
+   如果没有空行就直接断开，这一帧会被丢掉。最后一帧是 `[DONE]` 时，流会落到末尾的 `raise invalid_output()`，
+   用户看到的是“模型输出无效”；最后一帧是正文时会少字。修复：迭代结束时如果缓存非空，吐出剩余数据。
+   单测覆盖：`[DONE]` 后无空行、最后一个 `delta` 后无空行直接断开、`\r\n` 换行。
+2. **分析缓存键未包含知识引用**：`analysis_cache_key` 只哈希了标题、描述、分类、词表、模型和提示词版本。
+   `TicketContext.references` 变化（文章新发布或更新）时会命中旧缓存。把引用的 `article_id` 和摘要（`excerpt`）
+   的哈希加入缓存键；补单测：同一工单引用变化时缓存键不同，引用顺序不同但内容相同时缓存键相同。
+3. **流式 `meta` 帧的引用带标题**：`meta.references` 现在只有 UUID 列表，前端只能显示“引用了 N 篇”。
+   改为 `[{article_id, title}]`，同步更新服务 README 和 Phase 1 设计文档中的帧定义、网关验收 `tests/test_ai.py`
+   的断言。**这是破坏性变更**，前端 FE-08 同步跟进，报告里写明新的 `meta` 示例。
+4. **Mock 标签去重**：Mock 提供方返回 `tags=["工单", category]`，分类恰好是“工单”时标签重复。去重后如果
+   低于 `AnalysisDraft` 的下限，补一个固定标签；单测覆盖该分类。
+5. **分析路径重试缺直接单测**：为分析接口的上游重试补单测，覆盖可重试错误（连接失败、429、5xx）重试后成功、
+   不可重试错误（400、输出无效）不重试、重试耗尽后的错误映射。
+
+完成标准：`service-fastapi` 门禁（ruff、mypy、pytest）通过；在交付栈上重跑 `tests/` 网关验收，报告贴输出。
+
+## BE-06 测试稳定性
+
+分支：`be/test-stability`
+
+1. **`test_tag_center` 偶发失败**：`test_filter_uses_exists_subquery_not_materialized_ids` 断言 SQL 里不出现
+   用户主键，但 UUID 里恰好包含同样的数字时会误报。改成精确匹配（例如检查 `IN (...)` 参数列表，或用不会
+   与 UUID 碰撞的主键），不放宽断言的意图（必须走 EXISTS 子查询、不物化 ID）。说明修改前如何复现。
+2. **压测隔离栈的看板缓存包装**：`tests/load/drf_app.py` 的 `MeasuredDashboardCache` 只实现了 `get` / `set`，
+   看板代码以后调用其他缓存方法（`delete`、`get_many`、`add` 等）时会直接报错或绕过计数。改为把未覆盖的
+   方法转发给被包装的缓存，只对 `get` / `set` 计数；补一个单测或在 `prepare.py` 自检中覆盖。
+3. **Windows 检出的 Shell 脚本 CRLF**：在仓库根加 `.gitattributes`，对 `*.sh` 和 `deploy/` 下的入口脚本
+   强制 `eol=lf`，并 `git add --renormalize` 只提交受影响的文件。验证：在 Windows 主检出重新检出后，
+   直接挂进 Linux 容器跑运维脚本相关测试通过（迭代 4 时约 30 条失败）。
+
+完成标准：DRF 全量门禁通过；`test_tag_center` 连续跑 20 次（`pytest --count` 或循环）无失败，报告贴结果。

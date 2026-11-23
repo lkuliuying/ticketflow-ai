@@ -60,18 +60,21 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 ## 当前迭代
 
-迭代 4：交付（Phase 5），里程碑 M4 见[开发计划书](../docs/development/开发计划书.md)。迭代 2、3、4 均已合并到 `main`（迭代 4 于 2026-11-22 合并，验收见[迭代 4 验收说明](../docs/development/迭代4验收说明.md)）。
+迭代 5：遗留问题清零，见[开发计划书](../docs/development/开发计划书.md)第 4 节。迭代 2~4 已合并到 `main`
+（迭代 4 于 2026-11-22 合并，验收见[迭代 4 验收说明](../docs/development/迭代4验收说明.md)）。
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| DP-01 | 统一部署：一条命令起全栈 | Codex | — | 已通过 |
-| DP-02 | 网关验收测试 | Codex | DP-01 | 已通过 |
-| DP-03 | 压测 | Codex | DP-02 | 已通过 |
-| FE-05 | E2E 冒烟 | Claude | DP-01 | 已通过 |
-| DOC-01 | 交付文档 | Claude | DP-03 | 已完成 |
+| BE-05 | 已关闭工单禁止指派、`viewer.can_reply` | Codex | — | 待开始 |
+| SV-03 | AI 服务鲁棒性（SSE 流尾、缓存键、引用标题、Mock 标签、重试单测） | Codex | — | 待开始 |
+| BE-06 | 测试稳定性（`test_tag_center`、压测缓存包装、Shell 脚本换行符） | Codex | — | 待开始 |
+| FE-08 | 详情跟进契约、AI 引用标题、人机校验卸载中止 | Claude | BE-05、SV-03 | 待开始 |
+| FE-09 | E2E 健壮性 | Claude | — | 待开始 |
+| FE-10 | 前端门禁清零 | Claude | — | 待开始 |
 
-后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)。
-集成分支 `integration/iter4`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
+Codex 按 BE-05 → SV-03 → BE-06 顺序执行；Claude 先做 FE-09、FE-10，FE-08 等契约就绪。
+后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)，
+迭代 5 的任务都在两份任务书末尾。集成分支 `integration/iter5`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
 
 ## CLI 调度（Claude 执行）
 
