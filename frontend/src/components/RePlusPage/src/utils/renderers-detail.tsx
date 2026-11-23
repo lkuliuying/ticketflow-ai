@@ -10,6 +10,7 @@ import { getColourTypeByIndex } from "./index";
 import { SOLID_TAG_STYLE } from "@/utils/tagTone";
 import { colorBlockStyle } from "@/utils/cellRender";
 import { transformI18n } from "@/plugins/i18n";
+import { textDetailRenderers } from "./renderers-text";
 import type {
   ChoiceOptionItem,
   PageColumn,
@@ -42,6 +43,7 @@ const dictTagStyle = (color: string) => ({
  * 注意：无匹配 input_type 时不做任何配置（与原 switch 无 default 分支一致）
  */
 export const builtinDetailRenderers: PlusColumnRegistry = {
+  ...textDetailRenderers,
   labeled_choice: (item, { column }) => {
     item["prop"] = `${column.key}.value`;
     item["options"] = computed(() =>

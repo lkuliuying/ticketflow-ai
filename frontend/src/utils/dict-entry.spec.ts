@@ -50,10 +50,13 @@ describe("字典消费统一入口守护", () => {
   });
 
   it("除登记例外外，源码不得直连 @/api/system/dict", () => {
+    // 统一成正斜杠再与 ALLOWED 比对：Windows 下 path.relative 返回反斜杠
+    const relative = (file: string) =>
+      path.relative(SRC_ROOT, file).split(path.sep).join("/");
     const offenders = collectFiles(SRC_ROOT)
-      .filter(file => !ALLOWED.includes(path.relative(SRC_ROOT, file)))
+      .filter(file => !ALLOWED.includes(relative(file)))
       .filter(file => FORBIDDEN.test(fs.readFileSync(file, "utf8")))
-      .map(file => path.relative(SRC_ROOT, file));
+      .map(relative);
 
     expect(
       offenders,

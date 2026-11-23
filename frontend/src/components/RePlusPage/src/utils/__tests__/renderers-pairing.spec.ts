@@ -34,7 +34,10 @@ const CUSTOM_RENDER_TYPES = [
   "object_related_field_file",
   "m2m_related_field_file",
   "m2m_related_field_image",
-  "file upload"
+  "file upload",
+  "password",
+  "url",
+  "rich_text"
 ] as const;
 
 /** 详情走 valueType / options 通道（select / img / text），列表仍需 cellRenderer */

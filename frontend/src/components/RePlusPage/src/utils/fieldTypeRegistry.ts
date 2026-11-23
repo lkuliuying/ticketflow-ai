@@ -113,6 +113,10 @@ export const FIELD_TYPES: Record<string, FieldTypeSpec> = {
     search: builtinSearchRenderers.datetimerange,
     filterKind: "datetime"
   },
+  decimal: {
+    form: builtinFormRenderers.decimal,
+    filterKind: "number"
+  },
   email: {
     // 渲染走回退登记（x-fallback-rendered），仅校验与筛选形态在此声明
     rule: emailRuleFactory,
@@ -194,8 +198,18 @@ export const FIELD_TYPES: Record<string, FieldTypeSpec> = {
     form: builtinFormRenderers.object_related_field_image,
     detail: builtinDetailRenderers.object_related_field_image
   },
+  password: {
+    form: builtinFormRenderers.password,
+    detail: builtinDetailRenderers.password,
+    filterKind: "text"
+  },
   phone: {
     form: builtinFormRenderers.phone,
+    filterKind: "text"
+  },
+  rich_text: {
+    form: builtinFormRenderers.rich_text,
+    detail: builtinDetailRenderers.rich_text,
     filterKind: "text"
   },
   select: {
@@ -227,10 +241,12 @@ export const FIELD_TYPES: Record<string, FieldTypeSpec> = {
     form: builtinFormRenderers.time,
     filterKind: "time"
   },
+  url: {
+    form: builtinFormRenderers.url,
+    detail: builtinDetailRenderers.url,
+    filterKind: "text"
+  },
   // —— 词表外兼容项（契约词表不含；仅高级筛选形态的历史登记，勿新增）——
-  url: { filterKind: "text" },
-  password: { filterKind: "text" },
-  decimal: { filterKind: "number" },
   switch: { filterKind: "boolean" }
 };
 
