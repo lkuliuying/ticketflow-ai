@@ -5,6 +5,8 @@ import type { TicketDetail } from "@/api/ticketflow/tickets";
 import type { TicketRun } from "../utils/useTicketDetail";
 import { useReplyStream, useTicketAnalysis } from "../utils/useTicketAi";
 import { PRIORITY_TONE } from "../utils/ticketColumns";
+import type { ReplyReference } from "@/api/ticketflow/ai";
+import { openArticleDetail } from "../../knowledge/utils/articleDetailDrawer";
 
 /**
  * 详情右侧 AI 面板：工单分析与一键采纳、流式回复建议。
@@ -39,6 +41,11 @@ const statusText = computed(() => {
 function category(value: string) {
   const key = `ticketflow.categoryValue.${value}`;
   return te(key) ? t(key) : value;
+}
+
+/** 点击引用标题，在知识库详情抽屉里打开对应文章 */
+function openReference(ref: ReplyReference) {
+  openArticleDetail({ pk: ref.article_id, title: ref.title || ref.article_id });
 }
 </script>
 
@@ -165,12 +172,27 @@ function category(value: string) {
           {{ t("ticketflow.ai.retry") }}
         </el-button>
       </div>
-      <span
+      <div
         v-if="reply.references.length"
-        class="text-xs text-(--el-text-color-secondary)"
+        class="flex flex-col gap-1 text-xs"
+        data-testid="ai-references"
       >
-        {{ t("ticketflow.ai.references", { count: reply.references.length }) }}
-      </span>
+        <span class="text-(--el-text-color-secondary)">
+          {{
+            t("ticketflow.ai.references", { count: reply.references.length })
+          }}
+        </span>
+        <el-link
+          v-for="ref in reply.references"
+          :key="ref.article_id"
+          type="primary"
+          :underline="false"
+          class="justify-start! text-xs!"
+          @click="openReference(ref)"
+        >
+          {{ ref.title || ref.article_id.slice(0, 8) }}
+        </el-link>
+      </div>
       <div class="flex gap-2">
         <el-button
           type="primary"

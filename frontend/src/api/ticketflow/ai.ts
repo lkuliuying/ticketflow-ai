@@ -26,11 +26,13 @@ export const analyzeTicket = (ticketId: string) =>
 export type ReplyStatus =
   "idle" | "streaming" | "done" | "error" | "stopped" | "interrupted";
 
+/** 回复建议引用的已发布知识文章（meta 帧） */
+export type ReplyReference = { article_id: string; title: string };
+
 export type ReplyState = {
   status: ReplyStatus;
   text: string;
-  /** 引用的已发布知识文章 ID（meta 帧） */
-  references: string[];
+  references: ReplyReference[];
   ticketVersion?: number;
   finishReason?: string;
   error?: { code: number; detail: string; retryable: boolean };
@@ -41,6 +43,17 @@ export const emptyReply = (): ReplyState => ({
   text: "",
   references: []
 });
+
+/** 只保留带文章 ID 的引用；标题缺失时留空，由界面兜底显示 */
+function toReferences(value: unknown): ReplyReference[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(item => {
+    if (!item || typeof item !== "object") return [];
+    const { article_id, title } = item as Record<string, unknown>;
+    if (typeof article_id !== "string" || !article_id) return [];
+    return [{ article_id, title: typeof title === "string" ? title : "" }];
+  });
+}
 
 function parse(data: string): Record<string, unknown> | null {
   try {
@@ -65,9 +78,7 @@ export function applyReplyFrame(
     case "meta":
       return {
         ...state,
-        references: Array.isArray(data?.references)
-          ? data.references.map(String)
-          : [],
+        references: toReferences(data?.references),
         ticketVersion:
           typeof data?.ticket_version === "number"
             ? data.ticket_version
