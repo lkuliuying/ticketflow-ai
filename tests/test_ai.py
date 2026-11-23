@@ -1,6 +1,7 @@
 import json
 import re
 from time import monotonic
+from uuid import UUID
 
 import pytest
 
@@ -50,8 +51,15 @@ def test_logout_revokes_ai_access(gateway, login, ticket):
     assert_ai_failure(gateway.post(ANALYZE, headers=session.headers, json=payload), 401, "UNAUTHORIZED")
 
 
-def test_reply_stream_arrives_incrementally(gateway, agent, ticket):
-    headers = {**agent.headers, "Accept-Encoding": "gzip"}
+def test_reply_stream_arrives_incrementally(gateway, other_agent):
+    title = "园区 VPN 无法连接"
+    response = gateway.get("/api/tickets", params={"q": title}, headers=other_agent.headers)
+    assert response.status_code == 200, response.text
+    tickets = [ticket for ticket in response.json()["data"]["results"] if ticket["title"] == title]
+    assert tickets, "交付栈缺少可触发知识引用的 VPN 演示工单"
+    ticket = tickets[0]
+
+    headers = {**other_agent.headers, "Accept-Encoding": "gzip"}
     events = []
     frame = {}
     start = monotonic()
@@ -74,6 +82,12 @@ def test_reply_stream_arrives_incrementally(gateway, agent, ticket):
     meta = events[0][1]
     assert meta["ticket_id"] == ticket["pk"]
     assert isinstance(meta["ticket_version"], int) and isinstance(meta["references"], list)
+    for reference in meta["references"]:
+        assert isinstance(reference, dict) and set(reference) == {"article_id", "title"}
+        assert str(UUID(reference["article_id"])) == reference["article_id"]
+        assert isinstance(reference["title"], str) and reference["title"]
+    assert any(reference["title"] == "VPN 连接失败排查指南" for reference in meta["references"])
+    print(f"SSE meta: {json.dumps(meta, ensure_ascii=False)}")
     deltas = [(data, elapsed) for name, data, elapsed in events if name == "delta"]
     assert all(isinstance(data["text"], str) and data["text"] for data, _ in deltas)
     assert isinstance(events[-1][1]["finish_reason"], str)

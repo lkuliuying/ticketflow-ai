@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.core.config import Settings
 from app.core.errors import ProviderError, invalid_output, provider_timeout
 from app.schemas.context import TicketContext
-from app.schemas.tickets import AnalysisDraft, Priority
+from app.schemas.tickets import AnalysisDraft, Priority, unique_tags
 from app.services import prompts
 
 
@@ -50,9 +50,10 @@ class MockProvider:
             priority = "P1"
         elif any(word in text for word in ("咨询", "建议")):
             priority = "P3"
-        return AnalysisDraft(
-            category=category, suggested_priority=priority, summary=text[:4000], tags=["工单", category[:64]]
-        )
+        tags = unique_tags(["工单", category[:64].strip()])
+        if len(tags) == 1:
+            tags.append("客服")
+        return AnalysisDraft(category=category, suggested_priority=priority, summary=text[:4000], tags=tags)
 
     async def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]:
         await self._wait()
@@ -101,6 +102,8 @@ async def _sse_data(lines: AsyncIterator[str]) -> AsyncIterator[str]:
                 data.clear()
         elif line == "data" or line.startswith("data:"):
             data.append(line[5:].removeprefix(" "))
+    if data:
+        yield "\n".join(data)
 
 
 def _request_error(exc: httpx.RequestError) -> ProviderError:
