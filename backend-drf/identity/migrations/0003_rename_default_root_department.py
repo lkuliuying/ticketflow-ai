@@ -1,9 +1,11 @@
-from django.db import migrations
+from django.db import migrations, transaction
 
 
 def rename_default_root_department(apps, schema_editor):
-    departments = apps.get_model("identity", "DeptInfo").objects.using(schema_editor.connection.alias)
-    departments.filter(code="xadmin", parent__isnull=True, name="xAdmin管理团队").update(name="TicketFlow管理团队")
+    alias = schema_editor.connection.alias
+    with transaction.atomic(using=alias):
+        departments = apps.get_model("identity", "DeptInfo").objects.using(alias)
+        departments.filter(code="xadmin", parent__isnull=True, name="xAdmin管理团队").update(name="TicketFlow管理团队")
 
 
 class Migration(migrations.Migration):
