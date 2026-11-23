@@ -31,7 +31,17 @@ def analysis_cache_key(resources: Resources, user_id: str | int, context: Ticket
     text = _hash([_normalize(value) for value in (ticket.title, ticket.description, ticket.category)])
     categories = _hash(sorted(set(context.categories)))
     references = _hash(sorted(_hash([str(ref.article_id), ref.title, ref.excerpt]) for ref in context.references))
-    digest = _hash([str(user_id), text, categories, references, resources.provider.model, prompts.PROMPT_VERSION])
+    digest = _hash(
+        [
+            str(user_id),
+            text,
+            categories,
+            references,
+            resources.provider.model,
+            resources.settings.llm_thinking,
+            prompts.PROMPT_VERSION,
+        ]
+    )
     return f"{CACHE_PREFIX}:{digest}"
 
 

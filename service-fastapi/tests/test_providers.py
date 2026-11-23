@@ -50,6 +50,45 @@ async def test_real_provider_requires_a_key():
         Settings(mock_llm=False)
 
 
+def test_settings_reject_invalid_thinking_mode_without_exposing_secrets(monkeypatch, signing_key):
+    api_key = "test-only-provider-secret"
+    monkeypatch.setenv("MOCK_LLM", "false")
+    monkeypatch.setenv("LLM_API_KEY", api_key)
+    monkeypatch.setenv("LLM_THINKING", "invalid-thinking-mode")
+
+    with pytest.raises(ValidationError, match="llm_thinking") as raised:
+        Settings()
+
+    message = str(raised.value)
+    assert api_key not in message
+    assert signing_key not in message
+    assert "invalid-thinking-mode" not in message
+
+
+@pytest.mark.parametrize("mode", ["default", "enabled", "disabled"])
+async def test_thinking_config_controls_both_request_payloads(context, monkeypatch, mode):
+    if mode != "default":
+        monkeypatch.setenv("LLM_THINKING", mode)
+    settings = Settings(mock_llm=False, llm_api_key="test-upstream-key", llm_base_url="https://model.test/v1")
+    assert settings.llm_thinking == mode
+
+    def transport(request):
+        payload = json.loads(request.content)
+        if mode == "default":
+            assert "thinking" not in payload
+        else:
+            assert payload["thinking"] == {"type": mode}
+        if payload.get("stream"):
+            return httpx.Response(200, text="data: [DONE]\n\n")
+        content = {"category": "NETWORK", "suggested_priority": "P1", "summary": "VPN 故障", "tags": ["VPN"]}
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(content)}}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http:
+        provider = OpenAICompatibleProvider(settings, http)
+        assert (await provider.analyze(context)).summary == "VPN 故障"
+        assert [text async for text in provider.stream_reply(context)] == []
+
+
 async def test_completion_sends_only_authorized_content_and_parses_output(settings, context):
     def transport(request):
         assert request.url == "https://model.test/v1/chat/completions"
@@ -66,7 +105,9 @@ async def test_completion_sends_only_authorized_content_and_parses_output(settin
             "references": [{"title": "VPN 排障", "excerpt": "检查入口地址"}],
         }
         content = {"category": "NETWORK", "suggested_priority": "P1", "summary": "VPN 故障", "tags": ["VPN", "VPN"]}
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(content)}}]})
+        return httpx.Response(
+            200, json={"choices": [{"message": {"reasoning_content": "思考过程", "content": json.dumps(content)}}]}
+        )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http:
         draft = await OpenAICompatibleProvider(settings, http).analyze(context)
@@ -97,6 +138,9 @@ async def test_upstream_sse_parses_comments_roles_and_multiline_data(settings, c
             200,
             text=(
                 ': comment\r\n\r\ndata: {"choices":[{"delta":{"role":"assistant"}}]}\r\n\r\n'
+                'data: {"choices":[{"delta":{"reasoning_content":"先检查"}}]}\r\n\r\n'
+                'data: {"choices":[{"delta":{"reasoning_content":"再分析","content":null}}]}\r\n\r\n'
+                'data: {"choices":[{"delta":{"reasoning_content":"继续分析","content":""}}]}\r\n\r\n'
                 'data: {"choices":\r\ndata: [{"delta":{"content":"您好"}}]}\r\n\r\n'
                 'data: {"choices":[{"delta":{"content":"。"}}]}\r\n\r\n'
                 'data: {"choices":[]}\r\n\r\ndata: [DONE]\r\n\r\n'
