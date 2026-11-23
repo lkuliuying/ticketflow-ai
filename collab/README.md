@@ -90,14 +90,21 @@ python collab/bin/review.py BE-02 be/contract-gaps --repo ..\ticketflow-ai-be   
 - Antigravity：`agy`（1.5.13）以 plan 模式运行，模型 `gemini-4-neon-high`，评审材料由脚本拼好经 stdin
   传入，**不授予任何文件或终端权限**。模型在 `review.py` 的 `MODEL` 中修改，可选值见 `agy models`。
 
-## 代理指挥台（3D 可视化）
+## 代理指挥台（3D 办公室）
 
 ```powershell
 python collab/dashboard/server.py --port 8765   # 打开 http://127.0.0.1:8765
 ```
 
-- 页面用 Three.js 展示三个代理站台、8 个阶段的环形流水线、任务卡片、交接链路和 main 提交柱，
-  左侧是代理状态（Codex 最近命令、Gemini 最近结论），右侧是流水线 / 详情 / Git，底部是事件流。
+- 页面用 Three.js 画一间明亮的等距视角办公室：Claude、Codex、Gemini 各坐一张工位，显示器显示当前任务与状态
+  （运行中会打字、台灯亮起，异常时屏幕闪红）。工位前是一条传送带，按 待开始 → 阻塞 → 执行中 → 待评审 → 评审中
+  → 已通过 → 已合并 分段，任务卡片随阶段变化沿传送带滑动；“需修改”放在后方的回流带上，指回 Codex。
+  传送带末端是 main 归档柜，抽屉按最近提交排列、颜色区分作者，有新提交时抽屉弹出并撒纸屑。后墙白板是各阶段任务数。
+- 代理正在处理的卡片会描边呼吸，并有虚线连到对应工位。点击人物、卡片、阶段牌或归档柜，右侧切换到对应的详情或 Git。
+- 左侧代理面板、右侧详情面板和底部事件流都可以收起，偏好保存在浏览器本地；窄于 1300 px 时默认收起左侧面板。
+  镜头按可见区域自动适配，拖动后“复位”回到默认视角，“巡航”自动旋转。
+- 代码在 `collab/dashboard/web/`：`scene.js`（渲染、镜头、拾取、动画）、`office.js`（房间、工位、人物）、
+  `belt.js`（传送带、卡片、归档柜）、`hud.js`（面板）、`theme.js`（配色与文案）。
 - 数据全部来自本机：`collab/README.md` 看板、任务书、`collab/reports/`（报告、Codex 日志、
   `*.run-*.json` 调度记录、`claude.status.json`）、`collab/reviews/` 和 git，每 3 秒刷新，只监听 127.0.0.1。
 - `codex_task.py` 与 `review.py` 每次调度都会写运行记录；Claude 切换工作时更新 `claude.status.json`。

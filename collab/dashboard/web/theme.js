@@ -1,21 +1,21 @@
 // 场景与界面共用的颜色、阶段与文案。
 
 export const AGENT_COLORS = {
-  claude: "#f2a65a",
-  codex: "#4fd1a5",
-  gemini: "#6aa8ff",
-  human: "#c9d3e6"
+  claude: "#e07a3f",
+  codex: "#1f9d75",
+  gemini: "#3b7ddd",
+  human: "#8a94a6"
 };
 
 export const STAGE_COLORS = {
-  待开始: "#7d8aa3",
-  阻塞: "#c46b84",
-  执行中: "#f2c14e",
-  待评审: "#b48cff",
-  评审中: "#6aa8ff",
-  需修改: "#ff6b6b",
-  已通过: "#4fd1a5",
-  已合并: "#9be37b"
+  待开始: "#94a3b8",
+  阻塞: "#e0607e",
+  执行中: "#f0a92e",
+  待评审: "#9b7be0",
+  评审中: "#4a8fe7",
+  需修改: "#ef5b5b",
+  已通过: "#2fb383",
+  已合并: "#6cbf4a"
 };
 
 export const STAGE_HINT = {

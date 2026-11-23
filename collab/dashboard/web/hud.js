@@ -227,7 +227,7 @@ function stageDetail(stage, data) {
 export function renderDetail(data, selected) {
   const el = $("tab-detail");
   if (!selected) {
-    el.innerHTML = `<p class="muted pad">在 3D 场景里点击代理、任务卡片或阶段门，或在左右面板中点击条目查看详情。</p>`;
+    el.innerHTML = `<p class="muted pad">在办公室里点击代理、传送带上的任务卡片、阶段牌或 main 归档柜，或在左右面板中点击条目查看详情。</p>`;
     return;
   }
   if (selected.kind === "task") {
@@ -270,6 +270,10 @@ export function renderGit(data) {
 // ---------------------------------------------------------------- 底部事件流
 
 export function renderEvents(data) {
+  const last = data.events[0];
+  $("latest").innerHTML = last
+    ? `<span style="color:${AGENT_COLORS[last.agent] ?? "#999"}">${KIND_ICON[last.kind] ?? "•"}</span> ${esc(last.text)} <span class="muted">· ${relTime(last.time)}</span>`
+    : "";
   $("events").innerHTML = data.events
     .map(
       e => `<div class="event ${e.kind}" style="--a:${AGENT_COLORS[e.agent] ?? "#999"}">

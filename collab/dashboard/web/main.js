@@ -37,7 +37,8 @@ function hover(target, event) {
   let html = "";
   if (target.kind === "agent") {
     const a = data.agents[target.id];
-    html = `<b>${esc(a.name)}</b> · ${STATE_LABEL[a.state] ?? a.state}<br>${esc(a.task ?? "无任务")}`;
+    html = `<b>${esc(a.name)}</b> · ${STATE_LABEL[a.state] ?? a.state}<br>${esc(a.task ?? "无任务")}` +
+      (a.activity ? `<br><span class="muted">${esc(a.activity.slice(0, 140))}</span>` : "");
   } else if (target.kind === "task") {
     const t = data.tasks.find(x => x.id === target.id);
     html = t ? `<b>${t.id}</b> ${esc(t.title)}<br>${t.stage} · ${esc(t.executor)}` : "";
@@ -109,6 +110,47 @@ async function poll() {
 }
 
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+// 面板折叠：状态只是本机偏好，存储不可用时退回默认展开
+const COLLAPSE_KEY = "dashboard.collapsed";
+function loadCollapsed() {
+  try {
+    const saved = localStorage.getItem(COLLAPSE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {
+    /* 读不到偏好时用默认值 */
+  }
+  // 窄屏默认收起左侧代理面板，把空间留给办公室
+  return window.innerWidth < 1300 ? ["left"] : [];
+}
+function applyCollapsed(list) {
+  for (const side of ["left", "right", "bottom"]) document.body.classList.toggle(`collapsed-${side}`, list.includes(side));
+  // 过渡结束后再重算画面偏移，让场景居中到可见区域
+  setTimeout(() => scene.resize(), 320);
+}
+document.querySelectorAll("[data-panel]").forEach(el =>
+  el.addEventListener("transitionend", e => {
+    if (e.target === el) scene.resize();
+  })
+);
+let collapsed = loadCollapsed();
+applyCollapsed(collapsed);
+scene.resize();
+// 首屏直接呈现保存的折叠状态，不播放过渡
+requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove("preload")));
+document.querySelectorAll("[data-collapse]").forEach(b =>
+  b.addEventListener("click", () => {
+    const side = b.dataset.collapse;
+    collapsed = collapsed.includes(side) ? collapsed.filter(s => s !== side) : [...collapsed, side];
+    applyCollapsed(collapsed);
+    try {
+      localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed));
+    } catch {
+      /* 无痕模式等场景下不保存 */
+    }
+  })
+);
+document.getElementById("reset-view").addEventListener("click", () => scene.resetView());
+
 let rotating = false;
 document.getElementById("rotate-toggle").addEventListener("click", e => {
   rotating = !rotating;
