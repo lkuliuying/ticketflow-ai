@@ -81,6 +81,17 @@ def test_concurrent_create_uses_one_database_record(support: DeptInfo, requester
         create_ticket(requester, key, {**details, "title": "不同标题"})
 
 
+@pytest.mark.django_db
+def test_public_reply_requires_ticket_submitter_or_handler(support, requester, details):
+    ticket, _ = create_ticket(requester, str(uuid4()), details)
+    user = UserInfo.objects.create_user(username="other-requester")
+    access = TicketAccess.for_user(user)
+    with pytest.raises(PermissionDenied) as error:
+        add_comment(Ticket.objects.all(), ticket.pk, user, access, "无权发布的回复", Visibility.PUBLIC)
+    assert error.value.status_code == 403
+    assert not ticket.comments.exists()
+
+
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_update_rejects_stale_version(
     support: DeptInfo, requester: UserInfo, agent: UserInfo, details: NewTicket

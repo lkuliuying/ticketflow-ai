@@ -120,7 +120,9 @@ class TicketViewSet(
         data["viewer"] = {
             "can_handle": can_handle,
             "can_assign": can_handle
+            and ticket.status != Status.CLOSED
             and has_permission(self.actor, "assign:TicketFlowTickets", "assignees:TicketFlowTickets"),
+            "can_reply": self.access.can_reply(ticket),
             "can_comment_internal": can_handle,
             "can_archive": (
                 can_handle

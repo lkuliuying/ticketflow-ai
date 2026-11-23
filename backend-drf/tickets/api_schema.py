@@ -39,6 +39,7 @@ class TimelineEntrySerializer(serializers.Serializer):
 class TicketViewerSerializer(serializers.Serializer):
     can_handle = serializers.BooleanField()
     can_assign = serializers.BooleanField()
+    can_reply = serializers.BooleanField()
     can_comment_internal = serializers.BooleanField()
     can_archive = serializers.BooleanField()
 

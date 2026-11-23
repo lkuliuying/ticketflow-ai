@@ -18780,13 +18780,17 @@
           },
           "can_handle": {
             "type": "boolean"
+          },
+          "can_reply": {
+            "type": "boolean"
           }
         },
         "required": [
           "can_archive",
           "can_assign",
           "can_comment_internal",
-          "can_handle"
+          "can_handle",
+          "can_reply"
         ],
         "type": "object"
       },
