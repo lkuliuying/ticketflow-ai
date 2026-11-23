@@ -33,6 +33,13 @@ const { stub } = vi.hoisted(() => ({
 vi.mock("../TicketActions.vue", () => ({ default: stub("TicketActions") }));
 vi.mock("../TicketReply.vue", () => ({ default: stub("TicketReply") }));
 vi.mock("../TicketTimeline.vue", () => ({ default: stub("TicketTimeline") }));
+vi.mock("../../../ratings/components/RatingCard.vue", () => ({
+  default: stub("RatingCard")
+}));
+const ratingMocks = vi.hoisted(() => ({ openRatingDialog: vi.fn() }));
+vi.mock("../../../ratings/utils/ratingDialog", () => ({
+  openRatingDialog: ratingMocks.openRatingDialog
+}));
 vi.mock("../TicketAiPanel.vue", () => ({
   default: stub("TicketAiPanel", ["canFill"])
 }));
@@ -131,5 +138,46 @@ describe("TicketDetail 只读历史工单", () => {
       false
     );
     expect(wrapper.find(".TicketActions").exists()).toBe(true);
+  });
+});
+
+describe("TicketDetail 评价", () => {
+  it("可评价时显示评价按钮，点击打开评价弹窗", async () => {
+    const wrapper = mountWith({ can_rate: true }, { status: "CLOSED" });
+    await wrapper.get('[data-testid="ticket-rate"]').trigger("click");
+    expect(ratingMocks.openRatingDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ pk: "t1" }),
+      expect.objectContaining({ afterClose: false })
+    );
+  });
+
+  it("已有评价时显示评价卡，不再显示评价按钮", () => {
+    const wrapper = mountWith(
+      {},
+      { status: "CLOSED", rating: { pk: "r1", tags: [] } }
+    );
+    expect(wrapper.find(".RatingCard").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="ticket-rate"]').exists()).toBe(false);
+  });
+
+  it("确认解决后（流转到已关闭且可评价）自动弹出评价", async () => {
+    ratingMocks.openRatingDialog.mockClear();
+    const wrapper = mountWith({ can_rate: true }, { status: "CLOSED" });
+    wrapper
+      .findComponent({ name: "TicketActions" })
+      .vm.$emit("transitioned", "CLOSED");
+    expect(ratingMocks.openRatingDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ pk: "t1" }),
+      expect.objectContaining({ afterClose: true })
+    );
+  });
+
+  it("流转到其他状态不弹评价", () => {
+    ratingMocks.openRatingDialog.mockClear();
+    const wrapper = mountWith({ can_rate: true });
+    wrapper
+      .findComponent({ name: "TicketActions" })
+      .vm.$emit("transitioned", "IN_PROGRESS");
+    expect(ratingMocks.openRatingDialog).not.toHaveBeenCalled();
   });
 });

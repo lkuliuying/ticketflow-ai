@@ -172,6 +172,7 @@ import "element-plus/es/components/progress/style/css";
 import "element-plus/es/components/radio/style/css";
 import "element-plus/es/components/radio-button/style/css";
 import "element-plus/es/components/radio-group/style/css";
+import "element-plus/es/components/rate/style/css";
 import "element-plus/es/components/result/style/css";
 import "element-plus/es/components/row/style/css";
 import "element-plus/es/components/scrollbar/style/css";
@@ -317,6 +318,8 @@ const lazyComponents: Record<string, () => Promise<Component>> = {
     import("element-plus/es/components/menu/index.mjs").then(
       m => m.ElMenuItemGroup
     ),
+  ElRate: () =>
+    import("element-plus/es/components/rate/index.mjs").then(m => m.ElRate),
   ElSlider: () =>
     import("element-plus/es/components/slider/index.mjs").then(m => m.ElSlider),
   ElSplitter: () =>

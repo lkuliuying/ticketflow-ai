@@ -15,15 +15,18 @@ vi.mock("element-plus", async importOriginal => {
   return { ...actual, ElMessageBox: { prompt: mocks.prompt } };
 });
 vi.mock("@/api/ticketflow/tickets", () => ({
-  ticketApi: { returnTicket: mocks.returnTicket }
+  ticketApi: {
+    returnTicket: mocks.returnTicket,
+    transition: vi.fn().mockResolvedValue({ code: 1000 })
+  }
 }));
 
 import TicketActions from "../TicketActions.vue";
 
-function mountWith(viewer: Record<string, boolean>) {
+function mountWith(viewer: Record<string, boolean>, runResult = true) {
   const run = vi.fn(async (action: () => Promise<unknown>) => {
     await action();
-    return true;
+    return runResult;
   });
   const wrapper = mount(TicketActions, {
     props: {
@@ -31,7 +34,7 @@ function mountWith(viewer: Record<string, boolean>) {
         pk: "t1",
         status: "IN_PROGRESS",
         version: 4,
-        available_transitions: [],
+        available_transitions: ["CLOSED"],
         viewer: {
           can_handle: true,
           can_assign: false,
@@ -92,5 +95,23 @@ describe("TicketActions 退回重派", () => {
     expect(validator("   ")).toBe("ticketflow.detail.returnRequired");
     expect(validator("a".repeat(501))).toBe("ticketflow.detail.returnTooLong");
     expect(validator("原因")).toBe(true);
+  });
+});
+
+describe("TicketActions 流转通知", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("流转成功后发出 transitioned，失败时不发出", async () => {
+    mocks.prompt.mockResolvedValue({ value: "" });
+    for (const ok of [true, false]) {
+      const { wrapper } = mountWith({}, ok);
+      await wrapper
+        .get('[data-testid="ticket-transitions"] el-button')
+        .trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("transitioned")).toEqual(
+        ok ? [["CLOSED"]] : undefined
+      );
+    }
   });
 });
