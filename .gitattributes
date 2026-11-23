@@ -1,0 +1,5 @@
+*.sh text eol=lf
+
+# init_config.sh processes these files line by line with sed and awk.
+/backend-drf/config_example.yml text eol=lf
+/backend-drf/docker-compose.yml text eol=lf

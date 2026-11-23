@@ -5,7 +5,6 @@ from contextvars import ContextVar
 from functools import wraps
 from uuid import uuid4
 
-from django.core.cache import cache
 from django.db import connection
 from server.asgi import application as application
 
@@ -13,6 +12,7 @@ from server.asgi import application as application
 from tickets import timeline, views  # noqa: E402
 
 dashboard_cache = ContextVar("dashboard_cache", default=None)
+_CACHE_MISS = object()
 
 
 def without_timeline_prefetch(objects, *lookups):
@@ -25,13 +25,19 @@ def without_timeline_prefetch(objects, *lookups):
 
 
 class MeasuredDashboardCache:
-    def get(self, key):
-        result = cache.get(key)
-        dashboard_cache.set("miss" if result is None else "hit")
-        return result
+    def __init__(self, backend):
+        self.backend = backend
 
-    def set(self, key, value, timeout):
-        cache.set(key, value, timeout)
+    def __getattr__(self, name):
+        return getattr(self.backend, name)
+
+    def get(self, key, default=None, *args, **kwargs):
+        result = self.backend.get(key, _CACHE_MISS, *args, **kwargs)
+        if result is _CACHE_MISS:
+            dashboard_cache.set("miss")
+            return default
+        dashboard_cache.set("hit")
+        return result
 
 
 def unique_dashboard_key(original):
@@ -77,7 +83,7 @@ def configure():
         timeline.prefetch_related_objects = without_timeline_prefetch
     if dashboard == "cold":
         views.dashboard_key = unique_dashboard_key(views.dashboard_key)
-    views.cache = MeasuredDashboardCache()
+    views.cache = MeasuredDashboardCache(views.cache)
     for action in ("list", "retrieve", "dashboard"):
         handler = getattr(views.TicketViewSet, action)
         setattr(views.TicketViewSet, action, measure_queries(handler))
