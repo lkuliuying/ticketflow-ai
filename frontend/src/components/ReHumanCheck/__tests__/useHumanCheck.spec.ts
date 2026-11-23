@@ -1,6 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { SHA256 } from "crypto-es";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { effectScope } from "vue";
 import { leadingZeroBits } from "@/utils/captcha/protocol";
 
 const mocks = vi.hoisted(() => ({ challenge: vi.fn(), verify: vi.fn() }));
@@ -31,6 +32,11 @@ function setup(types: string[] = ["slide", "image"]) {
 beforeEach(() => {
   mocks.challenge.mockReset();
   mocks.verify.mockReset();
+});
+
+// 原型上的 spy 要在每个用例后恢复，断言失败时也不影响后续用例
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("useHumanCheck", () => {
@@ -155,6 +161,29 @@ describe("useHumanCheck", () => {
     const submitting = check.submit("ab12");
     check.cancel();
     await expect(submitting).resolves.toBeUndefined();
+    expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
+    expect(mocks.verify).not.toHaveBeenCalled();
+    expect(check.loading.value).toBe(false);
+  });
+
+  it("aborts a running PoW and settles as cancelled when the component unmounts", async () => {
+    const slowPow = { ...pow, difficulty_bits: 30 };
+    mocks.challenge.mockResolvedValue(
+      ok({ challenge_id: "c1", type: "pow", ttl: 60, pow: slowPow })
+    );
+    const scope = effectScope();
+    const check = scope.run(() => setup())!;
+
+    const outcome = check.obtain().catch((error: unknown) => error);
+    await flushPromises();
+    expect(check.loading.value).toBe(true);
+    // 直接断言在途的 AbortController 被中止，而不只是 promise 被拒绝
+    const abort = vi.spyOn(AbortController.prototype, "abort");
+    scope.stop();
+    expect(abort).toHaveBeenCalled();
+    expect(
+      abort.mock.contexts.some(c => (c as AbortController).signal.aborted)
+    ).toBe(true);
     expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
     expect(mocks.verify).not.toHaveBeenCalled();
     expect(check.loading.value).toBe(false);

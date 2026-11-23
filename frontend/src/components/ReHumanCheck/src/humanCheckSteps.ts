@@ -86,3 +86,9 @@ export async function verifyAnswer(
     ? (res.data.ticket ?? null)
     : null;
 }
+
+/** 一次 obtain() 等待中的调用方 */
+export type Pending = {
+  resolve: (v: string) => void;
+  reject: (e: Error) => void;
+};

@@ -48,7 +48,10 @@ export type TimelineEntry = {
 /** 当前调用者对该工单的能力，前端据此显示操作，不自行推断权限 */
 export type TicketViewer = {
   can_handle: boolean;
+  /** 可处理且有指派权限，已关闭的工单为 false */
   can_assign: boolean;
+  /** 可发对外回复：处理人或提交人，且有评论权限 */
+  can_reply: boolean;
   can_comment_internal: boolean;
   can_archive: boolean;
 };
