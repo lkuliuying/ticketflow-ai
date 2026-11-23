@@ -1,12 +1,12 @@
 <script lang="ts" setup>
 import { isSuccess } from "@/api/types";
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Motion from "../utils/motion";
 import { message } from "@/utils/message";
 import { loginRules } from "../utils/rule";
 import type { FormInstance } from "element-plus";
-import { LOGIN_PAGE, operates } from "../utils/enums";
+import { LOGIN_PAGE, visibleOperates } from "../utils/enums";
 import { useUserStoreHook } from "@/store/modules/user";
 import { useLoginPageStoreHook } from "@/store/modules/loginPage";
 import { HumanCheckCancelled, ReHumanCheck } from "@/components/ReHumanCheck";
@@ -56,8 +56,12 @@ const authInfo = reactive<AuthInfoResult["data"]>({
   encrypted: false,
   basic: false,
   lifetime: 1,
-  reset: false
+  reset: false,
+  register: false
 });
+
+/** 其他登录方式按后端能力过滤（注册、验证码登录） */
+const otherWays = computed(() => visibleOperates(authInfo));
 
 const ruleForm = reactive({
   username: "",
@@ -311,11 +315,11 @@ onMounted(() => {
       <Motion v-else :delay="300">
         <el-result icon="error" :title="t('login.serverForbidden')" />
       </Motion>
-      <Motion :delay="300">
+      <Motion v-if="otherWays.length" :delay="300">
         <el-form-item>
-          <div class="w-full h-5 flex-bc">
+          <div class="w-full h-5 flex-bc gap-3">
             <el-button
-              v-for="item in operates"
+              v-for="item in otherWays"
               :key="item.page"
               class="w-full mt-4!"
               size="default"

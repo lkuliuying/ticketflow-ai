@@ -1,69 +1,31 @@
 <script lang="ts" setup>
-import { computed, type Component } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-  AlarmClock,
-  Clock,
-  Finished,
-  RefreshLeft,
-  Tickets,
-  Warning
-} from "@element-plus/icons-vue";
 import type { WorkbenchStats } from "../useWorkbench";
+import type { StatCard } from "../cards";
 
-/** 工作台计数卡：每张卡对应工单列表的一个看板筛选，点击跳转并带上该筛选 */
+/** 工作台计数卡：每张卡对应工单列表的一个看板筛选，点击跳转并带上该筛选；卡片组合按视角传入 */
 defineOptions({ name: "WorkbenchStats" });
 
-const props = defineProps<{ stats: WorkbenchStats }>();
+const props = defineProps<{ stats: WorkbenchStats; cards: StatCard[] }>();
 const emit = defineEmits<{ open: [query: Record<string, string>] }>();
-
-type Card = {
-  key: keyof WorkbenchStats;
-  icon: Component;
-  tone: "primary" | "warning" | "info" | "danger";
-  query: Record<string, string>;
-};
 
 const { t } = useI18n();
 
-const CARDS: Card[] = [
-  { key: "open", icon: Tickets, tone: "primary", query: { status: "OPEN" } },
-  {
-    key: "reopened",
-    icon: RefreshLeft,
-    tone: "danger",
-    query: { status: "REOPENED" }
-  },
-  {
-    key: "inProgress",
-    icon: Clock,
-    tone: "warning",
-    query: { status: "IN_PROGRESS" }
-  },
-  {
-    key: "verifying",
-    icon: Finished,
-    tone: "info",
-    query: { status: "PENDING_VERIFY" }
-  },
-  {
-    key: "dueSoon",
-    icon: AlarmClock,
-    tone: "warning",
-    query: { sla: "DUE_SOON" }
-  },
-  { key: "overdue", icon: Warning, tone: "danger", query: { sla: "OVERDUE" } }
-];
-
-const cards = computed(() =>
-  CARDS.map(card => ({ ...card, value: props.stats[card.key] }))
+const items = computed(() =>
+  props.cards.map(card => ({ ...card, value: props.stats[card.key] }))
 );
 </script>
 
 <template>
-  <div class="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+  <div
+    class="grid gap-4 grid-cols-2"
+    :class="
+      cards.length > 4 ? 'md:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-4'
+    "
+  >
     <button
-      v-for="card in cards"
+      v-for="card in items"
       :key="card.key"
       type="button"
       class="stat-card"

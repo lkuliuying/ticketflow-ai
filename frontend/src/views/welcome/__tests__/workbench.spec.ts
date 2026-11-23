@@ -21,6 +21,7 @@ vi.mock("vue-i18n", async importOriginal => {
 import { greetingKey } from "../greeting";
 import { summarize, useWorkbench } from "../useWorkbench";
 import WorkbenchStats from "../components/WorkbenchStats.vue";
+import { cardsFor, workbenchRole } from "../cards";
 
 const ok = <T>(data: T) => ({ code: 1000, detail: "", data });
 
@@ -47,6 +48,9 @@ describe("summarize", () => {
         sla: { ON_TRACK: 5, DUE_SOON: 2, OVERDUE: 1, MET: 9 }
       })
     ).toEqual({
+      unassigned: 0,
+      current: 0,
+      history: 0,
       open: 3,
       reopened: 2,
       inProgress: 4,
@@ -57,7 +61,9 @@ describe("summarize", () => {
   });
 
   it("没有数据时全部为 0", () => {
-    expect(Object.values(summarize(null))).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(Object.values(summarize(null)).every(value => value === 0)).toBe(
+      true
+    );
   });
 });
 
@@ -117,34 +123,84 @@ describe("useWorkbench", () => {
   });
 });
 
+describe("工作台视角", () => {
+  const base = { status: {}, priority: {}, sla: {} } as never;
+
+  it("由看板的指派维度推断视角", () => {
+    expect(workbenchRole(null)).toBe("requester");
+    expect(
+      workbenchRole({ ...(base as object), assignment: {} } as never)
+    ).toBe("requester");
+    expect(
+      workbenchRole({
+        ...(base as object),
+        assignment: { unassigned: 2 }
+      } as never)
+    ).toBe("admin");
+    expect(
+      workbenchRole({
+        ...(base as object),
+        assignment: { current: 1, history: 0 }
+      } as never)
+    ).toBe("agent");
+  });
+
+  it("各视角的计数卡与筛选", () => {
+    expect(cardsFor("admin")[0]).toMatchObject({
+      key: "unassigned",
+      query: { assignment: "unassigned" }
+    });
+    expect(
+      cardsFor("agent")
+        .map(card => card.key)
+        .slice(0, 2)
+    ).toEqual(["current", "history"]);
+    expect(cardsFor("requester").map(card => card.key)).toEqual([
+      "open",
+      "inProgress",
+      "verifying",
+      "reopened"
+    ]);
+  });
+
+  it("summarize 读取指派计数", () => {
+    const stats = summarize({
+      ...(base as object),
+      assignment: { current: 3, history: 1 }
+    } as never);
+    expect(stats.current).toBe(3);
+    expect(stats.history).toBe(1);
+    expect(stats.unassigned).toBe(0);
+  });
+});
+
 describe("WorkbenchStats", () => {
-  it("展示计数，点击卡片带上与计数一致的单项筛选", async () => {
+  it("按传入的卡片展示计数，点击带上与计数一致的单项筛选", async () => {
+    const stats = {
+      ...summarize(null),
+      unassigned: 5,
+      open: 3,
+      overdue: 1
+    };
     const wrapper = mount(WorkbenchStats, {
-      props: {
-        stats: {
-          open: 3,
-          reopened: 2,
-          inProgress: 4,
-          verifying: 1,
-          dueSoon: 2,
-          overdue: 1
-        }
-      },
+      props: { stats, cards: cardsFor("admin") },
       global: { stubs: { "el-icon": true } }
     });
     await flushPromises();
     expect(
-      wrapper.get('[data-testid="workbench-stat-reopened"]').text()
-    ).toContain("2");
-    for (const key of ["open", "reopened", "dueSoon", "overdue"]) {
+      wrapper.get('[data-testid="workbench-stat-unassigned"]').text()
+    ).toContain("5");
+    expect(
+      wrapper.find('[data-testid="workbench-stat-history"]').exists()
+    ).toBe(false);
+    for (const key of ["unassigned", "open", "overdue"]) {
       await wrapper
         .get(`[data-testid="workbench-stat-${key}"]`)
         .trigger("click");
     }
     expect(wrapper.emitted("open")).toEqual([
+      [{ assignment: "unassigned" }],
       [{ status: "OPEN" }],
-      [{ status: "REOPENED" }],
-      [{ sla: "DUE_SOON" }],
       [{ sla: "OVERDUE" }]
     ]);
   });

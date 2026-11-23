@@ -40,7 +40,11 @@ vi.mock("../TicketAiPanel.vue", () => ({
 import TicketDetail from "../TicketDetail.vue";
 
 /** 回复区与 AI 面板“填入回复框”只看后端 viewer.can_reply，不再按提交人推断 */
-function mountWith(viewer: Record<string, boolean>, submitterId = 7) {
+function mountWith(
+  viewer: Record<string, boolean>,
+  overrides: Record<string, unknown> = {},
+  submitterId = 7
+) {
   state.detail = {
     pk: "t1",
     title: "VPN",
@@ -57,8 +61,11 @@ function mountWith(viewer: Record<string, boolean>, submitterId = 7) {
       can_reply: false,
       can_comment_internal: false,
       can_archive: false,
+      can_return: false,
+      read_only: false,
       ...viewer
-    }
+    },
+    ...overrides
   };
   return mount(TicketDetail, {
     props: { pk: "t1" },
@@ -84,5 +91,45 @@ describe("TicketDetail 回复能力", () => {
       expect(panel.exists()).toBe(true);
       expect(panel.props("canFill")).toBe(canReply);
     }
+  });
+});
+
+describe("TicketDetail 只读历史工单", () => {
+  it("read_only 时显示只读提示，隐藏操作区、回复区与 AI 面板", () => {
+    const wrapper = mountWith({ read_only: true });
+    expect(wrapper.find('[data-testid="ticket-read-only"]').exists()).toBe(
+      true
+    );
+    expect(wrapper.find(".TicketActions").exists()).toBe(false);
+    expect(wrapper.find(".TicketReply").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "TicketAiPanel" }).exists()).toBe(
+      false
+    );
+  });
+
+  it("只读但仍是提交人时，按能力位显示验收操作与回复区", () => {
+    const wrapper = mountWith(
+      { read_only: true, can_reply: true },
+      { available_transitions: ["CLOSED", "IN_PROGRESS"] }
+    );
+    expect(wrapper.find('[data-testid="ticket-read-only"]').exists()).toBe(
+      true
+    );
+    expect(wrapper.find(".TicketActions").exists()).toBe(true);
+    expect(wrapper.find(".TicketReply").exists()).toBe(true);
+  });
+
+  it("只读的已关闭工单可转存时不挂空的操作组件（转存入口由父级回调决定）", () => {
+    const wrapper = mountWith({ read_only: true, can_archive: true });
+    expect(wrapper.find(".TicketActions").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="ticket-archive"]').exists()).toBe(false);
+  });
+
+  it("非只读时不显示只读提示，操作区照常出现", () => {
+    const wrapper = mountWith({});
+    expect(wrapper.find('[data-testid="ticket-read-only"]').exists()).toBe(
+      false
+    );
+    expect(wrapper.find(".TicketActions").exists()).toBe(true);
   });
 });

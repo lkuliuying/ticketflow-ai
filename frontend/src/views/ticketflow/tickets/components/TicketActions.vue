@@ -16,9 +16,9 @@ import {
 } from "../utils/ticketActions";
 
 /**
- * 工单操作区：流转按钮来自后端 `available_transitions`，指派区只在
- * `viewer.can_assign` 为真时出现；写操作交给父组件的 `run` 统一处理
- * 成功刷新与 409 冲突。
+ * 工单操作区：流转按钮来自后端 `available_transitions`，退回按钮看 `viewer.can_return`，
+ * 指派区只在 `viewer.can_assign`（管理员）为真时出现；写操作交给父组件的 `run`
+ * 统一处理成功刷新与 409 冲突。
  */
 defineOptions({ name: "TicketFlowTicketActions" });
 
@@ -56,6 +56,42 @@ async function transition(to: TicketStatus) {
         ...(note.trim() ? { note: note.trim() } : {})
       }),
     t("ticketflow.detail.transitioned", { action: label })
+  );
+}
+
+const RETURN_REASON_MAX = 500;
+
+/** 退回给管理员重新分配：原因必填，写入指派历史与内部日志 */
+async function returnTicket() {
+  const reason = await ElMessageBox.prompt(
+    t("ticketflow.detail.returnPrompt"),
+    t("ticketflow.detail.return"),
+    {
+      inputType: "textarea",
+      inputPlaceholder: t("ticketflow.detail.returnPlaceholder"),
+      inputValidator: (value: string) => {
+        const length = value?.trim().length ?? 0;
+        if (!length) return t("ticketflow.detail.returnRequired");
+        if (length > RETURN_REASON_MAX)
+          return t("ticketflow.detail.returnTooLong", {
+            max: RETURN_REASON_MAX
+          });
+        return true;
+      },
+      confirmButtonText: t("ticketflow.detail.return"),
+      cancelButtonText: t("buttons.cancel")
+    }
+  )
+    .then(result => result.value?.trim() ?? "")
+    .catch(() => null);
+  if (!reason) return;
+  await props.run(
+    () =>
+      ticketApi.returnTicket(props.ticket.pk, {
+        version: props.ticket.version,
+        reason
+      }),
+    t("ticketflow.detail.returned")
   );
 }
 
@@ -102,6 +138,18 @@ async function assign() {
     <p v-else class="text-sm text-(--el-text-color-secondary) m-0">
       {{ t("ticketflow.detail.noTransition") }}
     </p>
+
+    <div v-if="ticket.viewer.can_return">
+      <el-button
+        type="warning"
+        plain
+        :loading="busy"
+        data-testid="ticket-return"
+        @click="returnTicket"
+      >
+        {{ t("ticketflow.detail.return") }}
+      </el-button>
+    </div>
 
     <div
       v-if="ticket.viewer.can_assign"

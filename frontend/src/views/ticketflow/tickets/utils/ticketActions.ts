@@ -32,7 +32,15 @@ export function transitionButtonType(
 
 /** 时间线日志动作名 */
 export function logActionKey(action: string): string {
-  const known = ["CREATE", "ASSIGN", "TRANSITION", "AI_METADATA"];
+  const known = [
+    "CREATE",
+    "ASSIGN",
+    "AUTO_ASSIGN",
+    "REOPEN_ASSIGN",
+    "RETURN",
+    "TRANSITION",
+    "AI_METADATA"
+  ];
   return known.includes(action)
     ? `ticketflow.log.${action}`
     : "ticketflow.log.OTHER";
