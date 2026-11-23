@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from typing import cast
-from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.utils import timezone
 
 from common.core.permission import get_user_permission_codes
 from identity.models import UserInfo
-from tickets.models import Status, Ticket
+from tickets.models import Status, Ticket, TicketAssignment
 
 REQUESTER_ROLE = "ticketflow_requester"
 AGENT_ROLE = "ticketflow_agent"
@@ -29,25 +29,23 @@ def has_permission(user: UserInfo, code: str, *additional_codes: str) -> bool:
     return user.is_superuser or {code, *additional_codes} <= get_user_permission_codes(user)
 
 
-def assignment_candidates(access: "TicketAccess") -> QuerySet[UserInfo]:
-    roles = (AGENT_ROLE, ADMIN_ROLE)
-    eligible = (
-        Q(is_superuser=True)
-        | Q(roles__code__in=roles, roles__is_active=True)
-        | Q(dept__roles__code__in=roles, dept__roles__is_active=True)
+def assignment_candidates() -> QuerySet[UserInfo]:
+    eligible = Q(roles__code=AGENT_ROLE, roles__is_active=True, roles__deleted_at__isnull=True) | Q(
+        dept__roles__code=AGENT_ROLE, dept__roles__is_active=True, dept__roles__deleted_at__isnull=True
     )
-    queryset = UserInfo.objects.filter(eligible, is_active=True)
-    if not access.admin:
-        if access.department_id is None:
-            return queryset.none()
-        queryset = queryset.filter(dept_id=access.department_id)
-    return queryset.select_related("dept").distinct().order_by("username", "pk")
+    return (
+        UserInfo.objects.filter(eligible, is_active=True, is_superuser=False, dept__is_active=True)
+        .filter(Q(date_expired__isnull=True) | Q(date_expired__gt=timezone.now()))
+        .exclude(invite_status=UserInfo.InviteStatusChoices.PENDING)
+        .select_related("dept")
+        .distinct()
+        .order_by("username", "pk")
+    )
 
 
 @dataclass(frozen=True)
 class TicketAccess:
     user_id: int
-    department_id: UUID | None
     roles: frozenset[str]
     is_superuser: bool
 
@@ -56,7 +54,7 @@ class TicketAccess:
         roles = set(user.roles.filter(is_active=True).values_list("code", flat=True))
         if user.dept_id is not None:
             roles.update(user.dept.roles.filter(is_active=True).values_list("code", flat=True))
-        return cls(user.pk, user.dept_id, frozenset(roles), user.is_superuser)
+        return cls(user.pk, frozenset(roles), user.is_superuser)
 
     @property
     def agent(self) -> bool:
@@ -71,21 +69,45 @@ class TicketAccess:
             return queryset
         allowed = Q(submitter_id=self.user_id)
         if self.agent:
-            allowed |= Q(assignee_id=self.user_id)
-            if self.department_id is not None:
-                allowed |= Q(department_id=self.department_id)
+            allowed |= Q(assignee_id=self.user_id) | Q(self.history())
         return queryset.filter(allowed)
 
-    def can_handle(self, ticket: Ticket) -> bool:
-        return self.admin or (
-            self.agent and (ticket.assignee_id == self.user_id or ticket.department_id == self.department_id)
+    def history(self) -> Exists:
+        return Exists(TicketAssignment.objects.filter(ticket_id=OuterRef("pk"), assignee_id=self.user_id))
+
+    def assignment_filter(self, queryset: QuerySet[Ticket], assignment: str) -> QuerySet[Ticket]:
+        if assignment == "unassigned":
+            return (
+                queryset.filter(assignee__isnull=True).exclude(status=Status.CLOSED) if self.admin else queryset.none()
+            )
+        if assignment == "current":
+            return queryset.filter(assignee_id=self.user_id)
+        if assignment == "history":
+            return queryset.filter(self.history()).exclude(assignee_id=self.user_id)
+        return queryset
+
+    def read_only(self, ticket: Ticket) -> bool:
+        return (
+            not self.admin
+            and self.agent
+            and ticket.assignee_id != self.user_id
+            and TicketAssignment.objects.filter(ticket=ticket, assignee_id=self.user_id).exists()
         )
 
+    def can_handle(self, ticket: Ticket) -> bool:
+        return self.admin or (self.agent and ticket.assignee_id == self.user_id)
+
+    def can_return(self, ticket: Ticket) -> bool:
+        return not self.admin and self.can_handle(ticket) and ticket.status != Status.CLOSED
+
+    def can_archive(self, ticket: Ticket) -> bool:
+        return self.can_handle(ticket) or self.read_only(ticket)
+
     def can_reply(self, ticket: Ticket) -> bool:
-        return self.user_id == ticket.submitter_id or self.can_handle(ticket)
+        return self.can_handle(ticket) or (self.user_id == ticket.submitter_id and not self.read_only(ticket))
 
     def targets(self, ticket: Ticket) -> tuple[str, ...]:
         allowed = self.can_handle(ticket)
         if ticket.status in VERIFY_STATES:
-            allowed = self.admin or ticket.submitter_id == self.user_id
+            allowed = self.admin or (ticket.submitter_id == self.user_id and not self.read_only(ticket))
         return TRANSITIONS.get(ticket.status, ()) if allowed else ()

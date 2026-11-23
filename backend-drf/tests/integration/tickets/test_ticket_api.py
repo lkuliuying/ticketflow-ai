@@ -66,7 +66,7 @@ def test_create_requires_idempotency_key_and_replays_same_request(
 
 
 def test_transition_distinguishes_hidden_ticket_missing_action_and_stale_version(users, make_ticket, client_for):
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     resource = f"{TICKETS}/{ticket.pk}"
     owner = client_for(users["requester"])
     agent = client_for(users["agent"])
@@ -126,7 +126,7 @@ def test_ticket_submitter_can_reply_at_either_status(users, make_ticket, client_
 
 
 def test_comments_preserve_first_staff_response_and_hide_internal_activity(users, make_ticket, client_for):
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     resource = f"{TICKETS}/{ticket.pk}"
     agent = client_for(users["agent"])
     requester = client_for(users["requester"])
@@ -170,7 +170,7 @@ def test_comments_preserve_first_staff_response_and_hide_internal_activity(users
 
 
 def test_timeline_first_page_matches_full_pagination_across_timestamp_ties(users, make_ticket, client_for):
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     actor = users["agent"]
     logs = TicketLog.objects.bulk_create(
         TicketLog(ticket=ticket, action="TRANSITION", operator=actor) for _ in range(14)
@@ -210,8 +210,8 @@ def test_dashboard_cache_is_scoped_to_viewer_and_invalidated_on_create(
 ):
     requester = client_for(users["requester"])
     agent = client_for(users["agent"])
-    make_ticket()
-    make_ticket(users["admin"], priority=Priority.P0)
+    make_ticket(assignee=users["agent"])
+    make_ticket(users["admin"], priority=Priority.P0, assignee=users["agent"])
     url = f"{TICKETS}/dashboard"
 
     def dashboard(api):
@@ -247,7 +247,7 @@ def test_export_task_replays_submitted_filter_with_current_ticket_scope(
 ):
     settings.CELERY_TASK_ALWAYS_EAGER = False
     admin = users["admin"]
-    visible = make_ticket(status=Status.CLOSED, title="同部门关闭工单")
+    visible = make_ticket(status=Status.CLOSED, title="本人处理的关闭工单", assignee=admin)
     other_department = DeptInfo.objects.create(code="export-other", name="其他支持部门")
     hidden = make_ticket(status=Status.CLOSED, department=other_department)
     make_ticket(status=Status.OPEN)
@@ -302,7 +302,7 @@ def test_ai_context_requires_handling_scope_and_exposes_only_published_reference
     assert api.get(resource).status_code == 200
     assert_error(api.get(f"{resource}/ai-context"), 403)
 
-    ticket = make_ticket(title="Wireguard failure")
+    ticket = make_ticket(title="Wireguard failure", assignee=agent)
     articles = {
         status: KnowledgeArticle.objects.create(
             title=f"Wireguard {status}",
@@ -329,7 +329,7 @@ def test_ai_context_rejects_missing_required_field(users, make_ticket, client_fo
     menu = Menu.objects.get(name="context:TicketFlowTickets")
     permissions = FieldPermission.objects.get(role=agent.roles.get(), menu=menu)
     permissions.field.remove(permissions.field.get(name="description", parent__name="tickets.ticket"))
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     restricted = client_for(agent).get(f"{TICKETS}/{ticket.pk}/ai-context")
     assert_error(restricted, 403)
     assert "字段权限" in restricted.data["detail"]

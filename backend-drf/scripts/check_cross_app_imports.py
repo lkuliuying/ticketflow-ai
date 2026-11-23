@@ -54,7 +54,8 @@ SMELL_PATTERN = re.compile(
 ALLOWLIST = {
     "demo/models.py": "FK 跨 app model 引用（规划允许保留）",
     "tickets/policy.py": "工单策略使用身份用户和部门角色定义数据范围",
-    "tickets/services.py": "指派时验证身份用户，建单时解析所属部门",
+    "tickets/services.py": "建单时解析工单所属技能组",
+    "tickets/assignment.py": "以身份域技能组行锁串行化工单自动派单",
     "tickets/views.py": "标注底座鉴权提供的身份用户",
     "knowledge/filters.py": "知识库与工单共享分类编码",
     "knowledge/serializers.py": "知识库与工单共享分类编码",

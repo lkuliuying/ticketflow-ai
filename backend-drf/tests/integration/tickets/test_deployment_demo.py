@@ -27,7 +27,7 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert ADMIN_ROLE in TicketAccess.for_user(users[ADMIN]).roles
     assert AGENT_ROLE in TicketAccess.for_user(agent).roles
     assert AGENT_ROLE in TicketAccess.for_user(network_agent).roles
-    assert has_permission(agent, "assign:TicketFlowTickets", "assignees:TicketFlowTickets")
+    assert not has_permission(agent, "assign:TicketFlowTickets", "assignees:TicketFlowTickets")
     assert not has_permission(network_agent, "assign:TicketFlowTickets", "assignees:TicketFlowTickets")
 
     tickets = Ticket.objects.all()
@@ -36,7 +36,10 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert set(tickets.values_list("priority", flat=True)) == set(Priority.values)
     assert set(tickets.values_list("department_id", flat=True)) == {agent.dept_id, network_agent.dept_id}
     for ticket in tickets:
-        assert ticket.version == ticket.logs.count()
+        assert ticket.version == ticket.logs.exclude(action__in=("AUTO_ASSIGN", "REOPEN_ASSIGN")).count()
+        assert ticket.assignments.exists()
+        assert ticket.assignee.dept_id == ticket.department_id
+        assert ticket.assignments.filter(ended_at__isnull=True).count() == (ticket.status != Status.CLOSED)
         if ticket.first_response_at:
             assert ticket.first_response_at == ticket.comments.get(visibility=Visibility.PUBLIC).created_time
             assert ticket.comments.filter(visibility=Visibility.INTERNAL).exists()
@@ -47,7 +50,7 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert tickets.filter(status=Status.CLOSED, knowledge_article__isnull=True).exists()
 
     ticket = tickets.get(department_id=agent.dept_id, title="门户密码重置邮件未收到")
-    response = client_for(agent).post(
+    response = client_for(users[ADMIN]).post(
         f"/api/tickets/{ticket.pk}/assign", {"assignee_id": agent.pk, "version": ticket.version}, format="json"
     )
     assert response.status_code == 200, response.data

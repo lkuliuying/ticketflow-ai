@@ -1793,6 +1793,7 @@
       "Assignee": {
         "properties": {
           "department_name": {
+            "description": "技能组名称",
             "nullable": true,
             "readOnly": true,
             "type": "string"
@@ -1832,6 +1833,23 @@
         },
         "required": [
           "assignee_id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "AssignmentReturn": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
           "version"
         ],
         "type": "object"
@@ -3847,6 +3865,26 @@
           "pk",
           "updated_time"
         ],
+        "type": "object"
+      },
+      "DashboardAssignment": {
+        "properties": {
+          "current": {
+            "description": "当前指派给技术员的工单数",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "history": {
+            "description": "技术员曾经处理的工单数",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "unassigned": {
+            "description": "管理员的待分配工单数",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "DataDict": {
@@ -14168,7 +14206,7 @@
         "description": "与 BaseSettingViewSet.perform_update 配对的保存契约（详见模块 docstring）。",
         "properties": {
           "SECURITY_REGISTER_ACCESS_ENABLED": {
-            "default": true,
+            "default": false,
             "description": "允许用户进行注册",
             "title": "允许注册",
             "type": "boolean"
@@ -17484,7 +17522,7 @@
         "description": "与 BaseSettingViewSet.perform_update 配对的保存契约（详见模块 docstring）。",
         "properties": {
           "SECURITY_REGISTER_ACCESS_ENABLED": {
-            "default": true,
+            "default": false,
             "description": "允许用户进行注册",
             "title": "允许注册",
             "type": "boolean"
@@ -18139,11 +18177,13 @@
             "type": "string"
           },
           "department_id": {
+            "description": "技能组 ID",
             "format": "uuid",
             "readOnly": true,
             "type": "string"
           },
           "department_name": {
+            "description": "技能组名称",
             "readOnly": true,
             "type": "string"
           },
@@ -18393,6 +18433,14 @@
       },
       "TicketDashboard": {
         "properties": {
+          "assignment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardAssignment"
+              }
+            ],
+            "description": "计数应用当前筛选。普通员工返回空对象。"
+          },
           "priority": {
             "additionalProperties": {
               "type": "integer"
@@ -18413,6 +18461,7 @@
           }
         },
         "required": [
+          "assignment",
           "priority",
           "sla",
           "status"
@@ -18487,11 +18536,13 @@
             "type": "string"
           },
           "department_id": {
+            "description": "技能组 ID",
             "format": "uuid",
             "readOnly": true,
             "type": "string"
           },
           "department_name": {
+            "description": "技能组名称",
             "readOnly": true,
             "type": "string"
           },
@@ -18773,6 +18824,7 @@
             "type": "boolean"
           },
           "can_assign": {
+            "description": "管理员对未关闭工单同时持有指派和候选人权限时可用。",
             "type": "boolean"
           },
           "can_comment_internal": {
@@ -18783,7 +18835,15 @@
             "type": "boolean"
           },
           "can_reply": {
-            "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。",
+            "description": "非历史只读，持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。",
+            "type": "boolean"
+          },
+          "can_return": {
+            "description": "仅持有退回权限的当前技术员可退回未关闭工单。",
+            "type": "boolean"
+          },
+          "read_only": {
+            "description": "历史工单可看含内部备注的完整时间线，工单动作全部禁用。",
             "type": "boolean"
           }
         },
@@ -18792,7 +18852,9 @@
           "can_assign",
           "can_comment_internal",
           "can_handle",
-          "can_reply"
+          "can_reply",
+          "can_return",
+          "read_only"
         ],
         "type": "object"
       },
@@ -96978,6 +97040,19 @@
             }
           },
           {
+            "description": "unassigned 为管理员的未关闭且未指派工单，current 为当前指派给本人，history 为曾指派给本人。\n\n* `unassigned` - 待分配\n* `current` - 当前处理\n* `history` - 历史处理",
+            "in": "query",
+            "name": "assignment",
+            "schema": {
+              "enum": [
+                "current",
+                "history",
+                "unassigned"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "description": "* `ACCOUNT` - 账户\n* `ACCESS` - 权限\n* `NETWORK` - 网络\n* `SERVICE` - 服务\n* `OTHER` - 其他",
             "in": "query",
             "name": "category",
@@ -96994,7 +97069,7 @@
             }
           },
           {
-            "description": "所属部门",
+            "description": "所属技能组",
             "in": "query",
             "name": "department_id",
             "schema": {
@@ -97752,6 +97827,15 @@
         "operationId": "api_tickets_assignees_retrieve",
         "parameters": [
           {
+            "description": "技能组 ID",
+            "in": "query",
+            "name": "department_id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "id",
             "required": true,
@@ -97845,6 +97929,79 @@
               }
             },
             "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/return": {
+      "post": {
+        "description": "退回工单",
+        "operationId": "api_tickets_return_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentReturn"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentReturn"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentReturn"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentReturn"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentReturn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "No response body"
+          },
+          "409": {
+            "description": "No response body"
           }
         },
         "security": [

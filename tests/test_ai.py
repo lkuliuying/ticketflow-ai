@@ -36,6 +36,28 @@ def test_analyze_rejects_ticket_requester(gateway, requester, ticket):
     assert_ai_failure(response, 403, "FORBIDDEN")
 
 
+def test_ai_access_follows_reassignment(gateway, login, agent, other_agent, transition_ticket):
+    ticket = transition_ticket
+    payload = {"ticket_id": ticket["pk"]}
+    assert ticket["assignee_name"] == agent.username
+    before = gateway.post(ANALYZE, headers=agent.headers, json=payload)
+    assert before.status_code == 200, before.text
+
+    admin = login("tf_admin")
+    path = f"/api/tickets/{ticket['pk']}"
+    candidates = gateway.get(f"{path}/assignees", params={"q": other_agent.username}, headers=admin.headers)
+    assert candidates.status_code == 200, candidates.text
+    assignee = next(row for row in candidates.json()["data"] if row["username"] == other_agent.username)
+    assigned = gateway.post(
+        f"{path}/assign", headers=admin.headers, json={"assignee_id": assignee["pk"], "version": ticket["version"]}
+    )
+    assert assigned.status_code == 200, assigned.text
+    assert_ai_failure(gateway.post(ANALYZE, headers=agent.headers, json=payload), 403, "FORBIDDEN")
+    assert_ai_failure(gateway.post(STREAM, headers=agent.headers, json=payload), 403, "FORBIDDEN")
+    current = gateway.post(ANALYZE, headers=other_agent.headers, json=payload)
+    assert current.status_code == 200, current.text
+
+
 def test_logout_revokes_ai_access(gateway, login, ticket):
     session = login("tf_agent")
     payload = {"ticket_id": ticket["pk"]}

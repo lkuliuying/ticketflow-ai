@@ -26,7 +26,8 @@ erDiagram
     DEPT_INFO ||--o{ TICKET : owns
     TICKET ||--o{ TICKET_LOG : records
     TICKET ||--o{ TICKET_COMMENT : contains
-    USER_INFO ||--o{ TICKET_LOG : acts
+    TICKET ||--o{ TICKET_ASSIGNMENT : tracks
+    USER_INFO o|--o{ TICKET_LOG : acts
     USER_INFO ||--o{ TICKET_COMMENT : writes
     USER_INFO ||--o{ TICKET_CREATE_REQUEST : submits
     TICKET ||--o| TICKET_CREATE_REQUEST : deduplicates
@@ -39,7 +40,8 @@ erDiagram
 | 表 | 字段与约束 |
 | --- | --- |
 | `Ticket` | `id`，唯一且服务端生成的 `number`，`title`（最长 200 字符），`description`，`category`，`priority`，`status`，`submitter_id`，可空 `assignee_id`，`department_id`，`sla_due_at`，`sla_cycle`（从 1 开始），可空 `first_response_at` / `resolved_at`，`ai_summary`，`ai_tags`（字符串数组），`version`（从 1 开始）。 |
-| `TicketLog` | `ticket_id`，`action`，可空 `from_status`，`to_status`，`operator_id`，`note`，`created_time`。记录建单、指派、流转和采纳 AI 建议，按时间和 ID 稳定排序。 |
+| `TicketLog` | `ticket_id`，`action`，可空 `from_status`，`to_status`，`operator_id`（系统操作为空），`note`，`created_time`。按时间和 ID 稳定排序。 |
+| `TicketAssignment` | `ticket_id`、`assignee_id`、可空 `assigned_by_id`、`started_at`、`ended_at`、`end_reason`、`note`。每张工单最多一段开放的指派记录。 |
 | `TicketComment` | `ticket_id`，`author_id`，`body`，`visibility`（`PUBLIC` 对外回复 / `INTERNAL` 内部备注），`created_time`。 |
 | `KnowledgeArticle` | `title`，`body_markdown`，`category`，`tags`（字符串数组），`status`（`DRAFT` / `PUBLISHED` / `ARCHIVED`），`view_count`（非负整数），可空 `source_ticket_id`（每个来源工单最多一篇），`created_time` / `updated_time`。 |
 | `TicketCreateRequest` | `submitter_id`，`key_hash`，`request_hash`，`ticket_id`，`expires_at`。唯一约束 `(submitter_id, key_hash)`，与创建工单同事务写入。 |
@@ -64,15 +66,15 @@ stateDiagram-v2
 
 ### 角色与可见范围
 
+角色、技能组和派单规则见[迭代 6 角色改造方案](../../../docs/development/迭代6角色改造方案.md)。
+
 | 身份 | 工单范围 | 动作 |
 | --- | --- | --- |
-| 普通用户 | 本人提交 | 创建、查阅、对外回复、验收确认、退回、重开 |
-| 客服 / 处理人 | 本部门或指派给本人，加本人提交 | 在处理范围内接单、回复、写内部备注、提交验收、调用 AI。指派权限由独立按钮权限点控制 |
-| 管理员 | 全部 | 业务管理、指派、知识库编辑与发布、导出，仍经状态机校验 |
+| 普通员工 | 本人提交 | 建单、查阅、对外回复、验收确认、验收退回、重开 |
+| 技术员 | 当前指派、曾指派及本人提交 | 当前可接单、回复、写内部备注、提交验收、退回重派和使用 AI。历史工单提供完整时间线并关闭全部工单动作。以提交人身份可回复、验收和重开。 |
+| 管理员 | 全部，含待分配 | 处理、指派、知识库编辑与发布、导出，仍经状态机校验 |
 
-API 动作复用上游 RBAC，数据范围由 Ticket 查询统一约束，覆盖列表、详情、看板、导出以及 AI 取上下文。底座字段权限继续生效。工单可见与处理权限分别校验，客服仅以提交人身份看到的工单也只暴露对外内容。日志的内部备注和工单内部评论在查询阶段过滤。知识库已发布文章对已登录用户开放，草稿对作者及知识维护人员开放，归档对知识维护人员开放。持有转存权限的客服可从其处理范围内的关闭工单创建草稿，由知识维护人员审阅发布。对外文章响应省略受限来源字段，知识检索只返回发布后的文章片段。
-
-知识维护人员使用 `ticketflow_kb_editor` 角色，可审阅和编辑文章、发布与归档。工单管理员保留全部知识库权限。
+API 动作复用底座 RBAC 和字段权限。列表、详情、时间线、看板、导出以及 AI 上下文统一应用工单可见范围。仅以提交人身份查看工单时只显示对外内容。技术员可通过知识库创建接口将经手过的已关闭工单转为草稿，每张工单最多转存一次。已发布文章对已登录用户开放，草稿对作者及管理员开放，归档对管理员开放。管理员负责审阅发布。
 
 ### 查询、缓存和后台任务
 
@@ -88,16 +90,17 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 
 | 接口 | 请求 | 成功响应 |
 | --- | --- | --- |
-| `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`sla`、`q`、分页 | 200，工单分页，含 `version` 和 `sla_state` |
+| `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`assignment`、`sla`、`q`、分页 | 200，工单分页，含 `version` 和 `sla_state` |
 | `POST /api/tickets` | `Idempotency-Key`，`{title, description, category, priority}` | 201，创建的工单。重放返回 200 和原工单 |
-| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive}`、原有可执行流转、时间线第一页 |
+| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive, can_return, read_only}`、可执行流转、时间线第一页 |
 | `GET /api/tickets/{id}/timeline` | 分页 | 200，合并排序的流转记录与评论分页 |
 | `POST /api/tickets/{id}/transition` | `{target_status, version, note?}` | 200，更新后的工单 |
 | `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单。已关闭工单返回 409 |
-| `GET /api/tickets/{id}/assignees` | `q` 按用户名或昵称搜索 | 200，最多 20 条 `{pk, username, nickname, department_name}`，非管理员限本部门，按用户名和主键排序 |
+| `GET /api/tickets/{id}/assignees` | 管理员可传 `q` 搜索用户名或昵称、`department_id` 筛选技能组 | 200，最多 20 条在职技术员 `{pk, username, nickname, department_name}`，按用户名和主键排序 |
+| `POST /api/tickets/{id}/return` | `{version, reason}`，原因长度 1–500 | 200，清空处理人、状态不变、版本递增 |
 | `POST /api/tickets/{id}/comments` | `{body, visibility}` | 201，新评论 |
 | `POST /api/tickets/{id}/ai-metadata` | `{version, summary, tags, category?, priority?}` | 200，采纳建议后的工单 |
-| `GET /api/tickets/dashboard` | 与列表共用筛选 | 200，按状态、优先级及 SLA 分组计数 |
+| `GET /api/tickets/dashboard` | 与列表共用筛选 | 200，按状态、优先级及 SLA 分组计数，`assignment` 按当前身份返回待分配或当前与历史计数 |
 | `POST /api/tickets/export-async` | 列表筛选字段加 `type: "csv"` | 200，`{record_id, task_id}`，完成后通过 `/api/task/exports/{record_id}/download` 下载 |
 | `GET /api/knowledge/articles` | `q`、`category`、`tag`、`status`、分页 | 200，`data: {total, results, can_create_standalone}`，独立创建要求管理员及知识库创建权限 |
 | `GET /api/knowledge/articles/{id}` | 文章 ID | 200，文章正文、浏览次数及 `viewer: {can_edit, can_publish}` |

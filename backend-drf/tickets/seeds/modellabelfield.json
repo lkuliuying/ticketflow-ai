@@ -124,7 +124,7 @@
     "fields": {
       "field_type": 0,
       "name": "department_id",
-      "label": "处理部门",
+      "label": "处理技能组",
       "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
     }
   },
@@ -134,7 +134,7 @@
     "fields": {
       "field_type": 0,
       "name": "department_name",
-      "label": "部门名称",
+      "label": "技能组名称",
       "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
     }
   },

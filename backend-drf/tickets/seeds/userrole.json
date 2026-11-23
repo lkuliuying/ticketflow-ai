@@ -3,7 +3,7 @@
     "model": "identity.userrole",
     "pk": "d2431bc0-217a-49eb-a6fa-000000000001",
     "fields": {
-      "name": "工单提交人",
+      "name": "普通员工",
       "code": "ticketflow_requester",
       "is_active": true
     }
@@ -12,7 +12,7 @@
     "model": "identity.userrole",
     "pk": "d2431bc0-217a-49eb-a6fa-000000000002",
     "fields": {
-      "name": "工单处理人",
+      "name": "技术员",
       "code": "ticketflow_agent",
       "is_active": true
     }
@@ -21,7 +21,7 @@
     "model": "identity.userrole",
     "pk": "d2431bc0-217a-49eb-a6fa-000000000003",
     "fields": {
-      "name": "工单管理员",
+      "name": "管理员",
       "code": "ticketflow_admin",
       "is_active": true
     }

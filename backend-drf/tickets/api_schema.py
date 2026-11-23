@@ -38,15 +38,17 @@ class TimelineEntrySerializer(serializers.Serializer):
 
 class TicketViewerSerializer(serializers.Serializer):
     can_handle = serializers.BooleanField()
-    can_assign = serializers.BooleanField()
+    can_assign = serializers.BooleanField(help_text="管理员对未关闭工单同时持有指派和候选人权限时可用。")
     can_reply = serializers.BooleanField(
-        help_text="持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。"
+        help_text="非历史只读，持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。"
         "超级用户免菜单权限检查。工单状态不影响此能力。"
     )
     can_comment_internal = serializers.BooleanField(
         help_text="持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"
     )
     can_archive = serializers.BooleanField()
+    can_return = serializers.BooleanField(help_text="仅持有退回权限的当前技术员可退回未关闭工单。")
+    read_only = serializers.BooleanField(help_text="历史工单可看含内部备注的完整时间线，工单动作全部禁用。")
 
 
 class TicketDetailSerializer(TicketSerializer):
@@ -74,10 +76,21 @@ class CommentResultSerializer(serializers.Serializer):
 
 
 comment_result = envelope("TicketCommentResult", CommentResultSerializer())
+
+
+class DashboardAssignmentSerializer(serializers.Serializer):
+    unassigned = serializers.IntegerField(required=False, min_value=0, help_text="管理员的待分配工单数")
+    current = serializers.IntegerField(required=False, min_value=0, help_text="当前指派给技术员的工单数")
+    history = serializers.IntegerField(required=False, min_value=0, help_text="技术员曾经处理的工单数")
+
+
 dashboard_result = envelope(
     "TicketDashboardResult",
     inline_serializer(
         name="TicketDashboard",
-        fields={key: serializers.DictField(child=serializers.IntegerField()) for key in ("status", "priority", "sla")},
+        fields={
+            **{key: serializers.DictField(child=serializers.IntegerField()) for key in ("status", "priority", "sla")},
+            "assignment": DashboardAssignmentSerializer(help_text="计数应用当前筛选。普通员工返回空对象。"),
+        },
     ),
 )

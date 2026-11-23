@@ -49,6 +49,7 @@ def silent_send(monkeypatch):
 @pytest.fixture
 def register_free(settings):
     """关闭发送验证码辅助安全项（图片验证码 / 临时 token / 加密），并开启 email 通道。"""
+    settings.SECURITY_REGISTER_ACCESS_ENABLED = True
     settings.SECURITY_REGISTER_CAPTCHA_ENABLED = False
     settings.SECURITY_REGISTER_TEMP_TOKEN_ENABLED = False
     settings.SECURITY_REGISTER_ENCRYPTED_ENABLED = False
@@ -498,6 +499,7 @@ class TestSendVerifyCodeRegisterEmail:
 
     @pytest.fixture
     def email_register(self, settings):
+        settings.SECURITY_REGISTER_ACCESS_ENABLED = True
         settings.SECURITY_REGISTER_CAPTCHA_ENABLED = False
         settings.SECURITY_REGISTER_TEMP_TOKEN_ENABLED = False
         settings.SECURITY_REGISTER_ENCRYPTED_ENABLED = False
@@ -530,6 +532,7 @@ class TestSendVerifyCodeRegisterEmail:
 
     def test_register_phone_already_exist(self, api_client, normal_user, settings, monkeypatch):
         """register 类别 sms 通道：手机号已注册 → 手机号已经存在。"""
+        settings.SECURITY_REGISTER_ACCESS_ENABLED = True
         settings.SECURITY_REGISTER_CAPTCHA_ENABLED = False
         settings.SECURITY_REGISTER_TEMP_TOKEN_ENABLED = False
         settings.SECURITY_REGISTER_ENCRYPTED_ENABLED = False

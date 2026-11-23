@@ -30,8 +30,6 @@ from tickets.policy import TicketAccess, has_permission
 from tickets.serializers import TicketSerializer
 from tickets.views import TicketViewSet
 
-KB_EDITOR_ROLE = "ticketflow_kb_editor"
-
 
 @extend_schema_view(list=extend_schema(responses=article_list_result))
 class ArticleViewSet(OnlyListModelSet, DetailAction):
@@ -55,15 +53,11 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
     def access(self) -> TicketAccess:
         return TicketAccess.for_user(self.actor)
 
-    @property
-    def can_review(self) -> bool:
-        return self.access.admin or KB_EDITOR_ROLE in self.access.roles
-
     def get_queryset(self) -> QuerySet[KnowledgeArticle]:
         if not self.request.user.is_authenticated:
             return self.queryset.none()
         queryset = super().get_queryset()
-        if not self.can_review:
+        if not self.access.admin:
             queryset = queryset.filter(
                 Q(status=ArticleStatus.PUBLISHED) | Q(status=ArticleStatus.DRAFT, creator=self.actor)
             )
@@ -91,7 +85,7 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
     def _response(self, article: KnowledgeArticle, status: int = 200) -> ApiResponse:
         data = ArticleSerializer(article, context=self.get_serializer_context()).data
         can_update = has_permission(self.actor, "partialUpdate:TicketFlowKnowledge")
-        can_publish = can_update and self.can_review
+        can_publish = can_update and self.access.admin
         data["viewer"] = {
             "can_edit": can_publish
             or (can_update and article.status == ArticleStatus.DRAFT and article.creator_id == self.actor.pk),
@@ -131,8 +125,8 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
         serializer = self.get_serializer(article, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         status = serializer.validated_data.get("status", article.status)
-        if not self.can_review and (article.status != ArticleStatus.DRAFT or status != ArticleStatus.DRAFT):
-            raise PermissionDenied("只有工单管理员或知识维护人员可发布、归档或编辑非草稿文章")
+        if not self.access.admin and (article.status != ArticleStatus.DRAFT or status != ArticleStatus.DRAFT):
+            raise PermissionDenied("只有管理员可发布、归档或编辑非草稿文章")
         old_key = article_key(article)
         serializer.save(modifier=self.actor)
         transaction.on_commit(lambda: cache.delete(old_key), robust=True)

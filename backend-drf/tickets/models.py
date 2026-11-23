@@ -67,12 +67,41 @@ class Ticket(DbAuditModel, DbUuidModel):
         return self.number
 
 
+class TicketAssignment(DbUuidModel):
+    class EndReason(models.TextChoices):
+        REASSIGNED = "REASSIGNED", "改派"
+        RETURNED = "RETURNED", "退回"
+        DEACTIVATED = "DEACTIVATED", "处理人停用"
+        CLOSED_OUT = "CLOSED_OUT", "工单关闭"
+
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="assignments")
+    assignee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="ticket_assignments")
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+    end_reason = models.CharField(max_length=12, choices=EndReason.choices, blank=True, default="")
+    note = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ticket"], condition=models.Q(ended_at__isnull=True), name="tf_open_assignment_once"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["ticket", "assignee"], name="tf_assignment_history_idx"),
+            models.Index(fields=["assignee", "-started_at"], name="tf_assignment_latest_idx"),
+        ]
+
+
 class TicketLog(DbUuidModel):
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="logs")
     action = models.CharField(max_length=20)
     from_status = models.CharField(max_length=16, choices=Status.choices, null=True, blank=True)
     to_status = models.CharField(max_length=16, choices=Status.choices)
-    operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True)
     note = models.TextField(blank=True, default="")
     internal = models.BooleanField(default=False)
     created_time = models.DateTimeField(auto_now_add=True)

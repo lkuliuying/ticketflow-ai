@@ -36,6 +36,7 @@ from tickets.models import Status, Ticket
 from tickets.policy import TicketAccess, assignment_candidates, has_permission
 from tickets.serializers import (
     AssigneeSerializer,
+    AssignmentReturnSerializer,
     AssignmentSerializer,
     CommentSerializer,
     SuggestionSerializer,
@@ -59,6 +60,7 @@ class TicketViewSet(
     search_columns_serializer_class = TicketColumnsSerializer
     transition_serializer_class = TransitionSerializer
     assign_serializer_class = AssignmentSerializer
+    return_ticket_serializer_class = AssignmentReturnSerializer
     comments_serializer_class = CommentSerializer
     ai_metadata_serializer_class = SuggestionSerializer
     filterset_class = TicketFilter
@@ -118,16 +120,19 @@ class TicketViewSet(
         ticket = self.get_object()
         data = self.get_serializer(ticket).data
         can_handle = self.access.can_handle(ticket)
+        read_only = self.access.read_only(ticket)
         is_superuser = self.actor.is_superuser
         permission_codes = set() if is_superuser else get_user_permission_codes(self.actor)
         can_comment = is_superuser or "comments:TicketFlowTickets" in permission_codes
         data["viewer"] = {
             "can_handle": can_handle,
-            "can_assign": can_handle
+            "can_assign": self.access.admin
             and ticket.status != Status.CLOSED
             and (is_superuser or {"assign:TicketFlowTickets", "assignees:TicketFlowTickets"} <= permission_codes),
             "can_reply": can_comment and self.access.can_reply(ticket),
             "can_comment_internal": can_comment and can_handle,
+            "can_return": self.access.can_return(ticket) and "returnTicket:TicketFlowTickets" in permission_codes,
+            "read_only": read_only,
             "can_archive": (
                 can_handle
                 and ticket.status == Status.CLOSED
@@ -137,17 +142,27 @@ class TicketViewSet(
             ),
         }
         data["available_transitions"] = self.access.targets(ticket)
-        data["timeline"] = first_page(ticket, self.access.can_handle(ticket))
+        data["timeline"] = first_page(ticket, can_handle or read_only)
         return ApiResponse(data=data)
 
-    @extend_schema(parameters=[OpenApiParameter("q", str)], responses=assignees_result)
+    @extend_schema(
+        parameters=[OpenApiParameter("q", str), OpenApiParameter("department_id", UUID, description="技能组 ID")],
+        responses=assignees_result,
+    )
     @action(detail=True, methods=["get"], filterset_class=None)
     def assignees(self, request: Request, pk: UUID) -> ApiResponse:
         """工单指派候选人"""
-        ticket = self.get_object()
-        if not self.access.can_handle(ticket) or not has_permission(self.actor, "assign:TicketFlowTickets"):
+        self.get_object()
+        if not self.access.admin or not has_permission(self.actor, "assign:TicketFlowTickets"):
             raise PermissionDenied("无权指派此工单")
-        queryset = assignment_candidates(self.access)
+        queryset = assignment_candidates()
+        department = request.query_params.get("department_id")
+        if department is not None:
+            try:
+                department_id = UUID(department)
+            except ValueError as exc:
+                raise ValidationError({"department_id": "请输入有效的技能组 ID"}) from exc
+            queryset = queryset.filter(dept_id=department_id)
         query = request.query_params.get("q", "").strip()
         if query:
             queryset = queryset.filter(Q(username__icontains=query) | Q(nickname__icontains=query))
@@ -158,7 +173,7 @@ class TicketViewSet(
     def timeline(self, request: Request, pk: UUID) -> ApiResponse:
         """工单时间线"""
         ticket = self.get_object()
-        rows = timeline_rows(ticket, self.access.can_handle(ticket))
+        rows = timeline_rows(ticket, self.access.can_handle(ticket) or self.access.read_only(ticket))
         page = self.paginate_queryset(rows)
         return ApiResponse(data=self.get_paginated_response(page).data)
 
@@ -176,6 +191,14 @@ class TicketViewSet(
         """指派工单"""
         scope = self.filter_queryset(self.get_queryset())
         ticket = services.assign(scope, pk, self.actor, self.access, **self._values(request))
+        return self._ticket_response(ticket)
+
+    @extend_schema(responses={200: ticket_result, 403: None, 409: None})
+    @action(detail=True, methods=["post"], url_path="return")
+    def return_ticket(self, request: Request, pk: UUID) -> ApiResponse:
+        """退回工单"""
+        scope = self.filter_queryset(self.get_queryset())
+        ticket = services.return_ticket(scope, pk, self.actor, self.access, **self._values(request))
         return self._ticket_response(ticket)
 
     @extend_schema(responses={201: comment_result})
@@ -202,8 +225,9 @@ class TicketViewSet(
     def dashboard(self, request: Request) -> ApiResponse:
         """工单看板"""
         queryset = self.filter_queryset(self.get_queryset()).order_by()
-        sql, params = queryset.query.sql_with_params()
-        key = dashboard_key(self.actor.pk, sql, params)
+        sql, params = ("", ()) if queryset.query.is_empty() else queryset.query.sql_with_params()
+        assignments = ("unassigned",) if self.access.admin else ("current", "history") if self.access.agent else ()
+        key = dashboard_key(self.actor.pk, sql, (*params, assignments))
         data = cache.get(key)
         if data is None:
             data = {
@@ -214,6 +238,10 @@ class TicketViewSet(
                 "sla": {
                     state: TicketFilter().filter_sla(queryset, "sla", state).count()
                     for state in ("DUE_SOON", "OVERDUE", "MET", "ON_TRACK")
+                },
+                "assignment": {
+                    assignment: self.access.assignment_filter(queryset, assignment).count()
+                    for assignment in assignments
                 },
             }
             cache.set(key, data, 30)
