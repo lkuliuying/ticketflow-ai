@@ -223,5 +223,21 @@
       "meta": "d2431bc0-217a-49eb-a6fa-000000000093",
       "model": []
     }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000094",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "returnTicket:TicketFlowTickets",
+      "rank": 14,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/return$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000095",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
   }
 ]

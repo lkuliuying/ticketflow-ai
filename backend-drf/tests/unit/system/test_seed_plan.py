@@ -287,11 +287,11 @@ class TestValidate:
         # 2026-10 数据集元数据端点统一走父级 list 权限：移除运行期不命中的 meta 权限点（菜单 -1、权限点 -1）
         # 2026-10 知识块向量列收敛为 pgvector 单存储：字段树移除历史二进制列（字段 -1）
         # 工单与知识库：20 个菜单（含 17 个权限点）、34 个字段节点、47 条字段白名单。
-        # 知识维护人员新增列表、详情和更新三条字段白名单。
-        assert summary.totals["menu"] == 767
+        # 技术员退回动作新增一个权限点及白名单，删除知识维护角色的三条白名单。
+        assert summary.totals["menu"] == 768
         assert summary.totals["field"] == 2196
-        assert summary.totals["grant"] == 300
-        assert summary.permission_total == 685
+        assert summary.totals["grant"] == 298
+        assert summary.permission_total == 686
 
 
 class TestRows:

@@ -16,18 +16,17 @@ from django.utils import timezone
 from identity.models import DeptInfo, UserInfo, UserRole
 from knowledge.models import ArticleStatus
 from knowledge.services import create_article
-from system.models import Menu
-from system.services.permission_sync import fill_field_permissions
+from tickets.assignment import dispatch
+from tickets.cache import invalidate_dashboard
 from tickets.models import Category, Priority, Status, Ticket, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE, TicketAccess
-from tickets.services import add_comment, assign, create_ticket, transition
+from tickets.services import add_comment, create_ticket, transition
 
 REQUESTER = "tf_requester"
 AGENT = "tf_agent"
 NETWORK_AGENT = "tf_agent_other"
 ADMIN = "tf_admin"
 USERNAMES = (REQUESTER, AGENT, NETWORK_AGENT, ADMIN)
-DISPATCH_PERMISSIONS = ("assign:TicketFlowTickets", "assignees:TicketFlowTickets")
 
 
 class Sample(NamedTuple):
@@ -37,7 +36,7 @@ class Sample(NamedTuple):
     priority: str
     status: str
     age_minutes: int
-    assigned: bool = True
+    with_comments: bool = True
     requester: str = REQUESTER
 
 
@@ -157,18 +156,12 @@ def ensure_seed_owner() -> None:
 
 
 def create_accounts(passwords: dict[str, str], support: DeptInfo, network: DeptInfo) -> dict[str, UserInfo]:
-    menus = list(Menu.objects.filter(name__in=DISPATCH_PERMISSIONS))
-    if {menu.name for menu in menus} != set(DISPATCH_PERMISSIONS):
-        raise CommandError("Ticket assignment permissions are missing; run the init service first")
-    delegation = UserRole.objects.create(code="ticketflow_demo_dispatch", name="演示指派授权")
-    delegation.menu.add(*menus)
-    fill_field_permissions(roles=[delegation])
     accounts = {}
     for username, nickname, role, department in (
-        (REQUESTER, "演示提交人", REQUESTER_ROLE, None),
-        (AGENT, "工单支持客服", AGENT_ROLE, support),
-        (NETWORK_AGENT, "网络支持客服", AGENT_ROLE, network),
-        (ADMIN, "演示工单管理员", ADMIN_ROLE, support),
+        (REQUESTER, "演示员工", REQUESTER_ROLE, None),
+        (AGENT, "工单支持技术员", AGENT_ROLE, support),
+        (NETWORK_AGENT, "网络支持技术员", AGENT_ROLE, network),
+        (ADMIN, "演示管理员", ADMIN_ROLE, support),
     ):
         user = UserInfo.objects.create_user(
             username=username,
@@ -178,18 +171,12 @@ def create_accounts(passwords: dict[str, str], support: DeptInfo, network: DeptI
             date_password_updated=timezone.now(),
         )
         user.roles.add(UserRole.objects.get(code=role))
-        if username == AGENT:
-            user.roles.add(delegation)
         accounts[username] = user
     return accounts
 
 
 def seed_ticket(sample: Sample, accounts: dict[str, UserInfo], now: datetime) -> Ticket:
     requester = accounts[sample.requester]
-    handler = accounts[NETWORK_AGENT if sample.category == Category.NETWORK else AGENT]
-    admin = accounts[ADMIN]
-    handler_access = TicketAccess.for_user(handler)
-    admin_access = TicketAccess.for_user(admin)
     requester_access = TicketAccess.for_user(requester)
     tickets = Ticket.objects.all()
     opened = now - timedelta(minutes=sample.age_minutes)
@@ -204,16 +191,9 @@ def seed_ticket(sample: Sample, accounts: dict[str, UserInfo], now: datetime) ->
                 "priority": sample.priority,
             },
         )
-    if sample.assigned:
-        with patch.object(timezone, "now", return_value=opened + timedelta(minutes=1)):
-            ticket = assign(
-                admin_access.scope(tickets),
-                ticket.pk,
-                admin,
-                admin_access,
-                ticket.version,
-                handler.pk,
-            )
+    handler = ticket.assignee or accounts[ADMIN]
+    handler_access = TicketAccess.for_user(handler)
+    if sample.with_comments:
         with patch.object(timezone, "now", return_value=opened + timedelta(seconds=90)):
             scoped = handler_access.scope(tickets)
             add_comment(
@@ -278,8 +258,8 @@ def seed_articles(accounts: dict[str, UserInfo], tickets: dict[str, Ticket]) -> 
             "附件预览提示格式不支持",
         ),
     ):
-        user = accounts[author]
         ticket = tickets[source] if source else None
+        user = accounts[author] if author == ADMIN or ticket is None else ticket.assignee or accounts[ADMIN]
         article = create_article(
             user,
             TicketAccess.for_user(user),
@@ -296,6 +276,27 @@ def seed_articles(accounts: dict[str, UserInfo], tickets: dict[str, Ticket]) -> 
             article.save(update_fields=["status", "updated_time"])
 
 
+def dispatch_existing_samples(accounts: dict[str, UserInfo]) -> None:
+    for sample in SAMPLES:
+        ticket = (
+            Ticket.objects.select_for_update(of=("self",))
+            .filter(
+                title=sample.title,
+                description=sample.description,
+                submitter=accounts[sample.requester],
+                assignee__isnull=True,
+                assignments__isnull=True,
+            )
+            .exclude(status=Status.CLOSED)
+            .first()
+        )
+        if ticket is not None:
+            dispatch(ticket)
+            if ticket.assignee_id is not None:
+                ticket.save(update_fields=["assignee"])
+                transaction.on_commit(invalidate_dashboard, robust=True)
+
+
 @transaction.atomic
 def seed(passwords: dict[str, str]) -> bool:
     support = DeptInfo.objects.select_for_update().get(code="ticketflow_support")
@@ -304,12 +305,13 @@ def seed(passwords: dict[str, str]) -> bool:
         if set(existing) == set(USERNAMES) and all(
             user.check_password(passwords[name]) for name, user in existing.items()
         ):
+            dispatch_existing_samples(existing)
             return False
         raise CommandError(
             "Demo usernames already exist with different credentials; restore the original accounts file"
         )
 
-    network = DeptInfo.objects.create(code="ticketflow_demo_network", name="网络支持")
+    network = DeptInfo.objects.create(code="ticketflow_demo_network", name="网络支持组")
     accounts = create_accounts(passwords, support, network)
     routing = {
         **settings.TICKETFLOW_CATEGORY_DEPARTMENTS,

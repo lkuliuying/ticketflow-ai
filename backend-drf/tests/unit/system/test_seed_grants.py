@@ -52,9 +52,8 @@ EXPECTED_ROLE_MENUS = {
     "default": 45,
     "demo": 67,
     "ticketflow_requester": 12,
-    "ticketflow_agent": 16,
+    "ticketflow_agent": 17,
     "ticketflow_admin": 24,
-    "ticketflow_kb_editor": 5,
 }
 
 

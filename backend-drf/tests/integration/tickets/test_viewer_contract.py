@@ -10,7 +10,7 @@ from identity.models import DeptInfo, UserInfo, UserRole
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from system.models import Menu
 from tests.integration.tickets.test_ticket_api import authenticated
-from tickets.models import Category, Priority, Status, Ticket, Visibility
+from tickets.models import Category, Priority, Status, Ticket, TicketAssignment, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE
 
 pytestmark = pytest.mark.django_db
@@ -34,6 +34,7 @@ def ticket(users: dict[str, UserInfo]) -> Ticket:
         priority=Priority.P1,
         submitter=users["requester"],
         department=users["agent"].dept,
+        assignee=users["agent"],
         sla_due_at=timezone.now(),
     )
 
@@ -48,7 +49,7 @@ def ticket(users: dict[str, UserInfo]) -> Ticket:
 )
 @pytest.mark.parametrize("status", [Status.IN_PROGRESS, Status.CLOSED])
 def test_ticket_viewer_matches_role_and_status(users, make_ticket, role, can_handle, has_assignment_grants, status):
-    ticket = make_ticket(status=status)
+    ticket = make_ticket(status=status, assignee=users["agent"])
     api = authenticated(users[role])
     resource = f"/api/tickets/{ticket.pk}"
     response = api.get(resource)
@@ -60,6 +61,8 @@ def test_ticket_viewer_matches_role_and_status(users, make_ticket, role, can_han
         "can_reply": True,
         "can_comment_internal": can_handle,
         "can_archive": can_handle and status == Status.CLOSED,
+        "can_return": role == "agent" and status != Status.CLOSED,
+        "read_only": False,
     }
     validate(data["viewer"], "ticketViewer")
     if status == Status.CLOSED:
@@ -74,9 +77,9 @@ def test_ticket_viewer_assignment_requires_both_menu_permissions(users, ticket, 
     if is_superuser:
         user = UserInfo.objects.create_user(username="viewer-superuser", is_superuser=True)
     else:
-        role = UserRole.objects.get(code=AGENT_ROLE)
-        role.menu.add(Menu.objects.get(name="assign:TicketFlowTickets"))
-        user = users["agent"]
+        role = UserRole.objects.get(code=ADMIN_ROLE)
+        role.menu.remove(Menu.objects.get(name="assignees:TicketFlowTickets"))
+        user = users["admin"]
     api_client.force_authenticate(user=user)
     resource = f"/api/tickets/{ticket.pk}"
     detail = api_client.get(resource)
@@ -111,7 +114,9 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
     role.menu.add(*Menu.objects.filter(name__in=["assign:TicketFlowTickets", "assignees:TicketFlowTickets"]))
     api = authenticated(users["agent"])
     resource = f"/api/tickets/{ticket.pk}"
-    assert api.get(resource).data["data"]["viewer"]["can_assign"] is True
+    assert api.get(resource).data["data"]["viewer"]["can_assign"] is False
+    blocked = api.post(f"{resource}/assign", {"assignee_id": None, "version": ticket.version}, format="json")
+    assert blocked.status_code == 403
     ticket.status = Status.CLOSED
     ticket.save(update_fields=["status"])
     viewer = api.get(resource).data["data"]["viewer"]
@@ -121,10 +126,12 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
         "can_reply": True,
         "can_comment_internal": True,
         "can_archive": False,
+        "can_return": False,
+        "read_only": False,
     }
     ticket.submitter = users["agent"]
-    ticket.department = DeptInfo.objects.create(code="elsewhere", name="其他部门")
-    ticket.save(update_fields=["submitter", "department"])
+    ticket.assignee = None
+    ticket.save(update_fields=["submitter", "assignee"])
     viewer = api.get(resource).data["data"]["viewer"]
     assert viewer == {
         "can_handle": False,
@@ -132,6 +139,8 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
         "can_reply": True,
         "can_comment_internal": False,
         "can_archive": False,
+        "can_return": False,
+        "read_only": False,
     }
 
 
@@ -153,9 +162,7 @@ def grant_assignment(user: UserInfo) -> None:
     user.roles.add(role)
 
 
-@pytest.mark.parametrize("role", ["agent", "admin"])
-def test_assignees_filter_department_roles_activity_and_search(users, ticket, role):
-    grant_assignment(users["agent"])
+def test_assignees_filter_skill_group_roles_activity_and_search(users, ticket):
     other = DeptInfo.objects.create(code="other-support", name="其他支持")
     external = UserInfo.objects.create_user(username="candidate-external", dept=other)
     external.roles.add(UserRole.objects.get(code=AGENT_ROLE))
@@ -167,9 +174,12 @@ def test_assignees_filter_department_roles_activity_and_search(users, ticket, ro
     inherited_dept = DeptInfo.objects.create(code="inherited", name="部门授权")
     inherited_dept.roles.add(UserRole.objects.get(code=AGENT_ROLE))
     inherited = UserInfo.objects.create_user(username="candidate-inherited", dept=inherited_dept)
+    inactive_dept = DeptInfo.objects.create(code="inactive-team", name="停用技能组", is_active=False)
+    inactive_member = UserInfo.objects.create_user(username="candidate-inactive-team", dept=inactive_dept)
+    inactive_member.roles.add(UserRole.objects.get(code=AGENT_ROLE))
     users["agent"].nickname = "客服昵称"
     users["agent"].save(update_fields=["nickname"])
-    api = authenticated(users[role])
+    api = authenticated(users["admin"])
     resource = f"/api/tickets/{ticket.pk}/assignees"
     response = api.get(resource)
     assert response.status_code == 200, response.data
@@ -178,18 +188,33 @@ def test_assignees_filter_department_roles_activity_and_search(users, ticket, ro
     ids = {row["pk"] for row in rows}
     assert users["requester"].pk not in ids
     assert inactive.pk not in ids and disabled.pk not in ids
-    assert users["agent"].pk in ids and users["admin"].pk in ids
-    assert (external.pk in ids) == (role == "admin")
-    assert (inherited.pk in ids) == (role == "admin")
+    assert ids == {users["agent"].pk, external.pk, inherited.pk}
+    filtered = api.get(resource, {"department_id": other.pk}).data["data"]
+    assert [row["pk"] for row in filtered] == [external.pk]
     searched = api.get(resource, {"q": "客服昵称"}).data["data"]
     assert searched == [
-        {"pk": users["agent"].pk, "username": "viewer-agent", "nickname": "客服昵称", "department_name": "工单支持"}
+        {"pk": users["agent"].pk, "username": "viewer-agent", "nickname": "客服昵称", "department_name": "工单支持组"}
     ]
     assert api.get(resource, {"q": "no-match"}).data["data"] == []
     assigned = api.post(
         f"/api/tickets/{ticket.pk}/assign", {"assignee_id": external.pk, "version": ticket.version}, format="json"
     )
-    assert assigned.status_code == (200 if role == "admin" else 400), assigned.data
+    assert assigned.status_code == 200, assigned.data
+
+
+def test_assignees_accept_empty_skill_group_and_explain_invalid_uuid(users, ticket):
+    api = authenticated(users["admin"])
+    resource = f"/api/tickets/{ticket.pk}/assignees"
+    params = {"q": users["agent"].username}
+    unfiltered = api.get(resource, params)
+    empty = api.get(resource, {**params, "department_id": ""})
+    assert empty.status_code == 200, empty.data
+    assert empty.data["data"] == unfiltered.data["data"]
+    assert [row["pk"] for row in empty.data["data"]] == [users["agent"].pk]
+
+    invalid = api.get(resource, {**params, "department_id": "invalid"})
+    assert invalid.status_code == 400, invalid.data
+    assert invalid.data["detail"] == "department_id: 请输入有效的技能组 UUID"
 
 
 def test_assignees_are_unique_bounded_and_stably_ordered(users, ticket):
@@ -204,7 +229,7 @@ def test_assignees_are_unique_bounded_and_stably_ordered(users, ticket):
     assert [row["username"] for row in rows] == [f"candidate-{index:02}" for index in range(20)]
 
 
-def test_assignees_exclude_inactive_roles_and_include_superusers_without_department(users, ticket):
+def test_assignees_exclude_inactive_roles_and_superusers(users, ticket):
     agent_role = UserRole.objects.get(code=AGENT_ROLE)
     agent_role.is_active = False
     agent_role.save(update_fields=["is_active"])
@@ -213,14 +238,14 @@ def test_assignees_exclude_inactive_roles_and_include_superusers_without_departm
     assert response.status_code == 200, response.data
     rows = response.data["data"]
     assert users["agent"].pk not in {row["pk"] for row in rows}
-    assert next(row for row in rows if row["pk"] == superuser.pk)["department_name"] is None
+    assert superuser.pk not in {row["pk"] for row in rows}
 
 
 def test_assignees_require_assignment_and_handling_and_hide_invisible_ticket(users, ticket):
     grant_assignment(users["agent"])
     resource = f"/api/tickets/{ticket.pk}"
-    ticket.department = DeptInfo.objects.create(code="outside", name="不可见部门")
-    ticket.save(update_fields=["department"])
+    ticket.assignee = None
+    ticket.save(update_fields=["assignee"])
     api = authenticated(users["agent"])
     assert api.get(resource).status_code == 404
     assert api.get(f"{resource}/assignees").status_code == 404
@@ -231,7 +256,7 @@ def test_assignees_require_assignment_and_handling_and_hide_invisible_ticket(use
     ticket.save(update_fields=["assignee"])
     users["agent"].dept = None
     users["agent"].save(update_fields=["dept"])
-    assert api.get(f"{resource}/assignees").data["data"] == []
+    assert api.get(f"{resource}/assignees").status_code == 403
 
 
 def test_assignees_permission_does_not_grant_assignment(users, ticket):
@@ -306,8 +331,12 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
     foreign_dept = DeptInfo.objects.create(code="other-support", name="其他部门")
     invisible = make_ticket(department=foreign_dept, status=Status.CLOSED)
     submitter_only = make_ticket(users["agent"], department=foreign_dept, status=Status.CLOSED)
-    opened = make_ticket()
+    opened = make_ticket(assignee=users["agent"])
     closed = make_ticket(status=Status.CLOSED)
+    now = timezone.now()
+    TicketAssignment.objects.create(
+        ticket=closed, assignee=users["agent"], started_at=now, ended_at=now, end_reason="CLOSED_OUT"
+    )
     values = {"title": "VPN 连接失败处理", "body_markdown": "先检查 VPN 连接状态", "category": details["category"]}
 
     for ticket, expected in ((invisible, 404), (submitter_only, 403), (opened, 409)):
@@ -315,6 +344,10 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
         assert denied.status_code == expected, denied.data
     assert not KnowledgeArticle.objects.exists()
 
+    ticket_path = f"/api/tickets/{closed.pk}"
+    viewer = api.get(ticket_path).data["data"]["viewer"]
+    assert viewer["read_only"] is True
+    assert viewer["can_archive"] is True
     payload = {**values, "source_ticket_id": str(closed.pk)}
     created = api.post(ARTICLES, payload, format="json")
     assert created.status_code == 201, created.data
@@ -324,6 +357,7 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
     duplicate = api.post(ARTICLES, payload, format="json")
     assert duplicate.status_code == 409, duplicate.data
     assert KnowledgeArticle.objects.filter(source_ticket=closed).count() == 1
+    assert api.get(ticket_path).data["data"]["viewer"]["can_archive"] is False
 
     resource = f"{ARTICLES}/{article['pk']}"
     assert api.get(resource).data["data"]["source_ticket_id"] == str(closed.pk)
@@ -342,34 +376,6 @@ def test_article_capabilities_respect_missing_action_grants(users):
     response = api.get(f"{ARTICLES}/{article.pk}")
     assert response.data["data"]["viewer"] == {"can_edit": False, "can_publish": False}
     assert api.get(ARTICLES).data["data"]["can_create_standalone"] is False
-
-
-@pytest.mark.parametrize("department_role", [False, True])
-def test_knowledge_editor_reviews_other_authors_without_ticket_privileges(users, ticket, api_client, department_role):
-    role = UserRole.objects.get(code="ticketflow_kb_editor")
-    editor = UserInfo.objects.create_user(username="knowledge-editor", dept=users["agent"].dept)
-    (editor.dept if department_role else editor).roles.add(role)
-    api_client.force_authenticate(user=editor)
-    article = KnowledgeArticle.objects.create(
-        title="待审阅草稿", creator=users["agent"], category=Category.NETWORK, source_ticket=ticket
-    )
-    resource = f"{ARTICLES}/{article.pk}"
-    page = api_client.get(ARTICLES)
-    assert page.status_code == 200, page.data
-    assert page.data["data"]["results"][0]["pk"] == str(article.pk)
-    assert page.data["data"]["can_create_standalone"] is False
-    draft = api_client.get(resource)
-    assert draft.status_code == 200, draft.data
-    assert draft.data["data"]["viewer"] == {"can_edit": True, "can_publish": True}
-    assert draft.data["data"]["source_ticket_id"] is None
-    for status in (ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED):
-        response = api_client.patch(resource, {"status": status, "title": "维护后的标题"}, format="json")
-        assert response.status_code == 200, response.data
-        assert response.data["data"]["status"] == status
-        assert response.data["data"]["title"] == "维护后的标题"
-    assert api_client.get(resource).status_code == 200
-    assert api_client.get(f"/api/tickets/{ticket.pk}").status_code == 403
-    assert api_client.post(ARTICLES, {}, format="json").status_code == 403
 
 
 def test_only_published_article_detail_counts_views(users, api_client):
@@ -395,7 +401,7 @@ def test_ticket_search_fields_use_localized_labels_and_sla_choices(users, api_cl
     assert response.status_code == 200, response.data
     fields = {field["key"]: field for field in response.data["data"]}
     assert fields["assignee_id"]["label"] == "处理人"
-    assert fields["department_id"]["label"] == "所属部门"
+    assert fields["department_id"]["label"] == "所属技能组"
     assert fields["sla"]["label"] == "SLA 状态"
     assert fields["q"]["label"] == "关键字"
     assert {choice["value"]: choice["label"] for choice in fields["sla"]["choices"] if choice["value"]} == {

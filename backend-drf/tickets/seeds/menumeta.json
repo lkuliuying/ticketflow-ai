@@ -98,5 +98,12 @@
     "fields": {
       "title": "工单指派候选人"
     }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000095",
+    "fields": {
+      "title": "退回工单"
+    }
   }
 ]

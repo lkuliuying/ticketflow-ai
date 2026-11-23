@@ -96,7 +96,7 @@
 | `update:SystemApprovalFlow` | B | 编辑兼容口径：前端 OR 检查 update/partialUpdate（两页编辑保存均走 partialUpdate，权限授予习惯不同，只认其一会让另一类角色看不到编辑入口），种子只授 partialUpdate |
 | `update:SystemApprovalRule` | B | 编辑兼容口径：同 SystemApprovalFlow |
 | `context:TicketFlowTickets` | A | 工单 AI 上下文由 FastAPI 通过内网调用 |
-| `timeline`、`transition`、`assign`、`comments`、`aiMetadata`、`dashboard`、`exportAsync`（`TicketFlowTickets`） | A | Phase 2 后端权限点，Phase 4 工作台接入后逐项移除 |
+| `timeline`、`transition`、`assign`、`returnTicket`、`comments`、`aiMetadata`、`dashboard`、`exportAsync`（`TicketFlowTickets`） | A | 工单工作台权限点，前端接入后逐项移除 |
 | `WHITELIST_A` 中标记为 v5.0.2 的 15 个底座权限点 | A | 当前后端基线和 v5.0.2 前端的存量差异，升级前端底座后逐项对账 |
 
 另：`retrieve:SystemGlobalSearch` 与 `list:SystemImportTemplate` 在门禁脚本的

@@ -34,7 +34,8 @@
       "comments:TicketFlowTickets",
       "aiMetadata:TicketFlowTickets",
       "context:TicketFlowTickets",
-      "dashboard:TicketFlowTickets"
+      "dashboard:TicketFlowTickets",
+      "returnTicket:TicketFlowTickets"
     ],
     "ticketflow_admin": [
       "TicketFlow",

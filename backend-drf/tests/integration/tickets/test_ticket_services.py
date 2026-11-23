@@ -11,7 +11,7 @@ from rest_framework.exceptions import PermissionDenied, Throttled
 
 from identity.models import DeptInfo, UserInfo
 from tickets.cache import check_rate
-from tickets.models import Status, Ticket, TicketCreateRequest, TicketLog, TicketSlaAlert, Visibility
+from tickets.models import Status, Ticket, TicketAssignment, TicketCreateRequest, TicketLog, TicketSlaAlert, Visibility
 from tickets.policy import TicketAccess
 from tickets.services import NewTicket, TicketConflict, add_comment, create_ticket, transition
 from tickets.tasks import scan_ticket_sla
@@ -58,9 +58,17 @@ def test_transitions_audit_and_reopen(
     assert ticket.first_response_at == public.created_time
     assert ticket.resolved_at is not None
     ticket = transition(tickets, ticket.pk, requester, owner, 3, Status.CLOSED)
+    assert ticket.assignments.get().end_reason == TicketAssignment.EndReason.CLOSED_OUT
     ticket = transition(tickets, ticket.pk, requester, owner, 4, Status.REOPENED)
+    assert ticket.assignee == agent
+    assert ticket.assignments.get(ended_at__isnull=True).assignee == agent
+    assert ticket.logs.get(action="REOPEN_ASSIGN").operator is None
     assert (ticket.sla_cycle, ticket.version, ticket.resolved_at) == (2, 5, None)
-    assert list(ticket.logs.order_by("created_time").values_list("to_status", flat=True)) == [
+    assert list(
+        ticket.logs.filter(action__in=("CREATE", "TRANSITION"))
+        .order_by("created_time")
+        .values_list("to_status", flat=True)
+    ) == [
         Status.OPEN,
         Status.IN_PROGRESS,
         Status.PENDING_VERIFY,

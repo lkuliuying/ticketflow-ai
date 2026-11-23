@@ -43,7 +43,7 @@ def create_article(
         ticket = access.scope(Ticket.objects.all()).select_for_update().filter(pk=source_ticket_id).first()
         if ticket is None:
             raise NotFound("来源工单不存在")
-        if not access.can_handle(ticket):
+        if not access.can_archive(ticket):
             raise PermissionDenied("无权转存此工单")
         if ticket.status != Status.CLOSED:
             raise TicketConflict("只有已关闭的工单可以转存")
