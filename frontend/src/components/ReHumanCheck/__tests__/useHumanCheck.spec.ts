@@ -1,6 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { SHA256 } from "crypto-es";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { effectScope } from "vue";
 import { leadingZeroBits } from "@/utils/captcha/protocol";
 
 const mocks = vi.hoisted(() => ({ challenge: vi.fn(), verify: vi.fn() }));
@@ -155,6 +156,23 @@ describe("useHumanCheck", () => {
     const submitting = check.submit("ab12");
     check.cancel();
     await expect(submitting).resolves.toBeUndefined();
+    expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
+    expect(mocks.verify).not.toHaveBeenCalled();
+    expect(check.loading.value).toBe(false);
+  });
+
+  it("aborts a running PoW and settles as cancelled when the component unmounts", async () => {
+    const slowPow = { ...pow, difficulty_bits: 30 };
+    mocks.challenge.mockResolvedValue(
+      ok({ challenge_id: "c1", type: "pow", ttl: 60, pow: slowPow })
+    );
+    const scope = effectScope();
+    const check = scope.run(() => setup())!;
+
+    const outcome = check.obtain().catch((error: unknown) => error);
+    await flushPromises();
+    expect(check.loading.value).toBe(true);
+    scope.stop();
     expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
     expect(mocks.verify).not.toHaveBeenCalled();
     expect(check.loading.value).toBe(false);
