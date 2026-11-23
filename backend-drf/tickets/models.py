@@ -20,6 +20,11 @@ class Priority(models.TextChoices):
     P3 = "P3", "P3"
 
 
+class CategoryRoute(models.Model):
+    category = models.CharField("分类", max_length=12, choices=Category.choices, primary_key=True)
+    skill_group = models.ForeignKey("identity.DeptInfo", on_delete=models.PROTECT, related_name="ticket_routes")
+
+
 class Status(models.TextChoices):
     OPEN = "OPEN", "待处理"
     IN_PROGRESS = "IN_PROGRESS", "处理中"

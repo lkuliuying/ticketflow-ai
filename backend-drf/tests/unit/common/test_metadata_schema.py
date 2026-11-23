@@ -37,9 +37,12 @@ from common.core.modelset.input_types import (
 )
 from demo.views import BookViewSet
 from file.views.admin.file import UploadFileViewSet
+from identity.models import UserInfo, UserRole
 from identity.views.admin.login_policy import LoginAccessPolicyViewSet
 from identity.views.admin.user import UserViewSet
 from settings.views.basic import BasicSettingViewSet
+from tickets.management_views import AccountViewSet, SkillGroupViewSet
+from tickets.policy import ADMIN_ROLE
 
 pytestmark = pytest.mark.django_db
 
@@ -92,7 +95,7 @@ def _collect_metadata_targets() -> list[dict]:
                 cls,
                 {
                     "cls": cls,
-                    "url": "/" + (prefix + part).lstrip("^").rstrip("$"),
+                    "url": "/" + (prefix + part).replace("^", "").rsplit("/", 1)[0],
                     "endpoints": set(),
                 },
             )
@@ -120,6 +123,15 @@ def _emit_metadata(target: dict, superuser) -> set[tuple[str, str]]:
 
 
 METADATA_TARGETS = _collect_metadata_targets()
+
+
+@pytest.fixture
+def metadata_actor(target, seeded_module, superuser):
+    if target["cls"] in {AccountViewSet, SkillGroupViewSet}:
+        user = UserInfo.objects.create_user(username="metadata-admin")
+        user.roles.add(UserRole.objects.get(code=ADMIN_ROLE))
+        return user
+    return superuser
 
 
 def _assert_matches_schema(payload, schema_name: str):
@@ -213,14 +225,14 @@ class TestVocabularyLockstep:
     METADATA_TARGETS,
     ids=lambda target: target["cls"].__name__,
 )
-def test_all_metadata_viewsets_match_schema(target, superuser):
+def test_all_metadata_viewsets_match_schema(target, metadata_actor):
     """全量视图集载荷 Schema 校验：契约真源不仅锁词表，也锁键形状。
 
     「词表闭包」只保证 input_type 合法；本用例保证每个真实载荷符合
     ``docs/schema/*.schema.json``（含 child / predefine / decimal_places 等扩展键），
     防止新增键或嵌套字段展开在无人察觉时漂移出契约。
     """
-    payloads = _metadata_payloads(target, superuser)
+    payloads = _metadata_payloads(target, metadata_actor)
     assert payloads, "元数据载荷不应为空"
     for endpoint, payload in payloads.items():
         _assert_matches_schema(payload, f"{endpoint}.schema.json")
@@ -231,7 +243,7 @@ def test_all_metadata_viewsets_match_schema(target, superuser):
     METADATA_TARGETS,
     ids=lambda target: target["cls"].__name__,
 )
-def test_all_metadata_viewsets_input_type_closure(target, superuser):
+def test_all_metadata_viewsets_input_type_closure(target, metadata_actor):
     """全量视图集闭包：URLconf 中每个暴露元数据动作的视图集都不许下发未登记类型。
 
     这是「后端定义了字段、前端没渲染」从线上现形提前到 CI 拦截的关键门禁；
@@ -240,7 +252,7 @@ def test_all_metadata_viewsets_input_type_closure(target, superuser):
     assert target["cls"].__name__ not in SKIPPED_METADATA_VIEWSETS, (
         f"{target['cls'].__name__} 已登记 skip：{SKIPPED_METADATA_VIEWSETS[target['cls'].__name__]}"
     )
-    emitted = _emit_metadata(target, superuser)
+    emitted = _emit_metadata(target, metadata_actor)
     assert emitted, "元数据载荷不应为空"
     undeclared = {t for _, t in emitted if not t.startswith(INPUT_TYPE_PREFIX_FAMILIES)} - DECLARED_INPUT_TYPES
     assert not undeclared, (

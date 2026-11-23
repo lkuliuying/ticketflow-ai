@@ -60,7 +60,10 @@ class TicketViewerSerializer(serializers.Serializer):
 class TicketDetailSerializer(TicketSerializer):
     viewer = TicketViewerSerializer(read_only=True)
     rating = TicketRatingSerializer(
-        read_only=True, allow_null=True, help_text="仅评价人、评价记录中的处理人和管理员可见，其他情况为 null。"
+        read_only=True,
+        allow_null=True,
+        ignore_field_permission=True,
+        help_text="仅评价人、评价记录中的处理人和管理员可见，其他情况为 null。",
     )
     available_transitions = serializers.ListField(
         child=serializers.CharField(), read_only=True, help_text="提交人的验收或重开动作在历史只读时仍可用。"
@@ -77,8 +80,11 @@ assignees_result = envelope("TicketAssigneesResult", AssigneeSerializer(many=Tru
 ticket_detail_result = envelope("TicketDetailResult", TicketDetailSerializer())
 ticket_list_result = envelope("TicketListResult", page("TicketPage", TicketSerializer(many=True)))
 timeline_result = envelope("TicketTimelineResult", page("TicketTimelinePage", TimelineEntrySerializer(many=True)))
-rating_result = envelope("TicketRatingResult", TicketRatingSerializer())
-rating_list_result = envelope("TicketRatingListResult", page("TicketRatingPage", TicketRatingSerializer(many=True)))
+# Schema declarations are constructed during URL loading, outside any request.
+rating_result = envelope("TicketRatingResult", TicketRatingSerializer(ignore_field_permission=True))
+rating_list_result = envelope(
+    "TicketRatingListResult", page("TicketRatingPage", TicketRatingSerializer(many=True, ignore_field_permission=True))
+)
 rating_summary_result = envelope("TicketRatingSummaryResult", RatingSummarySerializer())
 
 

@@ -54,7 +54,7 @@ EXPECTED_ROLE_MENUS = {
     "demo": 67,
     "ticketflow_requester": 14,
     "ticketflow_agent": 21,
-    "ticketflow_admin": 28,
+    "ticketflow_admin": 41,
 }
 
 

@@ -321,5 +321,189 @@
       "meta": "d2431bc0-217a-49eb-a6fa-000000000105",
       "model": []
     }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000130",
+    "fields": {
+      "name": "TicketFlowAccounts",
+      "path": "/ticketflow/accounts/index",
+      "component": "ticketflow/accounts/index",
+      "menu_type": 1,
+      "rank": 5,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000131",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000132",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "list:TicketFlowAccounts",
+      "rank": 1,
+      "path": "api/ticketflow/accounts$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000133",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000134",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "create:TicketFlowAccounts",
+      "rank": 2,
+      "path": "api/ticketflow/accounts$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000135",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000136",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "retrieve:TicketFlowAccounts",
+      "rank": 3,
+      "path": "api/ticketflow/accounts/(?P<pk>\\d+)$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000137",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000138",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowAccounts",
+      "rank": 4,
+      "path": "api/ticketflow/accounts/(?P<pk>\\d+)$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000139",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000140",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "resetPassword:TicketFlowAccounts",
+      "rank": 5,
+      "path": "api/ticketflow/accounts/(?P<pk>\\d+)/reset-password$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000141",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000144",
+    "fields": {
+      "name": "TicketFlowSkillGroups",
+      "path": "/ticketflow/skill-groups/index",
+      "component": "ticketflow/skill-groups/index",
+      "menu_type": 1,
+      "rank": 6,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000145",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000146",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "list:TicketFlowSkillGroups",
+      "rank": 1,
+      "path": "api/ticketflow/skill-groups$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000147",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000148",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "create:TicketFlowSkillGroups",
+      "rank": 2,
+      "path": "api/ticketflow/skill-groups$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000149",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000150",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "retrieve:TicketFlowSkillGroups",
+      "rank": 3,
+      "path": "api/ticketflow/skill-groups/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000151",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000152",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowSkillGroups",
+      "rank": 4,
+      "path": "api/ticketflow/skill-groups/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000153",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000154",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "categoryRoutes:TicketFlowSkillGroups",
+      "rank": 5,
+      "path": "api/ticketflow/skill-groups/category-routes$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000155",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000156",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "categoryRoute:TicketFlowSkillGroups",
+      "rank": 6,
+      "path": "api/ticketflow/skill-groups/category-routes/(?P<category>[^/.]+)$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000157",
+      "model": []
+    }
   }
 ]

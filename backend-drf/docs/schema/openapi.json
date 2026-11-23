@@ -1,6 +1,171 @@
 {
   "components": {
     "schemas": {
+      "Account": {
+        "properties": {
+          "email": {
+            "oneOf": [
+              {
+                "format": "email",
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "maxLength": 0,
+                "type": "string"
+              }
+            ],
+            "title": "邮箱"
+          },
+          "is_active": {
+            "default": true,
+            "title": "启用",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 150,
+            "title": "姓名",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 16,
+            "title": "手机",
+            "type": "string"
+          },
+          "pk": {
+            "readOnly": true,
+            "title": "编号",
+            "type": "integer"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleEnum"
+              }
+            ],
+            "title": "角色"
+          },
+          "skill_group": {
+            "format": "uuid",
+            "nullable": true,
+            "title": "技能组",
+            "type": "string"
+          },
+          "skill_group_name": {
+            "nullable": true,
+            "readOnly": true,
+            "title": "技能组名称",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 150,
+            "pattern": "^[\\w.@+-]+$",
+            "title": "用户名",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "pk",
+          "role",
+          "skill_group_name",
+          "username"
+        ],
+        "type": "object"
+      },
+      "AccountCreate": {
+        "properties": {
+          "email": {
+            "oneOf": [
+              {
+                "format": "email",
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "maxLength": 0,
+                "type": "string"
+              }
+            ],
+            "title": "邮箱"
+          },
+          "is_active": {
+            "default": true,
+            "title": "启用",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 150,
+            "title": "姓名",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 512,
+            "title": "初始密码",
+            "type": "string",
+            "writeOnly": true
+          },
+          "phone": {
+            "maxLength": 16,
+            "title": "手机",
+            "type": "string"
+          },
+          "pk": {
+            "readOnly": true,
+            "title": "编号",
+            "type": "integer"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleEnum"
+              }
+            ],
+            "title": "角色"
+          },
+          "skill_group": {
+            "format": "uuid",
+            "nullable": true,
+            "title": "技能组",
+            "type": "string"
+          },
+          "skill_group_name": {
+            "nullable": true,
+            "readOnly": true,
+            "title": "技能组名称",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 150,
+            "pattern": "^[\\w.@+-]+$",
+            "title": "用户名",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "password",
+          "pk",
+          "role",
+          "skill_group_name",
+          "username"
+        ],
+        "type": "object"
+      },
+      "AccountPassword": {
+        "properties": {
+          "password": {
+            "maxLength": 512,
+            "title": "密码",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "type": "object"
+      },
       "AccountRisk": {
         "properties": {
           "created_time": {
@@ -3509,6 +3674,32 @@
           "other"
         ],
         "type": "string"
+      },
+      "CategoryRoute": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/TicketFlowCategoryEnum"
+          },
+          "label": {
+            "type": "string"
+          },
+          "skill_group": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "skill_group_name": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "label",
+          "skill_group",
+          "skill_group_name"
+        ],
+        "type": "object"
       },
       "ChangePassword": {
         "description": "改密载荷：字段少而语义特殊，改动前先读本说明。\n\n字段面只有 ``old_password`` + ``sure_password``：后者即**新密码**——前端表单的\n「新密码 / 确认密码」两栏在提交层只发一栏（确认栏仅用于本地一致性比对），\n后端字段名沿用了表单里的「确认」语义；改名会同时触碰两端契约，保持现状并以\n本说明消歧。",
@@ -9386,6 +9577,71 @@
         },
         "type": "object"
       },
+      "PatchedAccount": {
+        "properties": {
+          "email": {
+            "oneOf": [
+              {
+                "format": "email",
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "maxLength": 0,
+                "type": "string"
+              }
+            ],
+            "title": "邮箱"
+          },
+          "is_active": {
+            "default": true,
+            "title": "启用",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 150,
+            "title": "姓名",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 16,
+            "title": "手机",
+            "type": "string"
+          },
+          "pk": {
+            "readOnly": true,
+            "title": "编号",
+            "type": "integer"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleEnum"
+              }
+            ],
+            "title": "角色"
+          },
+          "skill_group": {
+            "format": "uuid",
+            "nullable": true,
+            "title": "技能组",
+            "type": "string"
+          },
+          "skill_group_name": {
+            "nullable": true,
+            "readOnly": true,
+            "title": "技能组名称",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 150,
+            "pattern": "^[\\w.@+-]+$",
+            "title": "用户名",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PatchedAiAssistantSetting": {
         "description": "与 BaseSettingViewSet.perform_update 配对的保存契约（详见模块 docstring）。",
         "properties": {
@@ -10556,6 +10812,16 @@
             "nullable": true,
             "readOnly": true,
             "title": "更新时间",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchedCategoryRouteInput": {
+        "properties": {
+          "skill_group": {
+            "format": "uuid",
+            "nullable": true,
             "type": "string"
           }
         },
@@ -14327,6 +14593,38 @@
         },
         "type": "object"
       },
+      "PatchedSkillGroup": {
+        "properties": {
+          "description": {
+            "maxLength": 256,
+            "nullable": true,
+            "title": "描述",
+            "type": "string"
+          },
+          "is_active": {
+            "default": true,
+            "title": "启用",
+            "type": "boolean"
+          },
+          "is_default": {
+            "readOnly": true,
+            "title": "默认技能组",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 128,
+            "title": "名称",
+            "type": "string"
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "title": "编号",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PatchedSystemConfig": {
         "properties": {
           "access": {
@@ -16052,6 +16350,15 @@
           "user_count"
         ],
         "type": "object"
+      },
+      "RoleEnum": {
+        "description": "* `requester` - 普通员工\n* `agent` - 技术员\n* `admin` - 管理员",
+        "enum": [
+          "requester",
+          "agent",
+          "admin"
+        ],
+        "type": "string"
       },
       "RoutingKeyEnum": {
         "description": "* `` - 默认路由键\n* `celery` - celery\n* `heavy` - heavy",
@@ -17866,6 +18173,43 @@
         ],
         "type": "object"
       },
+      "SkillGroup": {
+        "properties": {
+          "description": {
+            "maxLength": 256,
+            "nullable": true,
+            "title": "描述",
+            "type": "string"
+          },
+          "is_active": {
+            "default": true,
+            "title": "启用",
+            "type": "boolean"
+          },
+          "is_default": {
+            "readOnly": true,
+            "title": "默认技能组",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 128,
+            "title": "名称",
+            "type": "string"
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "title": "编号",
+            "type": "string"
+          }
+        },
+        "required": [
+          "is_default",
+          "name",
+          "pk"
+        ],
+        "type": "object"
+      },
       "Status109Enum": {
         "description": "* `OPEN` - 待处理\n* `IN_PROGRESS` - 处理中\n* `PENDING_VERIFY` - 待验收\n* `CLOSED` - 已关闭\n* `REOPENED` - 已重开",
         "enum": [
@@ -18880,6 +19224,78 @@
         ],
         "type": "object"
       },
+      "TicketFlowAccountListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketFlowAccountPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketFlowAccountPage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "TicketFlowAccountResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Account"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
       "TicketFlowCategoryEnum": {
         "description": "* `ACCOUNT` - 账户\n* `ACCESS` - 权限\n* `NETWORK` - 网络\n* `SERVICE` - 服务\n* `OTHER` - 其他",
         "enum": [
@@ -18890,6 +19306,158 @@
           "OTHER"
         ],
         "type": "string"
+      },
+      "TicketFlowCategoryRouteListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryRoute"
+            },
+            "type": "array"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketFlowCategoryRouteResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CategoryRoute"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketFlowResetPasswordResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketFlowSkillGroupListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketFlowSkillGroupPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketFlowSkillGroupPage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SkillGroup"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "TicketFlowSkillGroupResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SkillGroup"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
       },
       "TicketListResult": {
         "properties": {
@@ -97447,7 +98015,7 @@
             "in": "query",
             "name": "handler_id",
             "schema": {
-              "type": "number"
+              "type": "integer"
             }
           },
           {
@@ -97810,6 +98378,1180 @@
         ],
         "tags": [
           "TicketRatingViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/accounts": {
+      "get": {
+        "description": "获取{cls}的列表",
+        "operationId": "api_ticketflow_accounts_list",
+        "parameters": [
+          {
+            "description": "状态\n\n* `true` - 启用\n* `false` - 停用",
+            "in": "query",
+            "name": "is_active",
+            "schema": {
+              "enum": [
+                "false",
+                "true"
+              ],
+              "title": "有效",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "用于排序结果的字段。",
+            "in": "query",
+            "name": "ordering",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "分页结果集中的页码。",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "用户名、姓名、手机或邮箱",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "角色\n\n* `requester` - 普通员工\n* `agent` - 技术员\n* `admin` - 管理员",
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "enum": [
+                "admin",
+                "agent",
+                "requester"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "每页返回的结果数量。",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "技能组",
+            "in": "query",
+            "name": "skill_group",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowAccountListResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      },
+      "post": {
+        "description": "创建业务账号",
+        "operationId": "api_ticketflow_accounts_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowAccountResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/accounts/search-columns": {
+      "get": {
+        "description": "获取{cls}的展示字段",
+        "operationId": "api_ticketflow_accounts_search_columns_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "choices": {
+                            "items": {
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "pk": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "choices_truncated": {
+                            "type": "boolean"
+                          },
+                          "default": {},
+                          "help_text": {
+                            "type": "string"
+                          },
+                          "input_type": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "lookups": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "max_length": {
+                            "type": "number"
+                          },
+                          "max_value": {
+                            "type": "number"
+                          },
+                          "min_value": {
+                            "type": "number"
+                          },
+                          "multiple": {
+                            "type": "boolean"
+                          },
+                          "read_only": {
+                            "type": "boolean"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "sortable": {
+                            "type": "boolean"
+                          },
+                          "step": {
+                            "type": "number"
+                          },
+                          "table_show": {
+                            "type": "number"
+                          },
+                          "write_only": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/accounts/search-fields": {
+      "get": {
+        "description": "获取{cls}的查询字段",
+        "operationId": "api_ticketflow_accounts_search_fields_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "choices": {
+                            "items": {
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "pk": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "choices_truncated": {
+                            "type": "boolean"
+                          },
+                          "default": {},
+                          "help_text": {
+                            "type": "string"
+                          },
+                          "input_type": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/accounts/{id}": {
+      "get": {
+        "description": "获取{cls}的详情",
+        "operationId": "api_ticketflow_accounts_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowAccountResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      },
+      "patch": {
+        "description": "编辑业务账号",
+        "operationId": "api_ticketflow_accounts_partial_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedAccount"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedAccount"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedAccount"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedAccount"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowAccountResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/accounts/{id}/reset-password": {
+      "post": {
+        "description": "重置业务账号密码",
+        "operationId": "api_ticketflow_accounts_reset_password_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPassword"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPassword"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPassword"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPassword"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowResetPasswordResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AccountViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/skill-groups": {
+      "get": {
+        "description": "获取{cls}的列表",
+        "operationId": "api_ticketflow_skill_groups_list",
+        "parameters": [
+          {
+            "description": "状态\n\n* `true` - 启用\n* `false` - 停用",
+            "in": "query",
+            "name": "is_active",
+            "schema": {
+              "enum": [
+                "false",
+                "true"
+              ],
+              "title": "激活状态",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "用于排序结果的字段。",
+            "in": "query",
+            "name": "ordering",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "分页结果集中的页码。",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "技能组名称",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "每页返回的结果数量。",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowSkillGroupListResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      },
+      "post": {
+        "description": "创建技能组",
+        "operationId": "api_ticketflow_skill_groups_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillGroup"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillGroup"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillGroup"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillGroup"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillGroup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowSkillGroupResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/skill-groups/category-routes": {
+      "get": {
+        "description": "分类路由列表",
+        "operationId": "api_ticketflow_skill_groups_category_routes_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowCategoryRouteListResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/skill-groups/category-routes/{category}": {
+      "patch": {
+        "description": "编辑分类路由",
+        "operationId": "api_ticketflow_skill_groups_category_routes_partial_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ACCESS",
+                "ACCOUNT",
+                "NETWORK",
+                "OTHER",
+                "SERVICE"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedCategoryRouteInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedCategoryRouteInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedCategoryRouteInput"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedCategoryRouteInput"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedCategoryRouteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowCategoryRouteResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/skill-groups/search-columns": {
+      "get": {
+        "description": "获取{cls}的展示字段",
+        "operationId": "api_ticketflow_skill_groups_search_columns_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "choices": {
+                            "items": {
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "pk": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "choices_truncated": {
+                            "type": "boolean"
+                          },
+                          "default": {},
+                          "help_text": {
+                            "type": "string"
+                          },
+                          "input_type": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "lookups": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "max_length": {
+                            "type": "number"
+                          },
+                          "max_value": {
+                            "type": "number"
+                          },
+                          "min_value": {
+                            "type": "number"
+                          },
+                          "multiple": {
+                            "type": "boolean"
+                          },
+                          "read_only": {
+                            "type": "boolean"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "sortable": {
+                            "type": "boolean"
+                          },
+                          "step": {
+                            "type": "number"
+                          },
+                          "table_show": {
+                            "type": "number"
+                          },
+                          "write_only": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/skill-groups/search-fields": {
+      "get": {
+        "description": "获取{cls}的查询字段",
+        "operationId": "api_ticketflow_skill_groups_search_fields_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "choices": {
+                            "items": {
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "pk": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "choices_truncated": {
+                            "type": "boolean"
+                          },
+                          "default": {},
+                          "help_text": {
+                            "type": "string"
+                          },
+                          "input_type": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      }
+    },
+    "/api/ticketflow/skill-groups/{id}": {
+      "get": {
+        "description": "获取{cls}的详情",
+        "operationId": "api_ticketflow_skill_groups_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowSkillGroupResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
+        ]
+      },
+      "patch": {
+        "description": "编辑技能组",
+        "operationId": "api_ticketflow_skill_groups_partial_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSkillGroup"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSkillGroup"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSkillGroup"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSkillGroup"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSkillGroup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFlowSkillGroupResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "SkillGroupViewSet"
         ]
       }
     },

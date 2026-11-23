@@ -4,7 +4,6 @@ from hashlib import sha256
 from typing import NotRequired, TypedDict, Unpack
 from uuid import UUID, uuid4
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import QuerySet
@@ -26,6 +25,7 @@ from tickets.models import (
     Visibility,
 )
 from tickets.policy import TRANSITIONS, TicketAccess, assignment_candidates
+from tickets.skill_groups import destination
 
 SLA_HOURS = {str(Priority.P0): 2, str(Priority.P1): 8, str(Priority.P2): 24, str(Priority.P3): 72}
 SLA_WARNING = timedelta(minutes=30)
@@ -51,19 +51,9 @@ class RatingInput(TypedDict):
     comment: NotRequired[str | None]
 
 
-def _destination(category: str) -> DeptInfo:
-    routing = getattr(settings, "TICKETFLOW_CATEGORY_DEPARTMENTS", {})
-    dept_id = routing.get(category) or getattr(settings, "TICKETFLOW_DEFAULT_DEPARTMENT", None)
-    departments = DeptInfo.objects.filter(is_active=True)
-    dept = departments.filter(pk=dept_id).first() if dept_id else departments.filter(code="ticketflow_support").first()
-    if dept is None:
-        raise ValidationError({"department": "请配置可用的工单支持技能组"})
-    return dept
-
-
 def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
     ticket_id = uuid4()
-    department = _destination(values["category"])
+    department = destination(values["category"])
     ticket = Ticket.objects.create(
         id=ticket_id,
         number=f"TF-{ticket_id.hex.upper()}",
@@ -165,7 +155,7 @@ def _record_change(
         to_status=ticket.status,
         operator=user,
         note=note,
-        internal=action in ("ASSIGN", "RETURN", "AI_METADATA"),
+        internal=action in ("ASSIGN", "RETURN", "AI_METADATA", "DEACTIVATED"),
     )
     transaction.on_commit(invalidate_dashboard, robust=True)
     return ticket
@@ -181,6 +171,9 @@ def transition(
     target_status: str,
     note: str = "",
 ) -> Ticket:
+    if target_status == Status.REOPENED:
+        group_ids = queryset.filter(pk=ticket_id).order_by().values("department_id")
+        list(DeptInfo.objects.select_for_update(no_key=True).filter(pk__in=group_ids))
     ticket = _locked(queryset, ticket_id)
     allowed_targets = access.targets(ticket)
     if target_status not in allowed_targets and access.read_only(ticket):
@@ -222,6 +215,11 @@ def assign(
     version: int,
     assignee_id: int | None,
 ) -> Ticket:
+    group_id = None
+    if access.admin and assignee_id is not None:
+        groups = UserInfo.objects.filter(pk=assignee_id).order_by().values("dept_id")
+        group = DeptInfo.objects.select_for_update(no_key=True).filter(pk__in=groups).first()
+        group_id = group.pk if group is not None else None
     ticket = _locked(queryset, ticket_id)
     if not access.admin:
         raise PermissionDenied("无权指派此工单")
@@ -230,12 +228,20 @@ def assign(
         raise TicketConflict("已关闭的工单不能指派")
     note = "取消指派"
     if assignee_id is not None:
-        assignee = assignment_candidates().filter(pk=assignee_id).first()
+        assignee = assignment_candidates().filter(pk=assignee_id, dept_id=group_id).first()
         if assignee is None:
             raise ValidationError({"assignee_id": "处理人不在可指派范围内"})
         note = f"处理人：{assignee.username}"
     set_assignee(ticket, assignee_id, user)
     return _record_change(ticket, user, "ASSIGN", ticket.status, ["assignee"], note)
+
+
+def release_assigned_tickets(assignee: UserInfo, actor: UserInfo, note: str) -> None:
+    tickets = Ticket.objects.select_for_update().filter(assignee=assignee).exclude(status=Status.CLOSED).order_by("pk")
+    for ticket in tickets:
+        end_assignment(ticket, str(TicketAssignment.EndReason.DEACTIVATED), note)
+        ticket.assignee_id = None
+        _record_change(ticket, actor, "DEACTIVATED", ticket.status, ["assignee"], note)
 
 
 @transaction.atomic

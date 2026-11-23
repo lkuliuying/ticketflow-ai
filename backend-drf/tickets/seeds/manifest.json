@@ -7,7 +7,9 @@
   ],
   "url_prefixes": [
     "api/tickets/",
-    "api/ticket-ratings"
+    "api/ticket-ratings",
+    "api/ticketflow/accounts",
+    "api/ticketflow/skill-groups"
   ],
   "config_keys": [],
   "dict_codes": [

@@ -216,4 +216,5 @@ XADMIN_APPS: [tickets, knowledge, demo]
 
 # 按类别覆盖部门 UUID。空配置走种子创建的 ticketflow_support。
 TICKETFLOW_DEFAULT_DEPARTMENT: ""
+# 已部署库迁移时导入旧映射，日常通过 TicketFlow 技能组页面维护分类路由。
 TICKETFLOW_CATEGORY_DEPARTMENTS: {}

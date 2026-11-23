@@ -121,6 +121,10 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 
 工单提交人可用 `viewer.can_rate` 判断能否评价。每张工单仅可评价一次，重开和重新关闭后保留原评价。详情仅向评价人、被评处理人及管理员返回评价。列表中员工看给出的评价，技术员看收到的评价，管理员看全部。汇总时间筛选按评价创建时间，两端含边界。解决率为 0–1 的比例，无评价时均分和解决率为空。标签编码及中英文名称见 [工单契约](../schema/ticketflow.schema.json)。
 
+业务管理员可在 `/api/ticketflow/accounts` 管理业务账号，使用 `PATCH /api/ticketflow/accounts/{pk}` 启停或编辑，使用 `POST /api/ticketflow/accounts/{pk}/reset-password` 重置密码。技术员停用或改为其他角色后，未关闭工单结束当前指派并进入待分配。账号降权、停用和重置密码沿用底座全会话撤销。
+
+业务管理员可在 `/api/ticketflow/skill-groups` 管理技能组，并通过 `/api/ticketflow/skill-groups/category-routes` 查询分类路由，按分类 PATCH。路由保存在数据库，只影响后续建单，未配置使用默认组。默认组、有在职技术员的组或仍被分类指向的组停用时返回 409。迁移会导入旧配置中有效的分类映射。账号和技能组列表都提供 `search-fields` 与 `search-columns`。
+
 | FastAPI 接口 | 请求 | 成功响应 |
 | --- | --- | --- |
 | `POST /ai/v1/tickets/analyze` | `{ticket_id: UUID}` | 200，`{ticket_id, ticket_version, category, suggested_priority, summary, tags}`，Pydantic v2 校验类别、优先级和长度 |

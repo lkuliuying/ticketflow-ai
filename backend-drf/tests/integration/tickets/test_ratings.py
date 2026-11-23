@@ -5,7 +5,7 @@ import pytest
 from django.utils import timezone
 
 from identity.models import UserInfo
-from system.models import Menu
+from system.models import FieldPermission, Menu
 from tests.integration.tickets.test_ticket_services import race_twice
 from tests.integration.tickets.test_viewer_contract import validate
 from tickets.models import RatingTag, Status, Ticket, TicketRating
@@ -66,6 +66,34 @@ def test_only_submitter_can_rate_visible_closed_ticket(users, other_agent, make_
     assert owner.patch(f"{path}/rating", {"satisfaction": 1}, format="json").status_code == 403
     assert TicketRating.objects.count() == 1
     assert TicketRating.objects.get(ticket=ticket).satisfaction == PAYLOAD["satisfaction"]
+
+
+@pytest.mark.django_db
+def test_rating_response_uses_the_action_field_allowlist(users, make_ticket, client_for, settings):
+    settings.PERMISSION_FIELD_ENABLED = True
+    requester = users["requester"]
+    ticket = make_ticket(status=Status.CLOSED, assignee=users["agent"])
+    menu = Menu.objects.get(name="rating:TicketFlowTickets")
+    fields = FieldPermission.objects.get(menu=menu, role=requester.roles.get())
+    fields.field.remove(*fields.field.filter(parent__name="tickets.ticketrating").exclude(name__in=["pk", "resolved"]))
+
+    response = client_for(requester).post(f"/api/tickets/{ticket.pk}/rating", PAYLOAD, format="json")
+    assert response.status_code == 201, response.data
+    rating = TicketRating.objects.get(ticket=ticket)
+    assert response.data["data"] == {"pk": str(rating.pk), "resolved": True}
+    assert rating.comment == PAYLOAD["comment"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("comment", ["", " \t\n", None])
+def test_rating_stores_blank_comments_as_null(users, make_ticket, client_for, comment):
+    ticket = make_ticket(status=Status.CLOSED)
+    response = client_for(users["requester"]).post(
+        f"/api/tickets/{ticket.pk}/rating", PAYLOAD | {"comment": comment}, format="json"
+    )
+    assert response.status_code == 201, response.data
+    assert response.data["data"]["comment"] is None
+    assert TicketRating.objects.get(ticket=ticket).comment is None
 
 
 @pytest.mark.django_db
@@ -220,6 +248,8 @@ def test_rating_list_scope_filters_and_replus_metadata(users, client_for, rating
             assert standalone.status_code == 200, standalone.data
             assert data[metadata.replace("-", "_")] == standalone.data["data"]
     admin = client_for(users["admin"])
+    handlers = admin.get(RATINGS, {"handler_id": users["agent"].pk}).data["data"]["results"]
+    assert [row["pk"] for row in handlers] == [str(rating_rows[index].pk) for index in (1, 0)]
     expected = rating_rows[2]
     params = {
         "handler_id": expected.handler_id,
@@ -233,6 +263,14 @@ def test_rating_list_scope_filters_and_replus_metadata(users, client_for, rating
     assert admin.get(RATINGS, {"page": 2, "size": 1}).data["data"]["results"][0]["pk"] == str(expected.pk)
     assert client_for(users["agent"]).get(RATINGS, params).data["data"]["total"] == 0
     assert admin.get(RATINGS, {"created_to": "yesterday"}).status_code == 400
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("invalid_handler_id", ["2.9", "2.0", "2e0", "two"])
+def test_rating_handler_filter_rejects_non_integer_input(users, client_for, invalid_handler_id):
+    response = client_for(users["admin"]).get(RATINGS, {"handler_id": invalid_handler_id})
+    assert response.status_code == 400, response.data
+    assert "handler_id" in response.data["detail"]
 
 
 @pytest.mark.django_db

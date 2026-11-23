@@ -42,6 +42,8 @@ TRIAGE_RESOURCES = {
         "沿用业务权限与状态校验。AI 只读通过工单专用上下文接口取授权字段与知识片段。",
     ),
     "ticket-ratings": ("exempt", "工单评价明细与汇总供员工、技术员及管理员按角色在页面查看。"),
+    "ticketflow/accounts": ("exempt", "账号资料、角色授权、账号启停及密码重置由业务管理员在页面管理。"),
+    "ticketflow/skill-groups": ("exempt", "技能组和自动派单规则由业务管理员在页面配置。"),
     "knowledge/articles": (
         "exempt",
         "知识库列表与详情由页面读取，草稿创建、编辑及发布由有权限的用户发起；AI 侧通过专用上下文读取已发布文章片段。",
@@ -68,11 +70,11 @@ TRIAGE_RESOURCES = {
 
 
 def resource_key(url: str) -> str:
-    """候选 URL → 资源域键；平台和知识库按资源细分，其余按首段归类。"""
+    """候选 URL → 资源域键；平台、知识库和 TicketFlow 管理端按资源细分。"""
     parts = [part for part in str(url or "").strip("/").split("/") if part and part != "api"]
     if not parts:
         return "?"
-    if parts[0] in ("system", "knowledge") and len(parts) > 1:
+    if parts[0] in ("system", "knowledge", "ticketflow") and len(parts) > 1:
         return f"{parts[0]}/{parts[1]}"
     return parts[0]
 
