@@ -46,13 +46,36 @@ function hover(target, event) {
     html = `<b>${target.id}</b><br>${esc(STAGE_HINT[target.id])}`;
   } else if (target.kind === "trunk") {
     html = "<b>main</b><br>点击查看分支与提交";
+  } else if (target.kind === "branch") {
+    const b = data.git.branches.find(x => x.name === target.id);
+    html = b
+      ? `<b>${esc(b.name)}</b><br>领先 main ${b.ahead} · 落后 ${b.behind}<br><span class="muted">${esc(b.subject)}</span>`
+      : "";
   }
   tooltip.innerHTML = html;
   tooltip.style.opacity = html ? 1 : 0;
   tooltip.style.transform = `translate(${event.clientX + 14}px, ${event.clientY + 14}px)`;
 }
 
-const scene = new AgentScene(document.getElementById("stage"), { onSelect: select, onHover: hover });
+const backButton = document.getElementById("back-overview");
+const crumb = document.getElementById("crumb");
+const AGENT_LABEL = { claude: "Claude", codex: "Codex", gemini: "Gemini" };
+
+// 进入或离开仓库内部：显示返回按钮与面包屑，切换视图会停止巡航
+function onMode(mode, agent) {
+  backButton.hidden = mode !== "interior";
+  crumb.textContent = mode === "interior" ? `总览 / ${AGENT_LABEL[agent]} 仓库内部` : "总览";
+  rotating = false;
+  document.getElementById("rotate-toggle").classList.add("off");
+}
+
+function backToOverview() {
+  scene.exit();
+  select(null);
+}
+
+const scene = new AgentScene(document.getElementById("stage"), { onSelect: select, onHover: hover, onMode });
+backButton.addEventListener("click", backToOverview);
 
 const SCROLLERS = ["agents", "tab-pipeline", "tab-detail", "tab-git", "events"];
 
@@ -163,7 +186,10 @@ document.getElementById("rotate-toggle").addEventListener("click", e => {
   e.currentTarget.classList.toggle("off", !rotating);
 });
 window.addEventListener("keydown", e => {
-  if (e.key === "Escape") select(null);
+  if (e.key !== "Escape") return;
+  // 在仓库内部按 Esc 回到总览，在总览按 Esc 取消选择
+  if (scene.mode === "interior") backToOverview();
+  else select(null);
 });
 
 poll();
