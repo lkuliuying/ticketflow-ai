@@ -65,6 +65,8 @@ export const MessageAction = {
   CHAT_READ: "chat_read",
   /** 未读红点推送（下行，ws/chat/） */
   CHAT_UNREAD: "chat_unread",
+  /** 群资料变更通知（成员/名称；下行，ws/chat/，客户端重拉会话列表） */
+  CHAT_ROOM: "chat_room",
   /** 任务执行日志增量推送 */
   TASK_LOG: "task_log",
   /** 监控面板指标推送（system/ws_monitor.py） */
@@ -74,7 +76,9 @@ export const MessageAction = {
   /** 大屏服务端聚合数据推送（dataset/ws_screen.py，按观察者各自聚合后自推） */
   SCREEN_DATA: "screen_data",
   /** 大屏展示端当前页上报（dataset/ws_screen.py，上行单向；carousel 触发聚合按上报页取数） */
-  SCREEN_PAGE_STATE: "screen_page_state"
+  SCREEN_PAGE_STATE: "screen_page_state",
+  /** 仪表盘服务端聚合数据推送（dataset/ws_dashboard.py，下行单向） */
+  DASHBOARD_DATA: "dashboard_data"
   // 值形态由生成契约约束（未知动作字面量即类型错误）；
   // 双向集合一致性由 protocol.spec.ts 对着镜像 schema 断言（新增 action 必须双端登记）
 } as const satisfies Record<string, WsContractAction>;
