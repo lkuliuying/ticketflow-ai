@@ -281,8 +281,8 @@ CELERY_TASK_SERIALIZER = "json"
 
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Xadmin Server API",
-    "DESCRIPTION": "Django Xadmin Server",
+    "TITLE": "TicketFlow API",
+    "DESCRIPTION": "TicketFlow backend API",
     "VERSION": VERSION,
     "ENUM_NAME_OVERRIDES": {
         "CategoryEnum": "file.serializers.upload.upload_category_choices",

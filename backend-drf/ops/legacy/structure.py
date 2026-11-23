@@ -130,11 +130,8 @@ PREREQUISITE_CALLABLES = (
     "check_duplicate_logins",
 )
 
-#: 幂等数据迁移白名单。当前为空：它们通过 ORM 查询默认连接，在「旧库别名」
-#: 对齐场景下会命中错误库；结构与账本对齐后由 post_upgrade 统一补齐（含下线
-#: 权限点清理与风险规则缺行合并），不在对齐器内执行（此前误跑会直接报 relation
-#: 不存在）。新增数据迁移必须在此表态或登记到 DEFERRED_CALLABLES。
-DATA_CLEANUP_CALLABLES: tuple[str, ...] = ()
+#: 对齐器建表后可安全执行的幂等数据迁移必须使用 schema_editor 的数据库别名。
+DATA_CLEANUP_CALLABLES: tuple[str, ...] = ("rename_default_site_title", "rename_default_root_department")
 
 #: 明确「跳过」的数据迁移登记（仅用于白名单守护：新增数据迁移必须在这里表态，
 #: 避免结构对齐路径静默漏执行或误执行）。

@@ -99,7 +99,7 @@ SETTINGS_CONFIG = {
     "SECURITY_MFA_LOGIN_PROTECT_ENABLED": True,  # 绑定 OTP 的用户登录时强制二次验证
     "SECURITY_MFA_LOGIN_TOKEN_TTL": 300,  # 登录 MFA 临时令牌有效期（秒）
     "SECURITY_MFA_OTP_VALID_WINDOW": 1,  # OTP 容错窗口（前后各 N 个周期）
-    "SECURITY_MFA_OTP_ISSUER": "XAdmin",  # OTP 绑定 URI 中的签发方名称
+    "SECURITY_MFA_OTP_ISSUER": "TicketFlow",  # OTP 绑定 URI 中的签发方名称
     # 认证方式策略：全局允许的验证方式白名单（空 = 全部启用后端）；
     # 角色级/用户级配置只能在此基础上继续收窄
     "SECURITY_MFA_METHODS": [],
@@ -290,7 +290,7 @@ SETTINGS_CONFIG = {
     "EMAIL_HOST_PASSWORD": "",
     "EMAIL_FROM": "",
     "EMAIL_RECIPIENT": "",
-    "EMAIL_SUBJECT_PREFIX": "Xadmin-Server ",
+    "EMAIL_SUBJECT_PREFIX": "TicketFlow ",
     "EMAIL_USE_SSL": True,
     "EMAIL_USE_TLS": False,
     # SMTP 连接/读取超时（秒）：黑洞 SMTP 不能无限挂住 celery 线程

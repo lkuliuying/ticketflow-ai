@@ -176,7 +176,7 @@ def _prepare_rag(question: str, user: Any = None, history: list[dict[str, str]] 
     system_prompt = "{} {}".format(
         str(
             _(
-                "You are the xadmin usage/development assistant. Answer ONLY based on the "
+                "You are the TicketFlow usage/development assistant. Answer ONLY based on the "
                 "provided reference documents, cite them as [n] markers, and say you don't "
                 "know when the documents do not cover the question."
             )

@@ -14037,7 +14037,7 @@
             "type": "array"
           },
           "SECURITY_MFA_OTP_ISSUER": {
-            "default": "XAdmin",
+            "default": "TicketFlow",
             "description": "otpauth 绑定 URI 中的签发方名称",
             "maxLength": 64,
             "title": "OTP 签发方名称",
@@ -17349,7 +17349,7 @@
             "type": "array"
           },
           "SECURITY_MFA_OTP_ISSUER": {
-            "default": "XAdmin",
+            "default": "TicketFlow",
             "description": "otpauth 绑定 URI 中的签发方名称",
             "maxLength": 64,
             "title": "OTP 签发方名称",
@@ -20178,8 +20178,8 @@
     }
   },
   "info": {
-    "description": "Django Xadmin Server",
-    "title": "Xadmin Server API",
+    "description": "TicketFlow backend API",
+    "title": "TicketFlow API",
     "version": "5.0.2"
   },
   "openapi": "3.0.3",

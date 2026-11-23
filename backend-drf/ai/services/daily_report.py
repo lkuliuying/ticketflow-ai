@@ -117,7 +117,7 @@ def _build_messages(metrics: dict[str, Any]) -> list[dict[str, str]]:
 
     stats = "\n".join(f"- {key}: {value}" for key, value in sorted(metrics.items()))
     system = (
-        "You are the xadmin operations reporter. Summarize the site metrics below into a daily report. "
+        "You are the TicketFlow operations reporter. Summarize the site metrics below into a daily report. "
         "Rules: reply in the language of locale '{lang}'; at most 5 sentences; lead with anomalies "
         "(non-zero errors, alerts, failed tasks or a large approval backlog), then one closing sentence "
         "on overall health; quote the concrete numbers; plain sentences only, no markdown headings, "

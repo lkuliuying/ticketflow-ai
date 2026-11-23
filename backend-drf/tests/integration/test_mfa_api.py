@@ -78,6 +78,7 @@ class TestOTPBind:
         resp = email_ready.post(OTP_START_URL)
         assert resp.data["code"] == 1000
         assert resp.data["data"]["uri"].startswith("otpauth://totp/")
+        assert pyotp.parse_uri(resp.data["data"]["uri"]).issuer == "TicketFlow"
         assert resp.data["data"]["secret"]
 
     def test_confirm_wrong_code(self, email_ready):
