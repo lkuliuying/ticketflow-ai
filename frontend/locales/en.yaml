@@ -4461,6 +4461,7 @@ ticketflow:
     commentTooLong: The comment cannot exceed {max} characters
     handler: Technician
     byHandler: By technician
+    drillHint: Click a technician to see their ratings below
     noRatings: No ratings yet
     periodStart: Start date
     periodEnd: End date

@@ -31,21 +31,41 @@ const {
 
 const handlers = computed(() => summary.value?.by_handler ?? []);
 
-function reloadSummary() {
+function periodParams() {
   const [from, to] = period.value ?? [];
-  loadSummary(from && to ? { created_from: from, created_to: to } : undefined);
+  return from && to ? { created_from: from, created_to: to } : {};
 }
 
-/** 点技术员一行：明细列表按该处理人筛选（没有处理人的评价不支持按人筛选） */
-function drillDown(row: HandlerRatingStats) {
+/** 时间段同时作用于上方汇总与下方明细，两处口径一致 */
+function applyPeriod() {
+  loadSummary(periodParams());
   const fields = tableRef.value?.searchFields;
-  if (!fields || row.handler_id == null) return;
-  fields.handler_id = row.handler_id;
-  fields.page = 1;
+  if (!fields) return;
+  const { created_from = "", created_to = "" } = periodParams();
+  Object.assign(fields, { created_from, created_to, page: 1 });
   tableRef.value?.handleGetData?.();
 }
 
-onMounted(reloadSummary);
+/** 点技术员一行：明细列表按该处理人与当前时间段筛选（没有处理人的评价不支持按人筛选） */
+function drillDown(row: HandlerRatingStats) {
+  const fields = tableRef.value?.searchFields;
+  if (!fields || row.handler_id == null) return;
+  const { created_from = "", created_to = "" } = periodParams();
+  Object.assign(fields, {
+    handler_id: row.handler_id,
+    created_from,
+    created_to,
+    page: 1
+  });
+  tableRef.value?.handleGetData?.();
+}
+
+const rowClassName = ({ row }: { row: HandlerRatingStats }) =>
+  row.handler_id == null ? "" : "cursor-pointer";
+
+defineExpose({ drillDown, applyPeriod });
+
+onMounted(() => loadSummary());
 </script>
 
 <template>
@@ -57,17 +77,21 @@ onMounted(reloadSummary);
         value-format="YYYY-MM-DD"
         :start-placeholder="t('ticketflow.rating.periodStart')"
         :end-placeholder="t('ticketflow.rating.periodEnd')"
-        @change="reloadSummary"
+        @change="applyPeriod"
       />
     </div>
     <RatingSummaryCards :stats="summary" :loading="summaryLoading" />
     <el-card shadow="never" data-testid="rating-by-handler">
       <template #header>
         <span class="font-medium">{{ t("ticketflow.rating.byHandler") }}</span>
+        <span class="ml-2 text-xs text-fg-muted">
+          {{ t("ticketflow.rating.drillHint") }}
+        </span>
       </template>
       <el-table
         :data="handlers"
         :empty-text="t('ticketflow.rating.noRatings')"
+        :row-class-name="rowClassName"
         @row-click="drillDown"
       >
         <el-table-column :label="t('ticketflow.rating.handler')">

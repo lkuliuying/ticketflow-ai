@@ -29,15 +29,19 @@ export function useRatings(componentName: string) {
 
   const summary = ref<RatingSummary | null>(null);
   const summaryLoading = ref(false);
+  let summarySeq = 0;
 
+  /** 快速切换时间段时只采用最后一次请求的结果；失败时清空旧汇总，避免展示与条件不符的数据 */
   async function loadSummary(params?: {
     created_from?: string;
     created_to?: string;
   }) {
+    const seq = ++summarySeq;
     summaryLoading.value = true;
     const res = await ratingApi.summary(params).catch(() => null);
+    if (seq !== summarySeq) return;
     summaryLoading.value = false;
-    if (res && isSuccess(res)) summary.value = res.data;
+    summary.value = res && isSuccess(res) ? res.data : null;
   }
 
   const stars = (value: number) =>

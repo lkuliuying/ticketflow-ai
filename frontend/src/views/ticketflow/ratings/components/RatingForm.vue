@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { FormInstance, FormRules } from "element-plus";
 import {
@@ -35,9 +35,11 @@ const form = reactive<{
   comment: ""
 });
 
-const isScore = (value: number) => value >= 1 && value <= 5;
+const isScore = (value: number) =>
+  Number.isInteger(value) && value >= 1 && value <= 5;
 
 const starRequired = (message: string) => ({
+  required: true,
   validator: (
     _rule: unknown,
     value: number,
@@ -48,6 +50,7 @@ const starRequired = (message: string) => ({
 const rules: FormRules = {
   resolved: [
     {
+      required: true,
       validator: (_rule, value, callback) =>
         value === undefined
           ? callback(new Error(t("ticketflow.rating.resolvedRequired")))
@@ -85,8 +88,9 @@ async function getPayload(): Promise<RatingPayload | null> {
 }
 
 /** 星级文案：1~5 分各一档 */
-const scoreTexts = () =>
-  [1, 2, 3, 4, 5].map(score => t(`ticketflow.rating.scoreText.${score}`));
+const scoreTexts = computed(() =>
+  [1, 2, 3, 4, 5].map(score => t(`ticketflow.rating.scoreText.${score}`))
+);
 
 defineExpose({ getPayload, form });
 </script>
@@ -113,7 +117,7 @@ defineExpose({ getPayload, form });
       :label="t('ticketflow.rating.satisfaction')"
       prop="satisfaction"
     >
-      <el-rate v-model="form.satisfaction" show-text :texts="scoreTexts()" />
+      <el-rate v-model="form.satisfaction" show-text :texts="scoreTexts" />
     </el-form-item>
     <el-form-item
       :label="
@@ -123,7 +127,7 @@ defineExpose({ getPayload, form });
       "
       prop="handler_score"
     >
-      <el-rate v-model="form.handler_score" show-text :texts="scoreTexts()" />
+      <el-rate v-model="form.handler_score" show-text :texts="scoreTexts" />
     </el-form-item>
     <el-form-item :label="t('ticketflow.rating.tags')">
       <el-checkbox-group v-model="form.tags">

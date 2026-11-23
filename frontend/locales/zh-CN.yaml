@@ -4459,6 +4459,7 @@ ticketflow:
     commentTooLong: 文字评价不能超过 {max} 字
     handler: 处理人
     byHandler: 按技术员统计
+    drillHint: 点击某位技术员查看其评价明细
     noRatings: 暂无评价
     periodStart: 开始日期
     periodEnd: 结束日期
