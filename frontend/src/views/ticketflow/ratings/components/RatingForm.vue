@@ -44,7 +44,7 @@ const starRequired = (message: string) => ({
     _rule: unknown,
     value: number,
     callback: (_error?: Error) => void
-  ) => (value >= 1 && value <= 5 ? callback() : callback(new Error(message)))
+  ) => (isScore(value) ? callback() : callback(new Error(message)))
 });
 
 const rules: FormRules = {
