@@ -178,7 +178,16 @@ export function refreshCard(card, task) {
 
 export function disposeCard(scene, card, pickables) {
   scene.remove(card.group);
-  if (card.link) scene.remove(card.link);
+  card.mesh.material[4].map?.dispose();
+  card.group.traverse(o => {
+    o.geometry?.dispose();
+    for (const m of [o.material].flat()) m?.dispose();
+  });
+  if (card.link) {
+    scene.remove(card.link);
+    card.link.geometry.dispose();
+    card.link.material.dispose();
+  }
   const i = pickables.indexOf(card.mesh);
   if (i >= 0) pickables.splice(i, 1);
 }
@@ -246,11 +255,13 @@ export function updateCabinet(scene, cab, git) {
   cab.known = new Set(commits.map(c => c.sha));
 }
 
+const CONFETTI_GEOMETRY = new THREE.PlaneGeometry(0.16, 0.1);
+
 function confetti(scene, cab, color) {
   const palette = [color, "#f0a92e", "#2fb383", "#3b7ddd", "#e07a3f"];
   const pieces = Array.from({ length: 36 }, (_, i) => {
     const piece = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.16, 0.1),
+      CONFETTI_GEOMETRY,
       new THREE.MeshBasicMaterial({ color: palette[i % palette.length], side: THREE.DoubleSide, transparent: true })
     );
     piece.position.set(cab.group.position.x, 4.4, cab.group.position.z);
@@ -282,7 +293,10 @@ export function tickCabinet(scene, cab, dt, t, selected) {
       p.material.opacity = Math.max(0, 1 - Math.max(0, burst.life - 1.8) / 1.2);
     }
     if (burst.life > 3) {
-      for (const p of burst.pieces) scene.remove(p);
+      for (const p of burst.pieces) {
+        scene.remove(p);
+        p.material.dispose();
+      }
       return false;
     }
     return true;

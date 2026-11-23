@@ -315,7 +315,7 @@ body.collapsed-bottom .legend, body.collapsed-bottom .events { display: none; }
 }
 .trunk-title { font-weight: 700; color: #3f8f2a; font-size: 13px; }
 .trunk-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lane-label { font-size: 11px; color: #b54848; background: white; padding: 1px 8px; border-radius: 6px; border: 1px dashed #ef5b5b; }
+.trunk-label.selected { box-shadow: 0 0 0 2px #6cbf4a, 0 4px 14px rgba(31, 41, 55, 0.1); }
 
 .tooltip {
   position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none; opacity: 0;
@@ -341,6 +341,7 @@ body.collapsed-bottom .legend, body.collapsed-bottom .events { display: none; }
   .panel { top: auto; bottom: calc(var(--bottom) + 8px); height: 40vh; width: auto; left: 16px; right: 16px; }
   .panel.left { display: none; }
   .panel.right { width: auto; left: 16px; }
-  body.collapsed-right .panel.right { transform: translateY(calc(100% - 44px)); }
+  /* 窄屏没有折叠按钮，忽略宽屏时保存的右侧收起状态 */
+  body.collapsed-right .panel.right { transform: none; }
   .panel.right .collapse { display: none; }
 }

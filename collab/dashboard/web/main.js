@@ -115,7 +115,8 @@ const COLLAPSE_KEY = "dashboard.collapsed";
 function loadCollapsed() {
   try {
     const saved = localStorage.getItem(COLLAPSE_KEY);
-    if (saved) return JSON.parse(saved);
+    const list = saved ? JSON.parse(saved) : null;
+    if (Array.isArray(list)) return list;
   } catch {
     /* 读不到偏好时用默认值 */
   }
@@ -149,9 +150,13 @@ document.querySelectorAll("[data-collapse]").forEach(b =>
     }
   })
 );
-document.getElementById("reset-view").addEventListener("click", () => scene.resetView());
-
 let rotating = false;
+document.getElementById("reset-view").addEventListener("click", () => {
+  // 复位同时停止巡航，按钮状态与 rotating 保持一致
+  rotating = false;
+  document.getElementById("rotate-toggle").classList.add("off");
+  scene.resetView();
+});
 document.getElementById("rotate-toggle").addEventListener("click", e => {
   rotating = !rotating;
   scene.setAutoRotate(rotating);

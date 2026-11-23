@@ -161,6 +161,7 @@ export class AgentScene {
     if (card.link) {
       this.scene.remove(card.link);
       card.link.geometry.dispose();
+      card.link.material.dispose();
       card.link = null;
     }
     if (!active) return;
@@ -207,7 +208,6 @@ export class AgentScene {
 
   resetView() {
     this.controls.autoRotate = false;
-    document.getElementById("rotate-toggle")?.classList.add("off");
     this.userMoved = false;
     this.#fit();
   }
@@ -266,7 +266,8 @@ export class AgentScene {
 
     for (const card of this.cards.values()) {
       const g = card.group;
-      g.position.lerp(card.target, 0.06);
+      // 与帧率无关的阻尼，后台节流或低帧率时滑动速度一致
+      g.position.lerp(card.target, 1 - Math.exp(-3.6 * dt));
       g.position.y += Math.sin(t * 1.4 + card.bob) * 0.004;
       // 卡片始终朝向镜头（只绕竖轴转）
       g.rotation.y = Math.atan2(this.camera.position.x - g.position.x, this.camera.position.z - g.position.z);

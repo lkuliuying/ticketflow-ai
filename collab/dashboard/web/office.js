@@ -130,6 +130,10 @@ function plant(x, z) {
 export function drawWhiteboard(board, data) {
   const counts = {};
   for (const t of data.tasks) counts[t.stage] = (counts[t.stage] ?? 0) + 1;
+  // 计数没变就不重绘，避免每 3 秒重新上传贴图
+  const sig = JSON.stringify([data.tasks.length, data.stages.map(s => counts[s] ?? 0)]);
+  if (board.userData.sig === sig) return;
+  board.userData.sig = sig;
   const max = Math.max(1, ...Object.values(counts));
   const tex = canvasTexture(1000, 400, (ctx, w, h) => {
     ctx.fillStyle = "#ffffff";
