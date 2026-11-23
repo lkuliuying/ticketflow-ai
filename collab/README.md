@@ -58,17 +58,17 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 ## 当前迭代
 
-迭代 5：遗留问题清零，见[开发计划书](../docs/development/开发计划书.md)第 4 节。迭代 2~4 已合并到 `main`
+迭代 5：遗留问题清零，见[开发计划书](../docs/development/开发计划书.md)第 4 节，已于 2026-11-23 合并到 `main`（验收见[迭代 5 验收说明](../docs/development/迭代5验收说明.md)）。迭代 2~4 已合并到 `main`
 （迭代 4 于 2026-11-22 合并，验收见[迭代 4 验收说明](../docs/development/迭代4验收说明.md)）。
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| BE-05 | 已关闭工单禁止指派、`viewer.can_reply` | Codex | — | 已通过 |
-| SV-03 | AI 服务鲁棒性（SSE 流尾、缓存键、引用标题、Mock 标签、重试单测） | Codex | — | 已通过 |
-| BE-06 | 测试稳定性（`test_tag_center`、压测缓存包装、Shell 脚本换行符） | Codex | — | 已通过 |
-| FE-08 | 详情跟进契约、AI 引用标题、人机校验卸载中止 | Claude | BE-05、SV-03 | 已通过 |
-| FE-09 | E2E 健壮性 | Claude | — | 已通过 |
-| FE-10 | 前端门禁清零 | Claude | — | 已通过 |
+| BE-05 | 已关闭工单禁止指派、`viewer.can_reply` | Codex | — | 已合并 |
+| SV-03 | AI 服务鲁棒性（SSE 流尾、缓存键、引用标题、Mock 标签、重试单测） | Codex | — | 已合并 |
+| BE-06 | 测试稳定性（`test_tag_center`、压测缓存包装、Shell 脚本换行符） | Codex | — | 已合并 |
+| FE-08 | 详情跟进契约、AI 引用标题、人机校验卸载中止 | Claude | BE-05、SV-03 | 已合并 |
+| FE-09 | E2E 健壮性 | Claude | — | 已合并 |
+| FE-10 | 前端门禁清零 | Claude | — | 已合并 |
 
 Codex 按 BE-05 → SV-03 → BE-06 顺序执行；Claude 先做 FE-09、FE-10，FE-08 等契约就绪。
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)，
