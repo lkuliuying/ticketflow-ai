@@ -4580,10 +4580,12 @@ workbench:
   myTickets: My tickets
   knowledge: Knowledge base
   stats:
-    pending: Open
+    open: Open
+    reopened: Reopened
     inProgress: In progress
     verifying: Pending verification
-    slaRisk: SLA at risk
+    dueSoon: Due soon
+    overdue: Overdue
   recentTickets: Recent tickets
   latestArticles: Latest articles
   viewAll: View all

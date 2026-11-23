@@ -1,10 +1,17 @@
 <script lang="ts" setup>
 import { computed, type Component } from "vue";
 import { useI18n } from "vue-i18n";
-import { Clock, Finished, Tickets, Warning } from "@element-plus/icons-vue";
+import {
+  AlarmClock,
+  Clock,
+  Finished,
+  RefreshLeft,
+  Tickets,
+  Warning
+} from "@element-plus/icons-vue";
 import type { WorkbenchStats } from "../useWorkbench";
 
-/** 工作台计数卡：待处理 / 处理中 / 待验收 / SLA 风险；点击跳转工单列表并带上对应筛选 */
+/** 工作台计数卡：每张卡对应工单列表的一个看板筛选，点击跳转并带上该筛选 */
 defineOptions({ name: "WorkbenchStats" });
 
 const props = defineProps<{ stats: WorkbenchStats }>();
@@ -20,7 +27,13 @@ type Card = {
 const { t } = useI18n();
 
 const CARDS: Card[] = [
-  { key: "pending", icon: Tickets, tone: "primary", query: { status: "OPEN" } },
+  { key: "open", icon: Tickets, tone: "primary", query: { status: "OPEN" } },
+  {
+    key: "reopened",
+    icon: RefreshLeft,
+    tone: "danger",
+    query: { status: "REOPENED" }
+  },
   {
     key: "inProgress",
     icon: Clock,
@@ -33,7 +46,13 @@ const CARDS: Card[] = [
     tone: "info",
     query: { status: "PENDING_VERIFY" }
   },
-  { key: "slaRisk", icon: Warning, tone: "danger", query: { sla: "OVERDUE" } }
+  {
+    key: "dueSoon",
+    icon: AlarmClock,
+    tone: "warning",
+    query: { sla: "DUE_SOON" }
+  },
+  { key: "overdue", icon: Warning, tone: "danger", query: { sla: "OVERDUE" } }
 ];
 
 const cards = computed(() =>
@@ -42,7 +61,7 @@ const cards = computed(() =>
 </script>
 
 <template>
-  <div class="grid gap-4 grid-cols-2 lg:grid-cols-4">
+  <div class="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
     <button
       v-for="card in cards"
       :key="card.key"

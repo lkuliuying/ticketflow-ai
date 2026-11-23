@@ -11,6 +11,7 @@ export type RouteIntent = {
 };
 
 const FILTER_KEYS = ["status", "sla", "priority"] as const;
+const INTENT_KEYS = [...FILTER_KEYS, "create"];
 
 /** 解析 query：`create=1` 打开新建表单，`status` / `sla` / `priority` 取第一个作为看板筛选 */
 export function parseRouteIntent(
@@ -24,9 +25,17 @@ export function parseRouteIntent(
   return create || filter ? { filter, create } : null;
 }
 
+/** 去掉意图参数后剩余的 query（其他参数原样保留） */
+export function withoutIntent<T extends Record<string, unknown>>(query: T) {
+  return Object.fromEntries(
+    Object.entries(query).filter(([key]) => !INTENT_KEYS.includes(key))
+  ) as Partial<T>;
+}
+
 /**
- * 消费路由意图：列表首次查询完成（元数据与表单列就绪）后执行，执行后清掉 query，
- * 避免刷新或返回时重复打开表单。页面被缓存时，再次带参进入同样会触发。
+ * 消费路由意图：列表首次查询完成（元数据与表单列就绪）后执行，执行后只清掉意图参数，
+ * 避免刷新或返回时重复打开表单。页面被缓存时，再次带参进入同样会触发；
+ * 只处理本页面自己的路径，缓存中的实例不会响应其他页面的同名参数。
  */
 export function useRouteIntent(handlers: {
   isReady: () => boolean;
@@ -35,16 +44,17 @@ export function useRouteIntent(handlers: {
 }) {
   const route = useRoute();
   const router = useRouter();
+  const ownPath = route.path;
 
   function consume() {
-    if (!handlers.isReady()) return;
+    if (route.path !== ownPath || !handlers.isReady()) return;
     const intent = parseRouteIntent(route.query);
     if (!intent) return;
-    router.replace({ path: route.path });
+    router.replace({ path: route.path, query: withoutIntent(route.query) });
     if (intent.filter) handlers.applyFilter(intent.filter);
     if (intent.create) handlers.openCreate();
   }
 
-  watch(() => route.query, consume);
+  watch(() => route.fullPath, consume);
   return { consume };
 }

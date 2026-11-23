@@ -4578,10 +4578,12 @@ workbench:
   myTickets: 我的工单
   knowledge: 知识库
   stats:
-    pending: 待处理
+    open: 待处理
+    reopened: 已重开
     inProgress: 处理中
     verifying: 待验收
-    slaRisk: SLA 风险
+    dueSoon: 即将超时
+    overdue: 已超时
   recentTickets: 最近工单
   latestArticles: 最新知识
   viewAll: 查看全部

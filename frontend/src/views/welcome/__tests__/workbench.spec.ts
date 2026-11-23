@@ -39,23 +39,25 @@ describe("greetingKey", () => {
 });
 
 describe("summarize", () => {
-  it("待处理合并新建与重开，SLA 风险合并即将超时与已超时", () => {
+  it("每张卡取对应状态或 SLA 的单项计数", () => {
     expect(
       summarize({
         status: { OPEN: 3, REOPENED: 2, IN_PROGRESS: 4, PENDING_VERIFY: 1 },
         priority: {},
         sla: { ON_TRACK: 5, DUE_SOON: 2, OVERDUE: 1, MET: 9 }
       })
-    ).toEqual({ pending: 5, inProgress: 4, verifying: 1, slaRisk: 3 });
+    ).toEqual({
+      open: 3,
+      reopened: 2,
+      inProgress: 4,
+      verifying: 1,
+      dueSoon: 2,
+      overdue: 1
+    });
   });
 
   it("没有数据时全部为 0", () => {
-    expect(summarize(null)).toEqual({
-      pending: 0,
-      inProgress: 0,
-      verifying: 0,
-      slaRisk: 0
-    });
+    expect(Object.values(summarize(null))).toEqual([0, 0, 0, 0, 0, 0]);
   });
 });
 
@@ -76,12 +78,28 @@ describe("useWorkbench", () => {
       expect.objectContaining({ page: 1, size: 6, ordering: "-updated_time" })
     );
     expect(mocks.articleList).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "PUBLISHED", size: 5 })
+      expect.objectContaining({
+        status: "PUBLISHED",
+        size: 5,
+        ordering: "-updated_time"
+      })
     );
-    expect(workbench.stats.value.pending).toBe(1);
+    expect(workbench.stats.value.open).toBe(1);
     expect(workbench.tickets.value).toEqual([{ pk: "t1" }]);
     expect(workbench.articles.value).toEqual([{ pk: "a1" }]);
     expect(workbench.loading.value).toBe(false);
+  });
+
+  it("没有列表权限的部分不请求", async () => {
+    mocks.articleList.mockResolvedValue(ok({ results: [] }));
+    const workbench = useWorkbench({
+      tickets: () => false,
+      articles: () => true
+    });
+    await workbench.reload();
+    expect(mocks.dashboard).not.toHaveBeenCalled();
+    expect(mocks.ticketList).not.toHaveBeenCalled();
+    expect(mocks.articleList).toHaveBeenCalledTimes(1);
   });
 
   it("单路失败不影响其他数据，加载状态正常结束", async () => {
@@ -100,25 +118,33 @@ describe("useWorkbench", () => {
 });
 
 describe("WorkbenchStats", () => {
-  it("展示计数，点击卡片带上对应筛选", async () => {
+  it("展示计数，点击卡片带上与计数一致的单项筛选", async () => {
     const wrapper = mount(WorkbenchStats, {
       props: {
-        stats: { pending: 5, inProgress: 4, verifying: 1, slaRisk: 3 }
+        stats: {
+          open: 3,
+          reopened: 2,
+          inProgress: 4,
+          verifying: 1,
+          dueSoon: 2,
+          overdue: 1
+        }
       },
       global: { stubs: { "el-icon": true } }
     });
     await flushPromises();
     expect(
-      wrapper.get('[data-testid="workbench-stat-pending"]').text()
-    ).toContain("5");
-    await wrapper
-      .get('[data-testid="workbench-stat-verifying"]')
-      .trigger("click");
-    await wrapper
-      .get('[data-testid="workbench-stat-slaRisk"]')
-      .trigger("click");
+      wrapper.get('[data-testid="workbench-stat-reopened"]').text()
+    ).toContain("2");
+    for (const key of ["open", "reopened", "dueSoon", "overdue"]) {
+      await wrapper
+        .get(`[data-testid="workbench-stat-${key}"]`)
+        .trigger("click");
+    }
     expect(wrapper.emitted("open")).toEqual([
-      [{ status: "PENDING_VERIFY" }],
+      [{ status: "OPEN" }],
+      [{ status: "REOPENED" }],
+      [{ sla: "DUE_SOON" }],
       [{ sla: "OVERDUE" }]
     ]);
   });

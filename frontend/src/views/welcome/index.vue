@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted } from "vue";
+import { computed, onActivated, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import dayjs from "dayjs";
@@ -27,7 +27,11 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const user = useUserStoreHook();
 const ticketAuth = usePageAuth("TicketFlowTickets");
-const { tickets, articles, loading, stats, reload } = useWorkbench();
+const articleAuth = usePageAuth("TicketFlowKnowledge");
+const { tickets, articles, loading, stats, reload } = useWorkbench({
+  tickets: () => Boolean(ticketAuth.list),
+  articles: () => Boolean(articleAuth.list)
+});
 
 const displayName = computed(() => user.nickname || user.username || "");
 /** 日期用浏览器内置的本地化格式（含星期），随界面语言切换 */
@@ -52,7 +56,15 @@ function openArticle(article: ArticleItem) {
   openArticleDetail(article);
 }
 
-onMounted(reload);
+/** 页面被缓存时，从工单页等处返回首页要刷新计数；首次挂载由 onMounted 负责 */
+let mounted = false;
+onMounted(async () => {
+  await reload();
+  mounted = true;
+});
+onActivated(() => {
+  if (mounted) reload();
+});
 </script>
 
 <template>
