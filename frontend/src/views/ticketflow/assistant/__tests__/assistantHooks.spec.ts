@@ -77,6 +77,24 @@ describe("useAssistantSessions", () => {
     expect(s.sessions.value).toHaveLength(1);
   });
 
+  it("改名响应晚于删除时不把会话插回列表", async () => {
+    mocks.list.mockResolvedValue(page([session("s1")]));
+    mocks.remove.mockResolvedValue("");
+    let finish: (value: unknown) => void = () => undefined;
+    mocks.rename.mockReturnValue(
+      new Promise(resolve => {
+        finish = resolve;
+      })
+    );
+    const s = useAssistantSessions();
+    await s.load();
+    const renaming = s.rename("s1", "VPN");
+    await s.remove("s1");
+    finish(ok(session("s1", "VPN")));
+    await renaming;
+    expect(s.sessions.value).toHaveLength(0);
+  });
+
   it("改名用服务端返回值替换并移到最前", async () => {
     mocks.list.mockResolvedValue(page([session("s1"), session("s2")]));
     mocks.rename.mockResolvedValue(ok(session("s2", "VPN 排查")));

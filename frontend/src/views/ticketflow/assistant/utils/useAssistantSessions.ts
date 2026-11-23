@@ -51,8 +51,9 @@ export function useAssistantSessions() {
     return res.data;
   }
 
-  /** 用服务端返回的最新会话替换本地一项，并移到列表最前 */
+  /** 用服务端返回的最新会话替换本地一项并移到最前；已移除的会话（迟到的响应）不再插回 */
   function upsert(session: AssistantSession) {
+    if (!sessions.value.some(s => s.pk === session.pk)) return;
     sessions.value = [
       session,
       ...sessions.value.filter(s => s.pk !== session.pk)
