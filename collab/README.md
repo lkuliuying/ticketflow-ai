@@ -90,14 +90,26 @@ python collab/bin/review.py BE-02 be/contract-gaps --repo ..\ticketflow-ai-be   
 - Antigravity：`agy`（1.5.13）以 plan 模式运行，模型 `gemini-4-neon-high`，评审材料由脚本拼好经 stdin
   传入，**不授予任何文件或终端权限**。模型在 `review.py` 的 `MODEL` 中修改，可选值见 `agy models`。
 
-## 代理指挥台（3D 可视化）
+## 代理指挥台（3D 仓库）
 
 ```powershell
 python collab/dashboard/server.py --port 8765   # 打开 http://127.0.0.1:8765
 ```
 
-- 页面用 Three.js 展示三个代理站台、8 个阶段的环形流水线、任务卡片、交接链路和 main 提交柱，
-  左侧是代理状态（Codex 最近命令、Gemini 最近结论），右侧是流水线 / 详情 / Git，底部是事件流。
+- **总览**：扁平低多边形的仓库区。Claude、Codex、Gemini 各一座封闭仓库（屋脊状态灯：运行中绿、异常红、空闲灰），
+  标签显示当前任务和库内各阶段数量，三座仓库摆成三角形，中央是 main 归档库（抽屉按最近提交着色，新提交弹出并撒纸屑）。
+  仓库之间用传送带连成环：任务书、完成报告、退回修改、评审结论、提交评审、合并。代理运行时对应车道流动数据包；
+  任务换了负责的代理时，一个阶段色货箱沿传送带运到下一座仓库。总览里不显示任务卡片。
+- **分支堆场**：main 之外每个分支一个集装箱。领先 main 的分支是彩色高箱（fe/ 橙、be/ 绿、integration/ 灰蓝，领先越多越高，
+  当前检出的分支有描边和“当前检出”标记），已合入的分支是前排一排小灰箱。点击集装箱查看分支详情（领先 / 落后、工作目录、关联任务）。
+- **仓库内部**：点击仓库（或在面板里选中代理、选中任务）进入该仓库内部。货架放等待中的任务，流水线上是正在处理的任务
+  （工作站状态灯、压头随运行上下），出货区是送出的任务（Claude：待合并；Codex：已送评审；Gemini：已放行 / 已退回，半透明）。
+  卡面为阶段色底白字。顶栏“返回总览”或 Esc 回到总览。
+- 左侧代理面板、右侧详情面板和底部事件流都可以收起，偏好保存在浏览器本地；窄于 1300 px 时默认收起左侧面板。
+  镜头按可见区域自动适配，拖动后“复位”回到默认视角，“巡航”自动旋转。
+- 代码在 `collab/dashboard/web/`：`scene.js`（两种视图、镜头、拾取、切换）、`warehouse.js`（总览仓库建筑与通用工具）、
+  `belt.js`（传送带、数据包、货箱、main 归档库、卡面纹理）、`branches.js`（分支堆场）、`interior.js`（仓库内部）、
+  `hud.js`（面板）、`theme.js`（配色与文案）。
 - 数据全部来自本机：`collab/README.md` 看板、任务书、`collab/reports/`（报告、Codex 日志、
   `*.run-*.json` 调度记录、`claude.status.json`）、`collab/reviews/` 和 git，每 3 秒刷新，只监听 127.0.0.1。
 - `codex_task.py` 与 `review.py` 每次调度都会写运行记录；Claude 切换工作时更新 `claude.status.json`。

@@ -227,7 +227,7 @@ function stageDetail(stage, data) {
 export function renderDetail(data, selected) {
   const el = $("tab-detail");
   if (!selected) {
-    el.innerHTML = `<p class="muted pad">在 3D 场景里点击代理、任务卡片或阶段门，或在左右面板中点击条目查看详情。</p>`;
+    el.innerHTML = `<p class="muted pad">点击仓库进入内部查看货架和流水线；点击 main 归档库或分支堆场的集装箱查看分支；也可以在左右面板中点击条目查看详情。</p>`;
     return;
   }
   if (selected.kind === "task") {
@@ -239,7 +239,31 @@ export function renderDetail(data, selected) {
     el.innerHTML = stageDetail(selected.id, data);
   } else if (selected.kind === "trunk") {
     el.innerHTML = gitHtml(data.git);
+  } else if (selected.kind === "branch") {
+    el.innerHTML = branchDetail(selected.id, data);
   }
+}
+
+function branchDetail(name, data) {
+  const b = data.git.branches.find(x => x.name === name);
+  if (!b) return `<p class="muted pad">分支 ${esc(name)} 已不存在</p>`;
+  const tasks = data.tasks.filter(t => t.branch === name);
+  const worktree = data.git.worktrees.find(w => w.branch === name);
+  const commits = data.git.commits.filter(c => c.refs.split(", ").some(r => r.replace("HEAD -> ", "") === name));
+  return `
+    <div class="detail-head" style="--c:${b.ahead ? "#3b7ddd" : "#9aa3b2"}">
+      <h3><code>${esc(b.name)}</code></h3>${b.name === data.git.current ? '<span class="chip running">当前检出</span>' : ""}
+    </div>
+    <p class="hint">${b.ahead ? "领先 main，尚未合入" : "已全部合入 main"}</p>
+    <dl class="grid">
+      <dt>相对 main</dt><dd>领先 ${b.ahead} · 落后 ${b.behind}</dd>
+      <dt>最新提交</dt><dd><code>${esc(b.sha)}</code> ${esc(b.subject)}</dd>
+      <dt>提交时间</dt><dd>${relTime(b.date)}</dd>
+      <dt>工作目录</dt><dd>${worktree ? `<code>${esc(worktree.worktree)}</code>${worktree.dirty ? ` · <b class="bad-text">${worktree.dirty} 个未提交改动</b>` : ""}` : "未检出"}</dd>
+    </dl>
+    <h4>关联任务</h4>
+    ${tasks.length ? tasks.map(t => `<div class="mini-task">${stageChip(t.stage)} <code>${t.id}</code> ${esc(t.title)}</div>`).join("") : '<p class="muted">无</p>'}
+    ${commits.length ? `<h4>分支头提交</h4><ul class="commits">${commits.map(c => `<li style="--a:${AGENT_COLORS[c.author] ?? "#9ca3af"}"><i></i><code>${esc(c.sha)}</code> ${esc(c.subject)}<em>${relTime(c.date)}</em></li>`).join("")}</ul>` : ""}`;
 }
 
 // ---------------------------------------------------------------- 右侧：Git
@@ -270,6 +294,10 @@ export function renderGit(data) {
 // ---------------------------------------------------------------- 底部事件流
 
 export function renderEvents(data) {
+  const last = data.events[0];
+  $("latest").innerHTML = last
+    ? `<span style="color:${AGENT_COLORS[last.agent] ?? "#999"}">${KIND_ICON[last.kind] ?? "•"}</span> ${esc(last.text)} <span class="muted">· ${relTime(last.time)}</span>`
+    : "";
   $("events").innerHTML = data.events
     .map(
       e => `<div class="event ${e.kind}" style="--a:${AGENT_COLORS[e.agent] ?? "#999"}">

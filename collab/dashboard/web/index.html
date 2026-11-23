@@ -19,28 +19,35 @@
       }
     </script>
   </head>
-  <body>
+  <body class="preload">
     <div id="stage"></div>
 
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark"></span>
         <div>
-          <h1>TicketFlow 代理指挥台</h1>
-          <p>Claude 总指导 · Codex 后端 · Gemini 评审 — 实时协作流水线</p>
+          <h1>TicketFlow 代理仓库</h1>
+          <p id="crumb">总览</p>
         </div>
+        <button id="back-overview" class="ghost back" hidden>← 返回总览</button>
       </div>
       <div id="stage-pills" class="stage-pills"></div>
       <div class="live">
         <span id="live-dot" class="live-dot"></span>
         <span id="live-text">连接中…</span>
+        <button id="reset-view" class="ghost" title="回到默认视角">⌂ 复位</button>
         <button id="rotate-toggle" class="ghost off" title="自动旋转">⟳ 巡航</button>
       </div>
     </header>
 
-    <aside id="agents" class="panel left"></aside>
+    <aside class="panel left" data-panel="left">
+      <button class="collapse" data-collapse="left" title="收起 / 展开代理面板"></button>
+      <div class="panel-title">代理</div>
+      <div id="agents" class="panel-body"></div>
+    </aside>
 
-    <aside class="panel right">
+    <aside class="panel right" data-panel="right">
+      <button class="collapse" data-collapse="right" title="收起 / 展开详情面板"></button>
       <nav class="tabs">
         <button data-tab="pipeline" class="active">流水线</button>
         <button data-tab="detail">详情</button>
@@ -51,10 +58,12 @@
       <div id="tab-git" class="tab"></div>
     </aside>
 
-    <footer class="timeline">
+    <footer class="timeline" data-panel="bottom">
       <div class="timeline-head">
         <strong>事件流</strong>
+        <span id="latest" class="latest"></span>
         <span class="legend" id="legend"></span>
+        <button class="collapse" data-collapse="bottom" title="收起 / 展开事件流"></button>
       </div>
       <div id="events" class="events"></div>
     </footer>
