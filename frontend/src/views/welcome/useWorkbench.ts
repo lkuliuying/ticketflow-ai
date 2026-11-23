@@ -57,6 +57,8 @@ export function useWorkbench(
   const tickets = ref<TicketItem[]>([]);
   const articles = ref<ArticleItem[]>([]);
   const loading = ref(false);
+  /** 首轮加载是否结束（成功或失败），供视图判断能否按视角渲染 */
+  const loaded = ref(false);
   const stats = computed(() => summarize(dashboard.value));
 
   async function loadDashboard() {
@@ -96,8 +98,9 @@ export function useWorkbench(
       await Promise.all(jobs);
     } finally {
       loading.value = false;
+      loaded.value = true;
     }
   }
 
-  return { dashboard, tickets, articles, loading, stats, reload };
+  return { dashboard, tickets, articles, loading, loaded, stats, reload };
 }

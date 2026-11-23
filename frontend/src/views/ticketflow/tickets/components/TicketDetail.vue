@@ -177,12 +177,12 @@ function time(value: string | null | undefined) {
             :run="run"
             :busy="busy"
           />
-          <div v-if="canArchive && onArchive">
+          <div v-if="canArchive">
             <el-button
               type="success"
               plain
               data-testid="ticket-archive"
-              @click="onArchive(detail, load)"
+              @click="onArchive?.(detail, load)"
             >
               {{ t("ticketflow.detail.archive") }}
             </el-button>

@@ -22,6 +22,8 @@ defineOptions({
   name: "Welcome"
 });
 
+/** 站点根目录的 Logo（public 静态资源，运行时按路径引用，不经构建导入） */
+const LOGO_URL = "/logo.svg";
 const TICKETS_PATH = "/ticketflow/tickets/index";
 const KNOWLEDGE_PATH = "/ticketflow/knowledge/index";
 
@@ -30,16 +32,17 @@ const router = useRouter();
 const user = useUserStoreHook();
 const ticketAuth = usePageAuth("TicketFlowTickets");
 const articleAuth = usePageAuth("TicketFlowKnowledge");
-const { dashboard, tickets, articles, loading, stats, reload } = useWorkbench({
-  tickets: () => Boolean(ticketAuth.list),
-  articles: () => Boolean(articleAuth.list)
-});
+const { dashboard, tickets, articles, loading, loaded, stats, reload } =
+  useWorkbench({
+    tickets: () => Boolean(ticketAuth.list),
+    articles: () => Boolean(articleAuth.list)
+  });
 
 /** 视角由看板的指派维度推断：管理员突出待分配，技术员突出我的待办，员工突出建单 */
 const role = computed(() => workbenchRole(dashboard.value));
 const cards = computed(() => cardsFor(role.value));
 /** 看板返回前不渲染随视角变化的卡片与入口，避免先闪出员工视角再跳变；看板失败时按员工视角兜底 */
-const roleReady = computed(() => dashboard.value !== null || !loading.value);
+const roleReady = computed(() => dashboard.value !== null || loaded.value);
 
 const displayName = computed(() => user.nickname || user.username || "");
 /** 日期用浏览器内置的本地化格式（含星期），随界面语言切换 */
@@ -82,7 +85,7 @@ onActivated(() => {
         class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
       >
         <div class="flex items-center gap-4">
-          <img src="/logo.svg" alt="" class="size-12" />
+          <img :src="LOGO_URL" alt="" class="size-12" />
           <div>
             <h2 class="workbench-title" data-testid="workbench-greeting">
               {{ t(greetingKey(dayjs().hour()), { name: displayName }) }}
