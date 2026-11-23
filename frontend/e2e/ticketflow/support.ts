@@ -43,10 +43,22 @@ export async function openTickets(page: Page) {
   await expect(page.getByTestId("ticket-dashboard")).toBeVisible();
 }
 
-/** 在列表中按标题找到工单并打开详情抽屉 */
+/**
+ * 在列表中找到工单并打开详情抽屉：先用列表的“关键字”筛选到这张工单，
+ * 与列表数据量、排序和分页无关（只看首屏时，工单多了会被挤到后面的页）。
+ */
 export async function openTicket(page: Page, title: string): Promise<Locator> {
   await openTickets(page);
-  const row = page.locator(".el-table__row", { hasText: title }).first();
+  // “关键字”默认收在搜索区的“展开”里；标签带冒号，按前缀匹配
+  const keyword = page.getByRole("textbox", { name: /^关键字/ });
+  const expand = page.getByRole("link", { name: "展开", exact: true });
+  if (!(await keyword.isVisible()) && (await expand.isVisible())) {
+    await expand.click();
+  }
+  await keyword.fill(title);
+  await keyword.press("Enter");
+  const rows = page.locator(".el-table__row");
+  const row = rows.filter({ hasText: title }).first();
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "工单详情" }).click();
   const drawer = page.locator(".el-drawer").last();
@@ -71,13 +83,17 @@ export async function transition(page: Page, drawer: Locator, action: string) {
   await expect(box).toBeHidden();
 }
 
-/** 选择 el-select 的选项：点开下拉后按可见文字选中 */
+/**
+ * 选择 el-select 的选项：只在这个下拉框自己弹出的列表里找。
+ * 输入框的 aria-controls 指向它的选项列表，页面上同时存在别的下拉层或同名选项时不会点错。
+ */
 export async function choose(page: Page, select: Locator, option: string) {
+  const combobox = select.getByRole("combobox");
   await select.click();
-  await page
-    .locator(".el-select-dropdown:visible .el-select-dropdown__item", {
-      hasText: option
-    })
-    .first()
-    .click();
+  await expect(combobox).toHaveAttribute("aria-expanded", "true");
+  const listId = await combobox.getAttribute("aria-controls");
+  expect(listId, "下拉框缺少 aria-controls").toBeTruthy();
+  const list = page.locator(`[id="${listId}"]`);
+  await list.getByRole("option", { name: option, exact: true }).click();
+  await expect(combobox).toHaveAttribute("aria-expanded", "false");
 }
