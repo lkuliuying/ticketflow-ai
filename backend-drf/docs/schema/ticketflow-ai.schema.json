@@ -28,13 +28,21 @@
       "properties": {"code": {"type": "integer"}, "error": {"type": "string"}, "detail": {"type": "string"}}
     },
     "streamMeta": {
-      "description": "HTTP 200 text/event-stream 的首帧 meta，references 为引用文章 ID。",
+      "description": "HTTP 200 text/event-stream 的首帧 meta，references 为引用文章的 ID 和标题。",
       "type": "object",
       "required": ["ticket_id", "ticket_version", "references"],
       "properties": {
         "ticket_id": {"type": "string", "format": "uuid"},
         "ticket_version": {"type": "integer", "minimum": 1},
-        "references": {"type": "array", "items": {"type": "string", "format": "uuid"}}
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["article_id", "title"],
+            "additionalProperties": false,
+            "properties": {"article_id": {"type": "string", "format": "uuid"}, "title": {"type": "string"}}
+          }
+        }
       }
     },
     "streamDelta": {
