@@ -1,5 +1,6 @@
 from rest_framework.routers import SimpleRouter
 
+from tickets.assistant_views import AssistantFeedbackViewSet, AssistantInternalViewSet, AssistantSessionViewSet
 from tickets.management_views import AccountViewSet, SkillGroupViewSet
 from tickets.rating_views import TicketRatingViewSet
 from tickets.views import TicketViewSet
@@ -21,3 +22,8 @@ skill_group_router.register("", SkillGroupViewSet, basename="ticketflow-skill-gr
 skill_group_urlpatterns = [
     pattern for pattern in skill_group_router.urls if pattern.name != "ticketflow-skill-group-list"
 ]
+
+assistant_router = SimpleRouter(trailing_slash=False)
+assistant_router.register("sessions", AssistantSessionViewSet, basename="assistant-session")
+assistant_router.register("feedback", AssistantFeedbackViewSet, basename="assistant-feedback")
+assistant_router.register("internal/sessions", AssistantInternalViewSet, basename="assistant-internal")

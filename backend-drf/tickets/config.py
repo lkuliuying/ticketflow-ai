@@ -2,7 +2,7 @@ from django.urls import include, path, re_path
 
 from tickets.management_views import AccountViewSet, SkillGroupViewSet
 from tickets.rating_views import TicketRatingViewSet
-from tickets.urls import account_urlpatterns, ratings_urlpatterns, skill_group_urlpatterns
+from tickets.urls import account_urlpatterns, assistant_router, ratings_urlpatterns, skill_group_urlpatterns
 from tickets.views import TicketViewSet
 
 URLPATTERNS = [
@@ -22,5 +22,6 @@ URLPATTERNS = [
         name="ticketflow-skill-group-list",
     ),
     re_path(r"^api/ticketflow/skill-groups/", include(skill_group_urlpatterns)),
+    path("api/assistant/", include(assistant_router.urls)),
 ]
 PERMISSION_WHITE_REURL: dict[str, list[str]] = {}

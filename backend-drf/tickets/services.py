@@ -12,6 +12,7 @@ from rest_framework.exceptions import APIException, NotFound, PermissionDenied, 
 
 from identity.models import DeptInfo, UserInfo
 from tickets.assignment import dispatch, end_assignment, set_assignee
+from tickets.assistant_services import owned_session, require_employee
 from tickets.cache import IDEMPOTENCY_TTL, invalidate_dashboard, request_key, reserve_create
 from tickets.models import (
     Priority,
@@ -73,9 +74,15 @@ def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
     return ticket
 
 
-def create_ticket(user: UserInfo, key: str, values: NewTicket) -> tuple[Ticket, bool]:
+def create_ticket(
+    user: UserInfo, key: str, values: NewTicket, *, assistant_session_id: UUID | None = None
+) -> tuple[Ticket, bool]:
     key_hash = sha256(key.encode()).hexdigest()
-    digest = sha256(json.dumps(values, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    request_values = dict(values)
+    if assistant_session_id is not None:
+        require_employee(TicketAccess.for_user(user))
+        request_values["assistant_session_id"] = str(assistant_session_id)
+    digest = sha256(json.dumps(request_values, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     redis_key = request_key(user.pk, key_hash)
     cached = cache.get(redis_key)
     if cached:
@@ -85,12 +92,17 @@ def create_ticket(user: UserInfo, key: str, values: NewTicket) -> tuple[Ticket, 
         if ticket is not None:
             return ticket, False
     with reserve_create(redis_key):
-        return _persist_ticket(user, key_hash, digest, redis_key, values)
+        return _persist_ticket(user, key_hash, digest, redis_key, values, assistant_session_id)
 
 
 @transaction.atomic
 def _persist_ticket(
-    user: UserInfo, key_hash: str, digest: str, redis_key: str, values: NewTicket
+    user: UserInfo,
+    key_hash: str,
+    digest: str,
+    redis_key: str,
+    values: NewTicket,
+    assistant_session_id: UUID | None = None,
 ) -> tuple[Ticket, bool]:
     now = timezone.now()
     record, inserted = TicketCreateRequest.objects.select_for_update().get_or_create(
@@ -103,7 +115,15 @@ def _persist_ticket(
             raise TicketConflict("相同幂等键已用于其他请求")
         if record.ticket_id is not None:
             return record.ticket, False
+    session = None
+    if assistant_session_id is not None:
+        session = owned_session(user.pk, assistant_session_id, lock=True)
+        if session.ticket_id is not None:
+            raise TicketConflict("此会话已关联工单")
     ticket = _make_ticket(user, values)
+    if session is not None:
+        session.ticket = ticket
+        session.save(update_fields=["ticket", "updated_time"])
     record.ticket = ticket
     record.request_hash = digest
     record.expires_at = now + timedelta(seconds=IDEMPOTENCY_TTL)

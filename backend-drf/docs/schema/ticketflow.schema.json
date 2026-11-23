@@ -65,8 +65,183 @@
         "title": {"type": "string", "minLength": 1, "maxLength": 200},
         "description": {"type": "string", "minLength": 1, "maxLength": 20000},
         "category": {"$ref": "#/$defs/category"},
-        "priority": {"$ref": "#/$defs/priority"}
+        "priority": {"$ref": "#/$defs/priority"},
+        "assistant_session_id": {"type": "string", "format": "uuid", "description": "可选。仅普通员工可提交本人未删除且尚未关联工单的会话。关联与建单同事务，参与幂等请求摘要。"}
       }
+    },
+    "ticketDetailAssistant": {
+      "type": "object",
+      "required": ["assistant_session_id"],
+      "properties": {
+        "assistant_session_id": {"type": ["string", "null"], "format": "uuid", "description": "仅有会话查看权限的提交人、当前处理技术员和管理员可见，其他情况为 null。GET /api/tickets/{id}/assistant-session 返回会话和分页消息。"}
+      }
+    },
+    "assistantSessionCreate": {
+      "type": "object",
+      "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 200, "default": "新对话"}}
+    },
+    "assistantSessionRename": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 200}}
+    },
+    "assistantSession": {
+      "type": "object",
+      "required": ["pk", "title", "ticket_id", "created_time", "updated_time"],
+      "properties": {
+        "pk": {"type": "string", "format": "uuid"},
+        "title": {"type": "string", "maxLength": 200},
+        "ticket_id": {"type": ["string", "null"], "format": "uuid"},
+        "created_time": {"type": "string", "format": "date-time"},
+        "updated_time": {"type": "string", "format": "date-time"}
+      }
+    },
+    "assistantReference": {
+      "type": "object",
+      "required": ["article_id", "title"],
+      "properties": {
+        "article_id": {"type": "string", "format": "uuid"},
+        "title": {"type": "string", "maxLength": 200}
+      }
+    },
+    "assistantExcerpt": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantReference"},
+        {"type": "object", "required": ["excerpt"], "properties": {"excerpt": {"type": "string", "maxLength": 800}}}
+      ]
+    },
+    "assistantMessageRole": {"enum": ["user", "assistant"]},
+    "assistantMessageStatus": {"enum": ["complete", "interrupted", "failed"]},
+    "assistantVote": {"enum": ["up", "down"]},
+    "assistantFeedbackReason": {
+      "enum": ["INACCURATE", "UNRESOLVED", "IRRELEVANT", "OTHER", null],
+      "x-labels": {
+        "INACCURATE": {"zh": "不准确"},
+        "UNRESOLVED": {"zh": "没解决"},
+        "IRRELEVANT": {"zh": "引用不相关"},
+        "OTHER": {"zh": "其他"}
+      }
+    },
+    "assistantFeedbackInput": {
+      "type": "object",
+      "required": ["vote"],
+      "properties": {
+        "vote": {"$ref": "#/$defs/assistantVote"},
+        "reason": {"$ref": "#/$defs/assistantFeedbackReason"},
+        "comment": {"type": "string", "maxLength": 300, "default": ""}
+      },
+      "description": "点赞清空原因和补充。改投以本次提交为准。"
+    },
+    "assistantFeedback": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantFeedbackInput"},
+        {"type": "object", "required": ["reason", "comment", "created_time", "updated_time"], "properties": {
+          "created_time": {"type": "string", "format": "date-time"},
+          "updated_time": {"type": "string", "format": "date-time"}
+        }}
+      ]
+    },
+    "assistantTranscriptMessage": {
+      "type": "object",
+      "required": ["pk", "role", "content", "references", "status", "user_message_id", "created_time"],
+      "properties": {
+        "pk": {"type": "string", "format": "uuid"},
+        "role": {"$ref": "#/$defs/assistantMessageRole"},
+        "content": {"type": "string"},
+        "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantReference"}},
+        "status": {"$ref": "#/$defs/assistantMessageStatus"},
+        "user_message_id": {"type": ["string", "null"], "format": "uuid"},
+        "created_time": {"type": "string", "format": "date-time"}
+      }
+    },
+    "assistantMessage": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantTranscriptMessage"},
+        {"type": "object", "required": ["feedback"], "properties": {
+          "feedback": {"oneOf": [{"$ref": "#/$defs/assistantFeedback"}, {"type": "null"}]}
+        }}
+      ]
+    },
+    "assistantHandoffSession": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantSession"},
+        {"type": "object", "required": ["user_id", "username", "ticket_number"], "properties": {
+          "user_id": {"type": "integer"},
+          "username": {"type": "string"},
+          "ticket_number": {"type": ["string", "null"]}
+        }}
+      ]
+    },
+    "assistantDownvote": {
+      "type": "object",
+      "required": ["session", "question", "answer"],
+      "properties": {
+        "session": {"$ref": "#/$defs/assistantHandoffSession"},
+        "question": {"$ref": "#/$defs/assistantTranscriptMessage"},
+        "answer": {"$ref": "#/$defs/assistantMessage", "description": "对应回答，含当前点踩及原因。"}
+      }
+    },
+    "assistantStats": {
+      "type": "object",
+      "required": ["sessions", "questions", "up", "down", "handoffs"],
+      "properties": {
+        "sessions": {"type": "integer", "minimum": 0},
+        "questions": {"type": "integer", "minimum": 0},
+        "up": {"type": "integer", "minimum": 0},
+        "down": {"type": "integer", "minimum": 0},
+        "handoffs": {"type": "integer", "minimum": 0}
+      },
+      "description": "created_from/created_to 双端含边界，分别按会话创建、问题创建、当前投票更新时间、关联工单创建过滤。包含员工软删除的会话。"
+    },
+    "assistantQuestionInput": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 4000}}
+    },
+    "assistantContext": {
+      "type": "object",
+      "required": ["history", "categories"],
+      "properties": {
+        "history": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["role", "content"],
+            "properties": {
+              "role": {"$ref": "#/$defs/assistantMessageRole"},
+              "content": {"type": "string"}
+            }
+          },
+          "description": "最近 10 个问题及其已完成回答，按提问顺序排列，最多 8000 字符。提问响应排除本次问题，转人工上下文包含最新问题。"
+        },
+        "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}}
+      }
+    },
+    "assistantQuestionContext": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantContext"},
+        {"type": "object", "required": ["user_message_id", "references"], "properties": {
+          "user_message_id": {"type": "string", "format": "uuid"},
+          "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantExcerpt"}}
+        }}
+      ]
+    },
+    "assistantAnswerInput": {
+      "type": "object",
+      "required": ["user_message_id", "content", "references", "status"],
+      "properties": {
+        "user_message_id": {"type": "string", "format": "uuid"},
+        "content": {"type": "string", "maxLength": 20000},
+        "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantReference"}},
+        "status": {"$ref": "#/$defs/assistantMessageStatus"}
+      },
+      "description": "首次写回保存并返回 assistant_message_id；重放返回原 ID，保留首次写入内容。已完成回答要求非空正文。"
+    },
+    "assistantAnswerResult": {
+      "type": "object",
+      "required": ["assistant_message_id"],
+      "properties": {"assistant_message_id": {"type": "string", "format": "uuid"}}
     },
     "ticketTransition": {
       "type": "object",

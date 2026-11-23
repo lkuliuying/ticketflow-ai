@@ -59,6 +59,7 @@ class TicketViewerSerializer(serializers.Serializer):
 
 class TicketDetailSerializer(TicketSerializer):
     viewer = TicketViewerSerializer(read_only=True)
+    assistant_session_id = serializers.UUIDField(read_only=True, allow_null=True)
     rating = TicketRatingSerializer(
         read_only=True,
         allow_null=True,
@@ -71,7 +72,14 @@ class TicketDetailSerializer(TicketSerializer):
     timeline = page("TicketTimelinePage", TimelineEntrySerializer(many=True))
 
     class Meta(TicketSerializer.Meta):
-        fields = (*TicketSerializer.Meta.fields, "viewer", "available_transitions", "timeline", "rating")
+        fields = (
+            *TicketSerializer.Meta.fields,
+            "viewer",
+            "available_transitions",
+            "timeline",
+            "rating",
+            "assistant_session_id",
+        )
 
 
 ticket_result = envelope("TicketResult", TicketSerializer())

@@ -64,6 +64,13 @@ class TicketAccess:
     def admin(self) -> bool:
         return self.is_superuser or ADMIN_ROLE in self.roles
 
+    @property
+    def employee(self) -> bool:
+        return REQUESTER_ROLE in self.roles and not (self.admin or self.agent)
+
+    def can_read_assistant_session(self, ticket: Ticket) -> bool:
+        return self.user_id == ticket.submitter_id or self.can_handle(ticket)
+
     def scope(self, queryset: QuerySet[Ticket]) -> QuerySet[Ticket]:
         if self.admin:
             return queryset

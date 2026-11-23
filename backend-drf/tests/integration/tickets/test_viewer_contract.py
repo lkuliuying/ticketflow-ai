@@ -429,11 +429,19 @@ def test_ticketflow_directory_contains_visible_pages_in_order(users):
         "ticketflow/ratings/stats/index",
         "ticketflow/accounts/index",
         "ticketflow/skill-groups/index",
+        "ticketflow/assistant/index",
+        "ticketflow/assistant/feedback/index",
     ]
     assert all(page.meta.is_show_menu for page in children)
     for user in users.values():
         assert user.roles.filter(menu=directory).exists()
-    for page in children[-2:]:
-        assert users["admin"].roles.filter(menu=page).exists()
-        assert not users["agent"].roles.filter(menu=page).exists()
-        assert not users["requester"].roles.filter(menu=page).exists()
+    role_pages = {
+        "TicketFlowAccounts": "admin",
+        "TicketFlowSkillGroups": "admin",
+        "TicketFlowAssistant": "requester",
+        "TicketFlowAssistantFeedback": "admin",
+    }
+    for page in children:
+        if page.name in role_pages:
+            for role, user in users.items():
+                assert user.roles.filter(menu=page).exists() is (role == role_pages[page.name])

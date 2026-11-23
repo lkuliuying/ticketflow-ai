@@ -2,7 +2,7 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
-from common.core.models import DbAuditModel, DbUuidModel
+from common.core.models import DbAuditModel, DbBaseModel, DbUuidModel, SoftDeleteModel
 
 
 class Category(models.TextChoices):
@@ -198,3 +198,69 @@ class TicketSlaAlert(DbUuidModel):
         constraints = [
             models.UniqueConstraint(fields=["ticket", "sla_cycle", "kind"], name="tf_sla_alert_once"),
         ]
+
+
+class AssistantSession(SoftDeleteModel, DbBaseModel, DbUuidModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="assistant_sessions")
+    title = models.CharField(max_length=200)
+    ticket = models.OneToOneField(
+        Ticket, on_delete=models.SET_NULL, null=True, blank=True, related_name="assistant_session"
+    )
+
+    class Meta:
+        verbose_name = "助手会话"
+        ordering = ("-updated_time", "-id")
+        indexes = [models.Index(fields=["user", "-updated_time", "-id"], name="tf_assistant_session_idx")]
+
+
+class AssistantMessage(DbUuidModel):
+    class Role(models.TextChoices):
+        USER = "user", "提问"
+        ASSISTANT = "assistant", "回答"
+
+    class Status(models.TextChoices):
+        COMPLETE = "complete", "完成"
+        INTERRUPTED = "interrupted", "中断"
+        FAILED = "failed", "失败"
+
+    session = models.ForeignKey(AssistantSession, on_delete=models.CASCADE, related_name="messages")
+    user_message = models.OneToOneField("self", on_delete=models.CASCADE, null=True, blank=True, related_name="answer")
+    role = models.CharField(max_length=9, choices=Role.choices)
+    content = models.TextField(blank=True)
+    references = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=11, choices=Status.choices, default=Status.COMPLETE)
+    created_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "助手消息"
+        ordering = ("created_time", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(role="user", user_message__isnull=True)
+                | models.Q(role="assistant", user_message__isnull=False),
+                name="tf_assistant_message_role",
+            )
+        ]
+        indexes = [models.Index(fields=["session", "created_time", "id"], name="tf_assistant_message_idx")]
+
+
+class AssistantFeedback(DbBaseModel, DbUuidModel):
+    class Vote(models.TextChoices):
+        UP = "up", "点赞"
+        DOWN = "down", "点踩"
+
+    class Reason(models.TextChoices):
+        INACCURATE = "INACCURATE", "不准确"
+        UNRESOLVED = "UNRESOLVED", "没解决"
+        IRRELEVANT = "IRRELEVANT", "引用不相关"
+        OTHER = "OTHER", "其他"
+
+    message = models.OneToOneField(AssistantMessage, on_delete=models.CASCADE, related_name="feedback")
+    vote = models.CharField(max_length=4, choices=Vote.choices)
+    reason = models.CharField(max_length=10, choices=Reason.choices, blank=True, null=True)
+    comment = models.CharField(max_length=300, blank=True, default="")
+
+    class Meta:
+        verbose_name = "助手反馈"
+        ordering = ("-updated_time", "-id")
+        indexes = [models.Index(fields=["vote", "-updated_time", "-id"], name="tf_assistant_feedback_idx")]

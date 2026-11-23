@@ -366,5 +366,15 @@
       "label": "评价时间",
       "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
     }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000211",
+    "fields": {
+      "field_type": 0,
+      "name": "assistant_session_id",
+      "label": "助手会话",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
   }
 ]

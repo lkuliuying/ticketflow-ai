@@ -42,6 +42,7 @@ TRIAGE_RESOURCES = {
         "沿用业务权限与状态校验。AI 只读通过工单专用上下文接口取授权字段与知识片段。",
     ),
     "ticket-ratings": ("exempt", "工单评价明细与汇总供员工、技术员及管理员按角色在页面查看。"),
+    "assistant": ("exempt", "员工助手与管理员反馈由页面调用，问答上下文和写回走独立的 FastAPI 内网链路。"),
     "ticketflow/accounts": ("exempt", "账号资料、角色授权、账号启停及密码重置由业务管理员在页面管理。"),
     "ticketflow/skill-groups": ("exempt", "技能组和自动派单规则由业务管理员在页面配置。"),
     "knowledge/articles": (
