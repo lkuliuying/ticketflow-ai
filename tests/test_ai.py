@@ -7,6 +7,8 @@ import pytest
 
 ANALYZE = "/ai/v1/tickets/analyze"
 STREAM = "/ai/v1/tickets/suggest-reply/stream"
+CHAT = "/ai/v1/assistant/chat/stream"
+DRAFT = "/ai/v1/assistant/handoff-draft"
 
 
 def assert_ai_failure(response, status, error):
@@ -73,19 +75,12 @@ def test_logout_revokes_ai_access(gateway, login, ticket):
     assert_ai_failure(gateway.post(ANALYZE, headers=session.headers, json=payload), 401, "UNAUTHORIZED")
 
 
-def test_reply_stream_arrives_incrementally(gateway, other_agent):
-    title = "园区 VPN 无法连接"
-    response = gateway.get("/api/tickets", params={"q": title}, headers=other_agent.headers)
-    assert response.status_code == 200, response.text
-    tickets = [ticket for ticket in response.json()["data"]["results"] if ticket["title"] == title]
-    assert tickets, "交付栈缺少可触发知识引用的 VPN 演示工单"
-    ticket = tickets[0]
-
-    headers = {**other_agent.headers, "Accept-Encoding": "gzip"}
+def read_stream(gateway, path, headers, body):
+    headers = {**headers, "Accept-Encoding": "gzip"}
     events = []
     frame = {}
     start = monotonic()
-    with gateway.stream("POST", STREAM, headers=headers, json={"ticket_id": ticket["pk"]}) as response:
+    with gateway.stream("POST", path, headers=headers, json=body) as response:
         assert response.status_code == 200, response.read().decode()
         assert response.headers["content-type"].split(";", 1)[0].strip().lower() == "text/event-stream"
         assert "gzip" not in response.headers.get("content-encoding", "").lower()
@@ -99,6 +94,17 @@ def test_reply_stream_arrives_incrementally(gateway, other_agent):
                 frame.clear()
 
     assert not frame
+    return events
+
+
+def test_reply_stream_arrives_incrementally(gateway, other_agent):
+    title = "园区 VPN 无法连接"
+    response = gateway.get("/api/tickets", params={"q": title}, headers=other_agent.headers)
+    assert response.status_code == 200, response.text
+    tickets = [ticket for ticket in response.json()["data"]["results"] if ticket["title"] == title]
+    assert tickets, "交付栈缺少可触发知识引用的 VPN 演示工单"
+    ticket = tickets[0]
+    events = read_stream(gateway, STREAM, other_agent.headers, {"ticket_id": ticket["pk"]})
     sequence = " ".join(name for name, _, _ in events)
     assert re.fullmatch(r"meta (?:ping )*(?:delta )+done", sequence), sequence
     meta = events[0][1]
@@ -116,3 +122,50 @@ def test_reply_stream_arrives_incrementally(gateway, other_agent):
     first_delta, done = deltas[0][1], events[-1][2]
     print(f"SSE {sequence}: first delta={first_delta:.3f}s, done={done:.3f}s, Content-Encoding has no gzip")
     assert first_delta < done / 2
+
+
+@pytest.fixture
+def assistant_session(gateway, requester):
+    response = gateway.post("/api/assistant/sessions", headers=requester.headers, json={})
+    assert response.status_code == 201, response.text
+    session_id = response.json()["data"]["pk"]
+    yield session_id
+    response = gateway.delete(f"/api/assistant/sessions/{session_id}", headers=requester.headers)
+    assert response.status_code == 204, response.text
+
+
+def test_assistant_stream_persists_answer_through_gateway(gateway, requester, assistant_session):
+    body = {"session_id": assistant_session, "message": "VPN"}
+    events = read_stream(gateway, CHAT, requester.headers, body)
+    sequence = " ".join(event for event, _, _ in events)
+    assert re.fullmatch(r"meta (?:ping |delta )*delta (?:ping |delta )*done", sequence), sequence
+    meta, done = events[0][1], events[-1][1]
+    assert set(meta) == {"session_id", "user_message_id", "references"}
+    assert meta["session_id"] == assistant_session
+    assert any(ref["title"] == "VPN 连接失败排查指南" for ref in meta["references"])
+    assert all(set(ref) == {"article_id", "title"} for ref in meta["references"])
+    assert done["finish_reason"] == "stop"
+    response = gateway.get(f"/api/assistant/sessions/{assistant_session}/messages", headers=requester.headers)
+    assert response.status_code == 200, response.text
+    messages = {message["pk"]: message for message in response.json()["data"]["results"]}
+    assert messages[meta["user_message_id"]]["content"] == body["message"]
+    answer = messages[done["assistant_message_id"]]
+    deltas = [data["text"] for event, data, _ in events if event == "delta"]
+    assert answer["content"] == "".join(deltas)
+    assert answer["user_message_id"] == meta["user_message_id"]
+    assert answer["status"] == "complete" and answer["references"] == meta["references"]
+    first_delta = next(elapsed for event, _, elapsed in events if event == "delta")
+    assert first_delta < events[-1][2] / 2
+    print(f"Assistant SSE {sequence}: first delta={first_delta:.3f}s, done={events[-1][2]:.3f}s, stored=complete")
+    for event, data in [("meta", meta), ("delta", {"text": deltas[0]}), ("done", done)]:
+        print(f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n")
+
+
+def test_assistant_handoff_draft_through_gateway(gateway, requester, assistant_session):
+    message = "VPN 客户端连接时超时"
+    chat = read_stream(gateway, CHAT, requester.headers, {"session_id": assistant_session, "message": message})
+    assert chat[-1][0] == "done"
+    response = gateway.post(DRAFT, headers=requester.headers, json={"session_id": assistant_session})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"title": message, "description": message, "category": "OTHER"}
+    print(f"Assistant handoff draft HTTP 200: {json.dumps(response.json(), ensure_ascii=False)}")

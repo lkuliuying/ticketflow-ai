@@ -12,7 +12,8 @@ from app.schemas.http import ErrorResponse
 from app.schemas.tickets import AnalysisResponse, TicketRequest
 from app.services.analysis import analyze_ticket
 from app.services.drf import fetch_ticket_context
-from app.services.reply import ReplyResponse, reply_events
+from app.services.reply import reply_events
+from app.services.stream import SSE_CONTENT, EventStreamResponse
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
@@ -39,13 +40,13 @@ async def _reply_context(
 @router.post(
     "/suggest-reply/stream",
     status_code=200,
-    response_class=ReplyResponse,
-    responses={**ERRORS, 200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
+    response_class=EventStreamResponse,
+    responses={**ERRORS, 200: {"content": SSE_CONTENT}},
 )
 async def suggest_reply(
     prepared: Annotated[tuple[TicketContext, AsyncExitStack], Depends(_reply_context)],
     resources: AppResources,
-) -> ReplyResponse:
+) -> EventStreamResponse:
     context, slot = prepared
     deadline = asyncio.get_running_loop().time() + resources.settings.stream_timeout
-    return ReplyResponse(reply_events(resources, context, slot, deadline), deadline)
+    return EventStreamResponse(reply_events(resources, context, slot, deadline), deadline)
