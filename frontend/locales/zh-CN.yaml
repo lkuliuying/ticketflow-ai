@@ -1136,6 +1136,8 @@ menus:
   ticketflowKnowledge: 工单知识库
   ticketflowMyRatings: 我的评价
   ticketflowRatingStats: 评价统计
+  ticketflowAccounts: 账号管理
+  ticketflowSkillGroups: 技能组
   searchData: 数据查询
   userOnline: 在线用户
   apiApp: API 应用
@@ -4427,6 +4429,61 @@ codegen:
   planImported: 方案已导入
   planImportFailed: 导入失败
 ticketflow:
+  account:
+    create: 新建账号
+    createTitle: 新建业务账号
+    editTitle: 编辑账号 {username}
+    edit: 编辑
+    saved: 账号已保存
+    username: 用户名
+    name: 姓名
+    phone: 手机
+    email: 邮箱
+    role: 角色
+    skill_group: 技能组
+    skill_group_name: 技能组
+    skillGroup: 技能组
+    is_active: 状态
+    q: 关键字
+    roleValue:
+      requester: 普通员工
+      agent: 技术员
+      admin: 管理员
+    active: 启用
+    inactive: 停用
+    password: 初始密码
+    newPassword: 新密码
+    generatePassword: 生成
+    usernameRequired: 请输入用户名
+    usernameInvalid: "3~64 位字母、数字或 _ . {'@'} + -"
+    nameRequired: 请输入姓名
+    emailInvalid: 邮箱格式不正确
+    roleRequired: 请选择角色
+    groupRequired: 技术员必须选择技能组
+    passwordRequired: 请输入密码
+    resetPassword: 重置密码
+    resetTitle: 重置 {username} 的密码
+    resetHint: 重置后 {username} 已登录的会话会全部失效，请把新密码告知本人
+    resetDone: 密码已重置
+    toggleActive: 启用 / 停用
+    enable: 启用账号
+    disable: 停用账号
+    enableConfirm: 确定启用 {username}？
+    disableConfirm: 停用后 {username} 无法登录，已登录的会话会立即失效。确定停用？
+    disableAgentConfirm: 停用后 {username} 无法登录，名下未关闭的工单会放回待分配，由管理员重新指派。确定停用？
+    enabled: 账号已启用
+    disabled: 账号已停用
+  skillGroup:
+    name: 名称
+    description: 说明
+    is_active: 状态
+    is_default: 默认组
+    q: 关键字
+    default: 默认组
+    routes: 分类路由
+    routesHint: 新建工单按分类进入对应技能组并自动派单；未配置的分类进入默认组（{name}）
+    useDefault: 使用默认组
+    routeSaved: 路由已保存
   rating:
     section: 评价
     rate: 评价这次处理
