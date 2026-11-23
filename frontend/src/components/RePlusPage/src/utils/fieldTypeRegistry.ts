@@ -113,6 +113,10 @@ export const FIELD_TYPES: Record<string, FieldTypeSpec> = {
     search: builtinSearchRenderers.datetimerange,
     filterKind: "datetime"
   },
+  decimal: {
+    form: builtinFormRenderers.decimal,
+    filterKind: "number"
+  },
   email: {
     // 渲染走回退登记（x-fallback-rendered），仅校验与筛选形态在此声明
     rule: emailRuleFactory,
@@ -127,10 +131,6 @@ export const FIELD_TYPES: Record<string, FieldTypeSpec> = {
   },
   float: {
     form: builtinFormRenderers.float,
-    filterKind: "number"
-  },
-  decimal: {
-    form: builtinFormRenderers.decimal,
     filterKind: "number"
   },
   "image upload": {

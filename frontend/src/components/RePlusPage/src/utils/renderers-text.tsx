@@ -2,8 +2,8 @@ import { get } from "lodash-es";
 import type { PlusColumnRegistry } from "./types";
 
 /**
- * 文本类字段（password / url / rich_text）的表单与详情渲染器。
- * 服务端词表 DECLARED_INPUT_TYPES 声明了这三种类型，渲染面在此集中实现，
+ * 文本类字段（decimal / password / url / rich_text）的表单与详情渲染器。
+ * 服务端词表 DECLARED_INPUT_TYPES 声明了这些类型，渲染面在此集中实现，
  * 由 renderers-form.tsx / renderers-detail.tsx 并入各自的内置表。
  */
 
@@ -28,6 +28,11 @@ function urlNode(value: unknown) {
 }
 
 export const textFormRenderers: PlusColumnRegistry = {
+  // DecimalField 序列化为字符串：按文本编辑并原样提交，避免转成浮点数丢精度，校验交给服务端
+  decimal: item => {
+    item["valueType"] = "input";
+    item["fieldProps"]!["inputmode"] = "decimal";
+  },
   password: item => {
     item["valueType"] = "input";
     item["fieldProps"]!["type"] = "password";
@@ -68,7 +73,9 @@ export const textDetailRenderers: PlusColumnRegistry = {
     );
     item["cellRenderer"] = ({ row }) => {
       const value = get(row, column.key);
-      return <span class="truncate">{value ? String(value) : EMPTY}</span>;
+      return (
+        <span class="block truncate">{value ? String(value) : EMPTY}</span>
+      );
     };
   }
 };

@@ -8,7 +8,7 @@ export function useMarkdownDrop({
   canUpload,
   uploadFiles
 }: {
-  canUpload: Ref<boolean>;
+  canUpload: Readonly<Ref<boolean>>;
   uploadFiles: (list: File[]) => Promise<void>;
 }) {
   const dragActive = ref(false);

@@ -6,6 +6,7 @@ import { hasAuth } from "@/router/utils";
 import { message } from "@/utils/message";
 import { useI18n } from "vue-i18n";
 import type { UploadKind } from "./types";
+import { uploadedSyntax } from "./markdownSyntax";
 import { useMarkdownDrop } from "./useMarkdownDrop";
 
 /**
@@ -95,12 +96,9 @@ export function useMarkdownUpload({
         });
         return;
       }
-      const label = (item.filename || file.name).replace(/[[\]]/g, "");
-      const syntax =
-        kind === "image"
-          ? `![${label}](<${item.access_url}>)`
-          : `[${label}](<${item.access_url}>)`;
-      insertBlock(syntax);
+      insertBlock(
+        uploadedSyntax(item.filename || file.name, item.access_url, kind)
+      );
     } catch {
       message(t("systemNotice.markdownUploadFailed"), { type: "error" });
     }
