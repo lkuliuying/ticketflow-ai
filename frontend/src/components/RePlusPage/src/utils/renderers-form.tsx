@@ -1,3 +1,4 @@
+import { textFormRenderers } from "./renderers-text";
 import { computed, defineAsyncComponent, h } from "vue";
 import dayjs from "dayjs";
 import {
@@ -38,8 +39,11 @@ const SuggestSelect = defineAsyncComponent(
  * 迁移自 columns.tsx formatAddOrEditColumns 的第一个 switch-case
  */
 export const builtinFormRenderers: PlusColumnRegistry = {
+  ...textFormRenderers,
   integer: numberFormRenderer,
   float: numberFormRenderer,
+  // DecimalField 序列化为字符串，el-input-number 读取时转数值，提交数值 DRF 同样接受
+  decimal: numberFormRenderer,
   string: item => {
     item["valueType"] = "input";
   },
@@ -210,7 +214,7 @@ export const formFallbackRenderer: PlusColumnHandler = (item, ctx) => {
   }
 };
 
-/** integer / float 共用 */
+/** integer / float / decimal 共用 */
 function numberFormRenderer(item: PageColumn, { column }: PlusColumnContext) {
   item["valueType"] = "input-number";
   item["fieldProps"]!["controlsPosition"] = "right";

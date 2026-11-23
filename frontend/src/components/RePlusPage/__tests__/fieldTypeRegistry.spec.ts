@@ -40,7 +40,7 @@ const vocabulary = new Set(
 );
 
 /** 词表外兼容项白名单（历史筛选形态登记，仅高级筛选使用；勿新增） */
-const EXTRA_ALLOWED = new Set(["url", "password", "decimal", "switch"]);
+const EXTRA_ALLOWED = new Set(["switch"]);
 
 /** 迁移前 advancedFilter.ts KIND_BY_INPUT_TYPE 的冻结快照（行为等价回归基准） */
 const LEGACY_KIND_BY_INPUT_TYPE: Record<string, LookupFieldKind> = {
