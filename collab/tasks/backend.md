@@ -480,3 +480,67 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
    直接挂进 Linux 容器跑运维脚本相关测试通过（迭代 4 时约 30 条失败）。
 
 完成标准：DRF 全量门禁通过；`test_tag_center` 连续跑 20 次（`pytest --count` 或循环）无失败，报告贴结果。
+
+## SV-04 模型思考模式开关与超时透传
+
+分支：`be/llm-thinking`，工作目录 `service-fastapi/` 与 `deploy/`（本任务只改这两处，外加下面点名的文档）。
+
+背景：交付栈要接 DeepSeek（`LLM_BASE_URL=https://api.deepseek.com`，`LLM_MODEL=deepseek-flash`）。
+DeepSeek 的 Chat Completions **默认开启思考模式**，关闭方式是请求体顶层带 `{"thinking": {"type": "disabled"}}`
+（开启为 `"enabled"`；官方文档 https://api-docs.deepseek.com/zh-cn/guides/thinking_mode ）。思考模式下思维链走
+`delta.reasoning_content` / `message.reasoning_content`，最终回答才在 `content`。现在 `OpenAICompatibleProvider`
+不传这个参数，于是：流式回复在模型思考期间只有心跳、迟迟不出字；分析受 `LLM_TIMEOUT`（30 秒）约束，思考过长会 504。
+另外交付栈 Compose 没有把 `LLM_TIMEOUT`、`STREAM_TIMEOUT` 传给 ai 容器，无法在 `deploy/.env` 调整。
+
+1. **配置项 `LLM_THINKING`**：`Settings` 新增 `llm_thinking: Literal["default", "enabled", "disabled"] = "default"`。
+   - `default`：请求体完全不带 `thinking` 字段，行为与现在一致（兼容 OpenAI 等不认识该字段的提供方）。
+   - `enabled` / `disabled`：分析请求和流式回复请求的 payload 顶层都加 `"thinking": {"type": <值>}`。
+   - 非法取值启动时报错（沿用 pydantic 校验，错误里不能回显密钥）。Mock 提供方忽略此项。
+2. **分析缓存键**：思考开关会改变输出，把 `llm_thinking` 纳入 `analysis_cache_key`（与模型名同级）；补单测：其他条件相同、
+   开关不同时缓存键不同。
+3. **`reasoning_content` 容错**：确认流式分片里只有 `reasoning_content`、`content` 为空或缺失时不报错、不输出正文、
+   不计为首段正文（自动重试只发生在第一段正文前的语义保持不变）；非流式分析的 `message` 带 `reasoning_content`
+   时仍只解析 `content`。现有行为如果已满足，补单测锁定即可，不要改协议。
+4. **Compose 透传**：`deploy/docker-compose.yml` 的 ai 服务新增 `LLM_THINKING: ${LLM_THINKING:-default}`、
+   `LLM_TIMEOUT: ${LLM_TIMEOUT:-30}`、`STREAM_TIMEOUT: ${STREAM_TIMEOUT:-90}`。默认值必须与服务端默认一致，
+   不改变现有交付栈行为。
+5. **文档与示例**：
+   - `service-fastapi/README.md` 配置表加 `LLM_THINKING`，说明三个取值；`service-fastapi/.env.example` 同步。
+   - `deploy/.env.example` 在 LLM 段加 `LLM_THINKING=`、`LLM_TIMEOUT=`、`STREAM_TIMEOUT=`（留空走默认，或写默认值，
+     与 `deploy/local.py env` 的生成逻辑保持一致——先看 `local.py` 怎么处理空值和已有键）。
+   - `deploy/README.md` 的模型段补一段“接入 DeepSeek”的示例：`MOCK_LLM=false`、`LLM_BASE_URL=https://api.deepseek.com`、
+     `LLM_MODEL=deepseek-flash`、`LLM_THINKING=disabled`、`LLM_API_KEY=<自行填写>`，以及改完后
+     `up -d ai` 只重建 ai 容器。
+6. **单测**（`service-fastapi/tests/`）：payload 在三种取值下的形态（`default` 不含 `thinking` 键）；分析与流式两条路径
+   都覆盖；非法取值被 `Settings` 拒绝；第 2、3 点的用例。用 `httpx.MockTransport` 或现有夹具，**不要访问真实
+   DeepSeek**，本任务没有可用的 API Key。
+
+不做：不接入思维链展示、不改 SSE 帧协议、不改前端、不改 `LLM_BASE_URL` 等现有默认值、不碰 `deploy/.env`（本机真实配置）。
+
+完成标准：`service-fastapi` 门禁（`uv run ruff format --check .`、`uv run ruff check .`、`uv run mypy`、`uv run pytest`）
+通过；`docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example config` 能解析且 ai 服务环境里出现
+三个新变量；报告贴命令和输出。交付栈 ai 镜像由 Claude 在评审通过后重建，本任务不需要重启 `:8080`。
+
+## BE-07 后端品牌：站点标题与用户可见的 xAdmin 字样
+
+分支：`be/branding`，工作目录 `backend-drf/`。前端同时在做 FE-11（把界面上的 xAdmin 换成 TicketFlow）。
+前端的站点标题以后端下发的站点配置为准（`settings/seeds/systemconfig.json` 的 `WEB_SITE_CONFIG.Title`，
+前端仅在缺失时回落 `platform-config.json`），所以后端不改，界面标题就还是 xAdmin。
+
+1. **站点配置种子**：`WEB_SITE_CONFIG.Title` 改为 `TicketFlow`。
+2. **已部署库**：现有交付栈和联调库里这条配置已经落库，改种子不会覆盖。新增一个数据迁移（放在站点配置所属
+   app 的常规线性迁移里）：只有当库里 `Title` 恰好是旧默认值 `xAdmin` 时才改成 `TicketFlow`，用户自定义过的
+   标题保持不动；反向迁移为空操作。补单测覆盖“旧默认值被替换”和“自定义值不变”。
+   先确认 `load_init_json` 对已存在配置的合并语义，如果它本身就会按种子补齐或覆盖，在报告里写明并说明为什么
+   仍需要（或不需要）迁移。
+3. **其他用户可见字样**：盘点运行时会展示给最终用户的 `xAdmin` / `xadmin` 文案并替换为 `TicketFlow`，至少检查：
+   根部门名称（`loadjson/deptinfo.json` 的“xAdmin管理团队”，只改名称，`code` 不动；已部署库同样用条件迁移改名）、
+   MFA / TOTP 的 issuer（会显示在用户的身份验证器 App 里）、邮件与通知模板标题、验证码或登录相关的提示文案、
+   OpenAPI 文档标题、`locale/zh` 里的对应译文。报告里列一张表：位置、原文、新文、是否需要迁移。
+4. **不改**：Python 包名与导入名（`xadmin-common`、`common`）、模块路径、配置键、环境变量、缓存键、
+   权限码、`code` 字段、上游许可证和版权声明、`demo_seed` 里的上游演示命令（交付栈不使用它们）、开发者向的
+   日志与注释。拿不准的列进报告“未改”一栏说明理由，不要扩大范围。
+
+完成标准：`backend-drf/AGENTS.md` 第六节门禁通过（含 `makemigrations --check`、`load_init_json --check`、
+`dump_openapi --check`），新增迁移与单测在真实 PG + Redis 下通过；报告贴命令输出。交付栈的 DRF 镜像由 Claude
+在评审通过后重建，本任务不需要重启 `:8080`。

@@ -58,21 +58,17 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 ## 当前迭代
 
-迭代 5：遗留问题清零，见[开发计划书](../docs/development/开发计划书.md)第 4 节，已于 2026-11-23 合并到 `main`（验收见[迭代 5 验收说明](../docs/development/迭代5验收说明.md)）。迭代 2~4 已合并到 `main`
-（迭代 4 于 2026-11-22 合并，验收见[迭代 4 验收说明](../docs/development/迭代4验收说明.md)）。
+迭代 6：按用户试用反馈逐项迭代。迭代 2~5 已合并到 `main`（迭代 5 于 2026-11-23 合并，验收见
+[迭代 5 验收说明](../docs/development/迭代5验收说明.md)）。
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| BE-05 | 已关闭工单禁止指派、`viewer.can_reply` | Codex | — | 已合并 |
-| SV-03 | AI 服务鲁棒性（SSE 流尾、缓存键、引用标题、Mock 标签、重试单测） | Codex | — | 已合并 |
-| BE-06 | 测试稳定性（`test_tag_center`、压测缓存包装、Shell 脚本换行符） | Codex | — | 已合并 |
-| FE-08 | 详情跟进契约、AI 引用标题、人机校验卸载中止 | Claude | BE-05、SV-03 | 已合并 |
-| FE-09 | E2E 健壮性 | Claude | — | 已合并 |
-| FE-10 | 前端门禁清零 | Claude | — | 已合并 |
+| SV-04 | 模型思考模式开关（接入 DeepSeek）与超时透传 | Codex | — | 评审通过，已集成 |
+| BE-07 | 后端品牌：站点标题种子与已部署库迁移、用户可见 xAdmin 字样 | Codex | — | 评审通过，已集成 |
+| FE-11 | 前端品牌：标识、登录页、关于页、工作台首页 | Claude | BE-07（标题） | 评审通过，已集成 |
 
-Codex 按 BE-05 → SV-03 → BE-06 顺序执行；Claude 先做 FE-09、FE-10，FE-08 等契约就绪。
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)，
-迭代 5 的任务都在两份任务书末尾。集成分支 `integration/iter5`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
+迭代 6 的任务在任务书末尾。集成分支 `integration/iter6`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
 
 ## CLI 调度（Claude 执行）
 
