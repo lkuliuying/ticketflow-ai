@@ -13,7 +13,7 @@
     "ticketViewer": {
       "type": "object",
       "description": "GET /api/tickets/{id} 的 viewer；能力由服务端按当前用户、权限点及工单状态计算。",
-      "required": ["can_handle", "can_assign", "can_reply", "can_comment_internal", "can_archive", "can_return", "read_only"],
+      "required": ["can_handle", "can_assign", "can_reply", "can_comment_internal", "can_archive", "can_return", "can_rate", "read_only"],
       "additionalProperties": false,
       "properties": {
         "can_handle": {"type": "boolean"},
@@ -22,6 +22,7 @@
         "can_comment_internal": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"},
         "can_archive": {"type": "boolean", "description": "已关闭且尚未转存时，管理员或当前及历史技术员持有知识库创建权限即可转存。"},
         "can_return": {"type": "boolean", "description": "仅当前处理工单且有退回权限的技术员，工单须未关闭。"},
+        "can_rate": {"type": "boolean", "description": "持有评价权限的工单提交人可对已关闭且尚未评价的工单提交评价。"},
         "read_only": {"type": "boolean", "description": "技术员曾经处理但当前未指派给自己时为 true，时间线包含内部内容。提交人的 can_reply 和 available_transitions，以及转存能力 can_archive，按各自规则给出。"}
       }
     },
@@ -98,6 +99,109 @@
         "current": {"type": "integer", "minimum": 0},
         "history": {"type": "integer", "minimum": 0}
       }
+    },
+    "ticketDetailRating": {
+      "type": "object",
+      "required": ["rating"],
+      "properties": {
+        "rating": {
+          "description": "仅工单评价人、评价记录中的处理人和管理员可见，其他情况为 null。",
+          "oneOf": [{"$ref": "#/$defs/ticketRating"}, {"type": "null"}]
+        }
+      }
+    },
+    "ticketRatingTag": {
+      "enum": ["FAST", "PROFESSIONAL", "FRIENDLY", "CLEAR"],
+      "x-labels": {
+        "FAST": {"zh": "响应快", "en": "Fast response"},
+        "PROFESSIONAL": {"zh": "专业", "en": "Professional"},
+        "FRIENDLY": {"zh": "态度好", "en": "Friendly"},
+        "CLEAR": {"zh": "沟通清楚", "en": "Clear communication"}
+      }
+    },
+    "ticketRatingScore": {"type": "integer", "minimum": 1, "maximum": 5},
+    "ticketRatingInput": {
+      "type": "object",
+      "description": "POST /api/tickets/{id}/rating。提交后不可修改，重开不重置评价。",
+      "required": ["resolved", "satisfaction", "handler_score"],
+      "properties": {
+        "resolved": {"type": "boolean"},
+        "satisfaction": {"$ref": "#/$defs/ticketRatingScore"},
+        "handler_score": {"$ref": "#/$defs/ticketRatingScore"},
+        "tags": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ticketRatingTag"}},
+        "comment": {"type": ["string", "null"], "maxLength": 500}
+      }
+    },
+    "ticketRating": {
+      "allOf": [
+        {"$ref": "#/$defs/ticketRatingInput"},
+        {
+          "type": "object",
+          "required": ["pk", "ticket_id", "ticket_number", "rater_id", "rater_name", "handler_id", "handler_name", "tags", "comment", "created_time"],
+          "properties": {
+            "pk": {"type": "string", "format": "uuid"},
+            "ticket_id": {"type": "string", "format": "uuid"},
+            "ticket_number": {"type": "string"},
+            "rater_id": {"type": "integer"},
+            "rater_name": {"type": "string"},
+            "handler_id": {"type": ["integer", "null"], "description": "评价所对应的关闭时处理人。"},
+            "handler_name": {"type": ["string", "null"]},
+            "created_time": {"type": "string", "format": "date-time"}
+          }
+        }
+      ]
+    },
+    "ticketRatingList": {
+      "type": "object",
+      "description": "GET /api/ticket-ratings。员工看本人给出的评价，技术员看本人收到的评价，管理员看全部。按创建时间、主键倒序，支持 handler_id、satisfaction、handler_score、resolved、created_from、created_to 筛选。时间用 ISO 8601，两端均含边界。",
+      "required": ["total", "results"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "results": {"type": "array", "items": {"$ref": "#/$defs/ticketRating"}}
+      }
+    },
+    "ticketRatingMetrics": {
+      "type": "object",
+      "required": ["count", "avg_satisfaction", "avg_handler_score", "resolved_rate", "tags"],
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "avg_satisfaction": {"type": ["number", "null"], "minimum": 1, "maximum": 5},
+        "avg_handler_score": {"type": ["number", "null"], "minimum": 1, "maximum": 5},
+        "resolved_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "已解决评价数除以评价总数。无评价时均分及解决率为 null。"},
+        "tags": {
+          "type": "object",
+          "description": "各已出现标签的计数，无标签时为空对象。",
+          "propertyNames": {"$ref": "#/$defs/ticketRatingTag"},
+          "additionalProperties": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "ticketRatingSummary": {
+      "description": "GET /api/ticket-ratings/summary。技术员返回本人指标，管理员另有 by_handler（按处理人排序，未关联处理人的评价归入 null 组并排在最后）。可用 created_from、created_to 筛选。",
+      "allOf": [
+        {"$ref": "#/$defs/ticketRatingMetrics"},
+        {
+          "type": "object",
+          "properties": {
+            "by_handler": {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  {"$ref": "#/$defs/ticketRatingMetrics"},
+                  {
+                    "type": "object",
+                    "required": ["handler_id", "handler_name"],
+                    "properties": {
+                      "handler_id": {"type": ["integer", "null"]},
+                      "handler_name": {"type": ["string", "null"]}
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "knowledgeReference": {
       "type": "object",

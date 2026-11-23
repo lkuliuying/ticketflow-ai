@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 from hashlib import sha256
-from typing import TypedDict
+from typing import NotRequired, TypedDict, Unpack
 from uuid import UUID, uuid4
 
 from django.conf import settings
@@ -22,6 +22,7 @@ from tickets.models import (
     TicketComment,
     TicketCreateRequest,
     TicketLog,
+    TicketRating,
     Visibility,
 )
 from tickets.policy import TRANSITIONS, TicketAccess, assignment_candidates
@@ -40,6 +41,14 @@ class NewTicket(TypedDict):
     description: str
     category: str
     priority: str
+
+
+class RatingInput(TypedDict):
+    resolved: bool
+    satisfaction: int
+    handler_score: int
+    tags: NotRequired[list[str]]
+    comment: NotRequired[str | None]
 
 
 def _destination(category: str) -> DeptInfo:
@@ -127,6 +136,20 @@ def _locked(queryset: QuerySet[Ticket], ticket_id: UUID) -> Ticket:
 def _check_version(ticket: Ticket, version: int) -> None:
     if ticket.version != version:
         raise TicketConflict()
+
+
+@transaction.atomic
+def create_rating(
+    queryset: QuerySet[Ticket], ticket_id: UUID, user: UserInfo, **values: Unpack[RatingInput]
+) -> TicketRating:
+    ticket = _locked(queryset, ticket_id)
+    if ticket.submitter_id != user.pk:
+        raise PermissionDenied("仅工单提交人可评价")
+    if ticket.status != Status.CLOSED:
+        raise TicketConflict("仅已关闭的工单可评价")
+    if TicketRating.objects.filter(ticket=ticket).exists():
+        raise TicketConflict("工单已评价")
+    return TicketRating.objects.create(ticket=ticket, rater=user, handler_id=ticket.assignee_id, **values)
 
 
 def _record_change(

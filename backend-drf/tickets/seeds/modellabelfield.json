@@ -227,5 +227,144 @@
       "label": "AI 标签",
       "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
     }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000110",
+    "fields": {
+      "field_type": 0,
+      "name": "tickets.ticketrating",
+      "label": "工单评价"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000111",
+    "fields": {
+      "field_type": 0,
+      "name": "pk",
+      "label": "编号",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000112",
+    "fields": {
+      "field_type": 0,
+      "name": "ticket_id",
+      "label": "工单 ID",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000113",
+    "fields": {
+      "field_type": 0,
+      "name": "ticket_number",
+      "label": "工单号",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000114",
+    "fields": {
+      "field_type": 0,
+      "name": "rater_id",
+      "label": "评价人 ID",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000115",
+    "fields": {
+      "field_type": 0,
+      "name": "rater_name",
+      "label": "评价人",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000116",
+    "fields": {
+      "field_type": 0,
+      "name": "handler_id",
+      "label": "处理人 ID",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000117",
+    "fields": {
+      "field_type": 0,
+      "name": "handler_name",
+      "label": "被评处理人",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000118",
+    "fields": {
+      "field_type": 0,
+      "name": "resolved",
+      "label": "是否解决",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000119",
+    "fields": {
+      "field_type": 0,
+      "name": "satisfaction",
+      "label": "满意度",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000120",
+    "fields": {
+      "field_type": 0,
+      "name": "handler_score",
+      "label": "处理人评分",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000121",
+    "fields": {
+      "field_type": 0,
+      "name": "tags",
+      "label": "标签",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000122",
+    "fields": {
+      "field_type": 0,
+      "name": "comment",
+      "label": "文字评价",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000123",
+    "fields": {
+      "field_type": 0,
+      "name": "created_time",
+      "label": "评价时间",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000110"
+    }
   }
 ]

@@ -105,5 +105,44 @@
     "fields": {
       "title": "退回工单"
     }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000099",
+    "fields": {
+      "title": "menus.ticketflowMyRatings",
+      "icon": "ep:star",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000101",
+    "fields": {
+      "title": "menus.ticketflowRatingStats",
+      "icon": "ep:data-analysis",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000097",
+    "fields": {
+      "title": "提交工单评价"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000103",
+    "fields": {
+      "title": "工单评价列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000105",
+    "fields": {
+      "title": "工单评价汇总"
+    }
   }
 ]

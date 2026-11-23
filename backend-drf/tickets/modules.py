@@ -6,8 +6,8 @@ MODULES = (
         "工单",
         STANDARD,
         depends=("core_auth", "core_rbac", "core_file"),
-        menus=("TicketFlowTickets",),
-        permissions=("api/tickets",),
-        routes=(r"^/api/tickets(?:/|$)",),
+        menus=("TicketFlowTickets", "TicketFlowMyRatings", "TicketFlowRatingStats"),
+        permissions=("api/tickets", "api/ticket-ratings"),
+        routes=(r"^/api/tickets(?:/|$)", r"^/api/ticket-ratings(?:/|$)"),
     ),
 )

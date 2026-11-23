@@ -80,8 +80,10 @@ def test_messagecontent_whitelists_cover_all_role_fields() -> None:
 #: 输出模型与视图主模型不同的动作（序列化器在 action 内手工构造）：白名单取值面
 #: 是「接口实际输出的模型」，此处显式登记该模型标签；未登记的按路由反查视图主模型。
 #: - access-logs：视图主模型为 file.uploadfile，但响应体是文件访问日志行
+#: - rating：在工单路由提交评价，响应体是工单评价记录
 OUTPUT_MODEL_OVERRIDES = {
     "accessLogs:SystemUploadFile": "file.fileaccesslog",
+    "rating:TicketFlowTickets": "tickets.ticketrating",
 }
 
 

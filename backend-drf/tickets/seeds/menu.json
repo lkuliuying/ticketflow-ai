@@ -239,5 +239,87 @@
         "d2431bc0-217a-49eb-a6fa-000000000012"
       ]
     }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000098",
+    "fields": {
+      "name": "TicketFlowMyRatings",
+      "path": "/ticketflow/ratings/mine/index",
+      "component": "ticketflow/ratings/mine/index",
+      "menu_type": 1,
+      "rank": 3,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000099",
+      "method": "",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110"
+      ],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000100",
+    "fields": {
+      "name": "TicketFlowRatingStats",
+      "path": "/ticketflow/ratings/stats/index",
+      "component": "ticketflow/ratings/stats/index",
+      "menu_type": 1,
+      "rank": 4,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000101",
+      "method": "",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110"
+      ],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000096",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "rating:TicketFlowTickets",
+      "rank": 15,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/rating$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000097",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000102",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000098",
+      "menu_type": 2,
+      "name": "list:TicketFlowMyRatings",
+      "rank": 1,
+      "path": "api/ticket-ratings$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000103",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110",
+        "d2431bc0-217a-49eb-a6fa-000000000012",
+        "14071ee3-6725-4fcc-962d-ad7898efa284"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000104",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000098",
+      "menu_type": 2,
+      "name": "summary:TicketFlowMyRatings",
+      "rank": 2,
+      "path": "api/ticket-ratings/summary$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000105",
+      "model": []
+    }
   }
 ]

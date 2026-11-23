@@ -25,6 +25,7 @@ from tickets.api_schema import (
     assignees_result,
     comment_result,
     dashboard_result,
+    rating_result,
     ticket_detail_result,
     ticket_error_result,
     ticket_list_result,
@@ -35,6 +36,7 @@ from tickets.cache import check_rate, dashboard_key
 from tickets.filters import TicketFilter
 from tickets.models import Status, Ticket
 from tickets.policy import TicketAccess, assignment_candidates, has_permission
+from tickets.rating_serializers import RatingInputSerializer, TicketRatingSerializer
 from tickets.serializers import (
     AssigneeSerializer,
     AssignmentReturnSerializer,
@@ -64,6 +66,7 @@ class TicketViewSet(
     return_ticket_serializer_class = AssignmentReturnSerializer
     comments_serializer_class = CommentSerializer
     ai_metadata_serializer_class = SuggestionSerializer
+    rating_serializer_class = RatingInputSerializer
     filterset_class = TicketFilter
     lookup_value_regex = UUIDConverter.regex
     select_related_fields = ("submitter", "assignee", "department")
@@ -80,7 +83,10 @@ class TicketViewSet(
     def get_queryset(self) -> QuerySet[Ticket]:
         if not self.request.user.is_authenticated:
             return self.queryset.none()
-        return self.access.scope(super().get_queryset())
+        queryset = self.access.scope(super().get_queryset())
+        if self.action == "retrieve":
+            return queryset.select_related("rating__rater", "rating__handler")
+        return queryset
 
     def data_permission_fallback_q(self, request: Request) -> Q:
         # 已在 get_queryset 应用业务范围，底座有显式数据权限时继续求交。
@@ -125,6 +131,7 @@ class TicketViewSet(
         is_superuser = self.actor.is_superuser
         permission_codes = set() if is_superuser else get_user_permission_codes(self.actor)
         can_comment = is_superuser or "comments:TicketFlowTickets" in permission_codes
+        rating = getattr(ticket, "rating", None)
         data["viewer"] = {
             "can_handle": can_handle,
             "can_assign": self.access.admin
@@ -133,6 +140,12 @@ class TicketViewSet(
             "can_reply": can_comment and self.access.can_reply(ticket),
             "can_comment_internal": can_comment and can_handle,
             "can_return": self.access.can_return(ticket) and "returnTicket:TicketFlowTickets" in permission_codes,
+            "can_rate": (
+                ticket.submitter_id == self.actor.pk
+                and ticket.status == Status.CLOSED
+                and rating is None
+                and (is_superuser or "rating:TicketFlowTickets" in permission_codes)
+            ),
             "read_only": read_only,
             "can_archive": (
                 ticket.status == Status.CLOSED
@@ -144,6 +157,11 @@ class TicketViewSet(
         }
         data["available_transitions"] = self.access.targets(ticket)
         data["timeline"] = first_page(ticket, can_handle or read_only)
+        data["rating"] = (
+            TicketRatingSerializer(rating, ignore_field_permission=True).data
+            if rating is not None and (self.access.admin or self.actor.pk in (rating.rater_id, rating.handler_id))
+            else None
+        )
         return ApiResponse(data=data)
 
     @extend_schema(
@@ -188,6 +206,23 @@ class TicketViewSet(
         scope = self.filter_queryset(self.get_queryset())
         ticket = services.transition(scope, pk, self.actor, self.access, **self._values(request))
         return self._ticket_response(ticket)
+
+    @extend_schema(
+        responses={
+            201: rating_result,
+            400: ticket_error_result,
+            403: ticket_error_result,
+            404: ticket_error_result,
+            409: ticket_error_result,
+        },
+    )
+    @action(detail=True, methods=["post"], filterset_class=None)
+    def rating(self, request: Request, pk: UUID) -> ApiResponse:
+        """提交工单评价"""
+        scope = self.filter_queryset(self.get_queryset())
+        values = cast(services.RatingInput, self._values(request))
+        rating = services.create_rating(scope, pk, self.actor, **values)
+        return ApiResponse(data=TicketRatingSerializer(rating).data, status=201)
 
     @extend_schema(responses=ticket_result)
     @action(detail=True, methods=["post"])

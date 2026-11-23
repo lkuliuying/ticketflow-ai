@@ -15615,6 +15615,150 @@
         ],
         "type": "string"
       },
+      "RatingHandlerMetrics": {
+        "properties": {
+          "avg_handler_score": {
+            "format": "double",
+            "maximum": 5,
+            "minimum": 1,
+            "nullable": true,
+            "type": "number"
+          },
+          "avg_satisfaction": {
+            "format": "double",
+            "maximum": 5,
+            "minimum": 1,
+            "nullable": true,
+            "type": "number"
+          },
+          "count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "handler_id": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "handler_name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "resolved_rate": {
+            "description": "已解决数除以评价总数，无评价时为 null。",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
+          },
+          "tags": {
+            "additionalProperties": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "description": "各已出现标签的次数。",
+            "type": "object"
+          }
+        },
+        "required": [
+          "avg_handler_score",
+          "avg_satisfaction",
+          "count",
+          "handler_id",
+          "handler_name",
+          "resolved_rate",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "RatingInput": {
+        "properties": {
+          "comment": {
+            "maxLength": 500,
+            "nullable": true,
+            "type": "string"
+          },
+          "handler_score": {
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "satisfaction": {
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagsEnum"
+            },
+            "maxItems": 4,
+            "type": "array"
+          }
+        },
+        "required": [
+          "handler_score",
+          "resolved",
+          "satisfaction"
+        ],
+        "type": "object"
+      },
+      "RatingSummary": {
+        "properties": {
+          "avg_handler_score": {
+            "format": "double",
+            "maximum": 5,
+            "minimum": 1,
+            "nullable": true,
+            "type": "number"
+          },
+          "avg_satisfaction": {
+            "format": "double",
+            "maximum": 5,
+            "minimum": 1,
+            "nullable": true,
+            "type": "number"
+          },
+          "by_handler": {
+            "description": "仅管理员返回，未关联处理人的评价归入 handler_id 为 null 的组。",
+            "items": {
+              "$ref": "#/components/schemas/RatingHandlerMetrics"
+            },
+            "type": "array"
+          },
+          "count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "resolved_rate": {
+            "description": "已解决数除以评价总数，无评价时为 null。",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
+          },
+          "tags": {
+            "additionalProperties": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "description": "各已出现标签的次数。",
+            "type": "object"
+          }
+        },
+        "required": [
+          "avg_handler_score",
+          "avg_satisfaction",
+          "count",
+          "resolved_rate",
+          "tags"
+        ],
+        "type": "object"
+      },
       "RenameGroup": {
         "description": "群聊改名（仅群主）。",
         "properties": {
@@ -17999,6 +18143,16 @@
         ],
         "type": "object"
       },
+      "TagsEnum": {
+        "description": "* `FAST` - 响应快\n* `PROFESSIONAL` - 专业\n* `FRIENDLY` - 态度好\n* `CLEAR` - 沟通清楚",
+        "enum": [
+          "FAST",
+          "PROFESSIONAL",
+          "FRIENDLY",
+          "CLEAR"
+        ],
+        "type": "string"
+      },
       "TargetStatusEnum": {
         "description": "* `OPEN` - 待处理\n* `IN_PROGRESS` - 处理中\n* `PENDING_VERIFY` - 待验收\n* `CLOSED` - 已关闭\n* `REOPENED` - 已重开",
         "enum": [
@@ -18578,6 +18732,16 @@
             "readOnly": true,
             "title": "优先级"
           },
+          "rating": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TicketRating"
+              }
+            ],
+            "description": "仅评价人、评价记录中的处理人和管理员可见，其他情况为 null。",
+            "nullable": true,
+            "readOnly": true
+          },
           "resolved_at": {
             "format": "date-time",
             "nullable": true,
@@ -18651,6 +18815,7 @@
           "number",
           "pk",
           "priority",
+          "rating",
           "resolved_at",
           "sla_due_at",
           "sla_state",
@@ -18771,6 +18936,203 @@
         ],
         "type": "object"
       },
+      "TicketRating": {
+        "properties": {
+          "comment": {
+            "nullable": true,
+            "readOnly": true,
+            "title": "文字评价",
+            "type": "string"
+          },
+          "created_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "title": "评价时间",
+            "type": "string"
+          },
+          "handler_id": {
+            "nullable": true,
+            "readOnly": true,
+            "title": "处理人 ID",
+            "type": "integer"
+          },
+          "handler_name": {
+            "nullable": true,
+            "readOnly": true,
+            "title": "被评处理人",
+            "type": "string"
+          },
+          "handler_score": {
+            "maximum": 5,
+            "minimum": 1,
+            "readOnly": true,
+            "title": "处理人评分",
+            "type": "integer"
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "title": "编号",
+            "type": "string"
+          },
+          "rater_id": {
+            "readOnly": true,
+            "title": "评价人 ID",
+            "type": "integer"
+          },
+          "rater_name": {
+            "readOnly": true,
+            "title": "评价人",
+            "type": "string"
+          },
+          "resolved": {
+            "readOnly": true,
+            "title": "是否解决",
+            "type": "boolean"
+          },
+          "satisfaction": {
+            "maximum": 5,
+            "minimum": 1,
+            "readOnly": true,
+            "title": "满意度",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagsEnum"
+            },
+            "readOnly": true,
+            "title": "标签",
+            "type": "array"
+          },
+          "ticket_id": {
+            "format": "uuid",
+            "readOnly": true,
+            "title": "工单 ID",
+            "type": "string"
+          },
+          "ticket_number": {
+            "readOnly": true,
+            "title": "工单号",
+            "type": "string"
+          }
+        },
+        "required": [
+          "comment",
+          "created_time",
+          "handler_id",
+          "handler_name",
+          "handler_score",
+          "pk",
+          "rater_id",
+          "rater_name",
+          "resolved",
+          "satisfaction",
+          "tags",
+          "ticket_id",
+          "ticket_number"
+        ],
+        "type": "object"
+      },
+      "TicketRatingListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketRatingPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketRatingPage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/TicketRating"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "TicketRatingResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketRating"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketRatingSummaryResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RatingSummary"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
       "TicketResult": {
         "properties": {
           "code": {
@@ -18860,6 +19222,10 @@
           "can_handle": {
             "type": "boolean"
           },
+          "can_rate": {
+            "description": "持有评价权限的工单提交人可对已关闭且尚未评价的工单提交评价。",
+            "type": "boolean"
+          },
           "can_reply": {
             "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。",
             "type": "boolean"
@@ -18878,6 +19244,7 @@
           "can_assign",
           "can_comment_internal",
           "can_handle",
+          "can_rate",
           "can_reply",
           "can_return",
           "read_only"
@@ -97052,6 +97419,400 @@
         ]
       }
     },
+    "/api/ticket-ratings": {
+      "get": {
+        "description": "获取{cls}的列表",
+        "operationId": "api_ticket_ratings_list",
+        "parameters": [
+          {
+            "description": "评价开始时间",
+            "in": "query",
+            "name": "created_from",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "评价结束时间",
+            "in": "query",
+            "name": "created_to",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "处理人 ID",
+            "in": "query",
+            "name": "handler_id",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "处理人评分\n\n* `1` - 1\n* `2` - 2\n* `3` - 3\n* `4` - 4\n* `5` - 5",
+            "in": "query",
+            "name": "handler_score",
+            "schema": {
+              "enum": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5"
+              ],
+              "maximum": 5,
+              "minimum": 1,
+              "title": "处理人评分",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "用于排序结果的字段。",
+            "in": "query",
+            "name": "ordering",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "分页结果集中的页码。",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "是否解决\n\n* `true` - 已解决\n* `false` - 未解决",
+            "in": "query",
+            "name": "resolved",
+            "schema": {
+              "enum": [
+                "false",
+                "true"
+              ],
+              "title": "是否解决",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "满意度\n\n* `1` - 1\n* `2` - 2\n* `3` - 3\n* `4` - 4\n* `5` - 5",
+            "in": "query",
+            "name": "satisfaction",
+            "schema": {
+              "enum": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5"
+              ],
+              "maximum": 5,
+              "minimum": 1,
+              "title": "满意度",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "每页返回的结果数量。",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketRatingListResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketRatingViewSet"
+        ]
+      }
+    },
+    "/api/ticket-ratings/search-columns": {
+      "get": {
+        "description": "获取{cls}的展示字段",
+        "operationId": "api_ticket_ratings_search_columns_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "choices": {
+                            "items": {
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "pk": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "choices_truncated": {
+                            "type": "boolean"
+                          },
+                          "default": {},
+                          "help_text": {
+                            "type": "string"
+                          },
+                          "input_type": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "lookups": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "max_length": {
+                            "type": "number"
+                          },
+                          "max_value": {
+                            "type": "number"
+                          },
+                          "min_value": {
+                            "type": "number"
+                          },
+                          "multiple": {
+                            "type": "boolean"
+                          },
+                          "read_only": {
+                            "type": "boolean"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "sortable": {
+                            "type": "boolean"
+                          },
+                          "step": {
+                            "type": "number"
+                          },
+                          "table_show": {
+                            "type": "number"
+                          },
+                          "write_only": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketRatingViewSet"
+        ]
+      }
+    },
+    "/api/ticket-ratings/search-fields": {
+      "get": {
+        "description": "获取{cls}的查询字段",
+        "operationId": "api_ticket_ratings_search_fields_retrieve",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "choices": {
+                            "items": {
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "pk": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "choices_truncated": {
+                            "type": "boolean"
+                          },
+                          "default": {},
+                          "help_text": {
+                            "type": "string"
+                          },
+                          "input_type": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketRatingViewSet"
+        ]
+      }
+    },
+    "/api/ticket-ratings/summary": {
+      "get": {
+        "description": "工单评价汇总",
+        "operationId": "api_ticket_ratings_summary_retrieve",
+        "parameters": [
+          {
+            "description": "评价时间下界（含）。",
+            "in": "query",
+            "name": "created_from",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "评价时间上界（含）。",
+            "in": "query",
+            "name": "created_to",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketRatingSummaryResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketRatingViewSet"
+        ]
+      }
+    },
     "/api/tickets": {
       "get": {
         "description": "获取{cls}的列表",
@@ -97961,6 +98722,113 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketCommentResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/rating": {
+      "post": {
+        "description": "提交工单评价",
+        "operationId": "api_tickets_rating_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingInput"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingInput"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketRatingResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
                 }
               }
             },

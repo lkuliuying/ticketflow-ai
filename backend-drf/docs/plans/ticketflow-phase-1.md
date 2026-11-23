@@ -27,8 +27,11 @@ erDiagram
     TICKET ||--o{ TICKET_LOG : records
     TICKET ||--o{ TICKET_COMMENT : contains
     TICKET ||--o{ TICKET_ASSIGNMENT : tracks
+    TICKET ||--o| TICKET_RATING : receives
     USER_INFO o|--o{ TICKET_LOG : acts
     USER_INFO ||--o{ TICKET_COMMENT : writes
+    USER_INFO ||--o{ TICKET_RATING : gives
+    USER_INFO o|--o{ TICKET_RATING : receives
     USER_INFO ||--o{ TICKET_CREATE_REQUEST : submits
     TICKET ||--o| TICKET_CREATE_REQUEST : deduplicates
     TICKET ||--o{ TICKET_SLA_ALERT : raises
@@ -43,6 +46,7 @@ erDiagram
 | `TicketLog` | `ticket_id`，`action`，可空 `from_status`，`to_status`，`operator_id`（系统操作为空），`note`，`created_time`。按时间和 ID 稳定排序。 |
 | `TicketAssignment` | `ticket_id`、`assignee_id`、可空 `assigned_by_id`、`started_at`、`ended_at`、`end_reason`、`note`。每张工单最多一段开放的指派记录。 |
 | `TicketComment` | `ticket_id`，`author_id`，`body`，`visibility`（`PUBLIC` 对外回复 / `INTERNAL` 内部备注），`created_time`。 |
+| `TicketRating` | 唯一 `ticket_id`，评价人 `rater_id`，关闭时的处理人 `handler_id`（可空），`resolved`，`satisfaction` 与 `handler_score`（均为 1–5），`tags`，可空 `comment`，`created_time`。 |
 | `KnowledgeArticle` | `title`，`body_markdown`，`category`，`tags`（字符串数组），`status`（`DRAFT` / `PUBLISHED` / `ARCHIVED`），`view_count`（非负整数），可空 `source_ticket_id`（每个来源工单最多一篇），`created_time` / `updated_time`。 |
 | `TicketCreateRequest` | `submitter_id`，`key_hash`，`request_hash`，`ticket_id`，`expires_at`。唯一约束 `(submitter_id, key_hash)`，与创建工单同事务写入。 |
 | `TicketSlaAlert` | `ticket_id`，`sla_cycle`，`kind`（`DUE_SOON` / `OVERDUE`），`sla_due_at`，`created_time`。唯一约束 `(ticket_id, sla_cycle, kind)`。 |
@@ -92,13 +96,16 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | --- | --- | --- |
 | `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`assignment`、`sla`、`q`、分页 | 200，工单分页，含 `version` 和 `sla_state` |
 | `POST /api/tickets` | `Idempotency-Key`，`{title, description, category, priority}` | 201，创建的工单。重放返回 200 和原工单 |
-| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive, can_return, read_only}`、可执行流转、时间线第一页 |
+| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive, can_return, can_rate, read_only}`、`rating`、可执行流转、时间线第一页 |
 | `GET /api/tickets/{id}/timeline` | 分页 | 200，合并排序的流转记录与评论分页 |
 | `POST /api/tickets/{id}/transition` | `{target_status, version, note?}` | 200，更新后的工单 |
 | `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单。已关闭工单返回 409 |
 | `GET /api/tickets/{id}/assignees` | 管理员可传 `q` 搜索用户名或昵称、`department_id` 筛选技能组。空值忽略，非法 UUID 返回 400 | 200，最多 20 条在职技术员 `{pk, username, nickname, department_name}`，按用户名和主键排序 |
 | `POST /api/tickets/{id}/return` | `{version, reason}`，原因长度 1–500 | 200，清空处理人、状态不变、版本递增 |
 | `POST /api/tickets/{id}/comments` | `{body, visibility}` | 201，新评论 |
+| `POST /api/tickets/{id}/rating` | `{resolved, satisfaction, handler_score, tags?, comment?}` | 201，新评价。工单未关闭或已有评价返回 409 |
+| `GET /api/ticket-ratings` | `handler_id`、`satisfaction`、`handler_score`、`resolved`、`created_from`、`created_to`、分页 | 200，评价分页，支持 `search-fields` 和 `search-columns` |
+| `GET /api/ticket-ratings/summary` | `created_from`、`created_to` | 200，技术员获本人指标，管理员获整体指标及 `by_handler` |
 | `POST /api/tickets/{id}/ai-metadata` | `{version, summary, tags, category?, priority?}` | 200，采纳建议后的工单 |
 | `GET /api/tickets/dashboard` | 与列表共用筛选 | 200，按状态、优先级及 SLA 分组计数，`assignment` 按当前身份返回待分配或当前与历史计数 |
 | `POST /api/tickets/export-async` | 列表筛选字段加 `type: "csv"` | 200，`{record_id, task_id}`，完成后通过 `/api/task/exports/{record_id}/download` 下载 |
@@ -111,6 +118,8 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 工单可见范围外返回 404，可见但缺少动作权限返回 403。契约校验失败返回 400，状态或版本冲突返回 409。Top-K 默认 5，按工单标题、描述和分类在 DRF 中检索，使用 PostgreSQL 关键词排序并为中文子串提供匹配。片段包含 `article_id`、`title` 和有长度上限的 `excerpt`。模型输入只包含当前用户获准的工单文本和知识片段。
 
 历史技术员的 `viewer.read_only` 为 `true`。本人提交时，`can_reply` 和 `available_transitions` 仍反映提交人的能力。管理员或经手过该工单的技术员可用 `viewer.can_archive` 判断是否能将已关闭工单转存为草稿。
+
+工单提交人可用 `viewer.can_rate` 判断能否评价。每张工单仅可评价一次，重开和重新关闭后保留原评价。详情仅向评价人、被评处理人及管理员返回评价。列表中员工看给出的评价，技术员看收到的评价，管理员看全部。汇总时间筛选按评价创建时间，两端含边界。解决率为 0–1 的比例，无评价时均分和解决率为空。标签编码及中英文名称见 [工单契约](../schema/ticketflow.schema.json)。
 
 | FastAPI 接口 | 请求 | 成功响应 |
 | --- | --- | --- |

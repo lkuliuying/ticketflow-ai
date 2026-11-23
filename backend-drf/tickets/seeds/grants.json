@@ -10,7 +10,9 @@
       "timeline:TicketFlowTickets",
       "transition:TicketFlowTickets",
       "comments:TicketFlowTickets",
-      "dashboard:TicketFlowTickets"
+      "dashboard:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings"
     ],
     "ticketflow_requester": [
       "TicketFlow",
@@ -21,7 +23,9 @@
       "timeline:TicketFlowTickets",
       "transition:TicketFlowTickets",
       "comments:TicketFlowTickets",
-      "dashboard:TicketFlowTickets"
+      "dashboard:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings"
     ],
     "ticketflow_agent": [
       "TicketFlow",
@@ -35,7 +39,11 @@
       "aiMetadata:TicketFlowTickets",
       "context:TicketFlowTickets",
       "dashboard:TicketFlowTickets",
-      "returnTicket:TicketFlowTickets"
+      "returnTicket:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "TicketFlowMyRatings",
+      "summary:TicketFlowMyRatings"
     ],
     "ticketflow_admin": [
       "TicketFlow",
@@ -56,7 +64,11 @@
       "list:SystemExportRecord",
       "retrieve:SystemExportRecord",
       "download:SystemExportRecord",
-      "assignees:TicketFlowTickets"
+      "assignees:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "TicketFlowRatingStats",
+      "summary:TicketFlowMyRatings"
     ]
   }
 }

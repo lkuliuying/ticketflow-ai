@@ -62,6 +62,7 @@ def test_ticket_viewer_matches_role_and_status(users, make_ticket, role, can_han
         "can_comment_internal": can_handle,
         "can_archive": can_handle and status == Status.CLOSED,
         "can_return": role == "agent" and status != Status.CLOSED,
+        "can_rate": role == "requester" and status == Status.CLOSED,
         "read_only": False,
     }
     validate(data["viewer"], "ticketViewer")
@@ -127,6 +128,7 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
         "can_comment_internal": True,
         "can_archive": False,
         "can_return": False,
+        "can_rate": False,
         "read_only": False,
     }
     ticket.submitter = users["agent"]
@@ -140,6 +142,7 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
         "can_comment_internal": False,
         "can_archive": False,
         "can_return": False,
+        "can_rate": True,
         "read_only": False,
     }
 
@@ -416,7 +419,12 @@ def test_ticketflow_directory_contains_visible_pages_in_order(users):
     directory = Menu.objects.get(name="TicketFlow")
     assert directory.menu_type == Menu.MenuChoices.DIRECTORY
     children = list(Menu.objects.filter(parent=directory).select_related("meta").order_by("rank"))
-    assert [page.component for page in children] == ["ticketflow/tickets/index", "ticketflow/knowledge/index"]
+    assert [page.component for page in children] == [
+        "ticketflow/tickets/index",
+        "ticketflow/knowledge/index",
+        "ticketflow/ratings/mine/index",
+        "ticketflow/ratings/stats/index",
+    ]
     assert all(page.meta.is_show_menu for page in children)
     for user in users.values():
         assert user.roles.filter(menu=directory).exists()
