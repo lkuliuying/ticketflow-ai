@@ -18,9 +18,9 @@ from knowledge.models import ArticleStatus
 from knowledge.services import create_article
 from tickets.assignment import dispatch
 from tickets.cache import invalidate_dashboard
-from tickets.models import Category, Priority, Status, Ticket, Visibility
+from tickets.models import Category, Priority, RatingTag, Status, Ticket, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE, TicketAccess
-from tickets.services import add_comment, create_ticket, transition
+from tickets.services import RatingInput, add_comment, create_rating, create_ticket, transition
 
 REQUESTER = "tf_requester"
 AGENT = "tf_agent"
@@ -38,6 +38,7 @@ class Sample(NamedTuple):
     age_minutes: int
     with_comments: bool = True
     requester: str = REQUESTER
+    rating: RatingInput | None = None
 
 
 SAMPLES = (
@@ -98,6 +99,9 @@ SAMPLES = (
         str(Priority.P1),
         str(Status.CLOSED),
         55,
+        rating=RatingInput(
+            resolved=True, satisfaction=5, handler_score=5, tags=[str(RatingTag.FAST), str(RatingTag.FRIENDLY)]
+        ),
     ),
     Sample(
         "办公电脑 DNS 解析超时",
@@ -106,6 +110,13 @@ SAMPLES = (
         str(Priority.P2),
         str(Status.CLOSED),
         80,
+        rating=RatingInput(
+            resolved=False,
+            satisfaction=2,
+            handler_score=4,
+            tags=[str(RatingTag.PROFESSIONAL), str(RatingTag.CLEAR)],
+            comment="排查说明很清楚，切换办公室后仍偶发解析超时。",
+        ),
     ),
     Sample(
         "附件预览提示格式不支持",
@@ -297,6 +308,22 @@ def dispatch_existing_samples(accounts: dict[str, UserInfo]) -> None:
                 transaction.on_commit(invalidate_dashboard, robust=True)
 
 
+def seed_ratings(accounts: dict[str, UserInfo]) -> None:
+    for sample in SAMPLES:
+        if sample.rating is None:
+            continue
+        requester = accounts[sample.requester]
+        scope = Ticket.objects.filter(submitter=requester)
+        ticket = (
+            scope.select_for_update()
+            .filter(title=sample.title, description=sample.description, status=Status.CLOSED)
+            .order_by("created_time", "pk")
+            .first()
+        )
+        if ticket is not None and getattr(ticket, "rating", None) is None:
+            create_rating(scope, ticket.pk, requester, **sample.rating)
+
+
 @transaction.atomic
 def seed(passwords: dict[str, str]) -> bool:
     support = DeptInfo.objects.select_for_update().get(code="ticketflow_support")
@@ -306,6 +333,7 @@ def seed(passwords: dict[str, str]) -> bool:
             user.check_password(passwords[name]) for name, user in existing.items()
         ):
             dispatch_existing_samples(existing)
+            seed_ratings(existing)
             return False
         raise CommandError(
             "Demo usernames already exist with different credentials; restore the original accounts file"
@@ -321,6 +349,7 @@ def seed(passwords: dict[str, str]) -> bool:
     with override_settings(TICKETFLOW_CATEGORY_DEPARTMENTS=routing):
         tickets = {sample.title: seed_ticket(sample, accounts, now) for sample in SAMPLES}
     seed_articles(accounts, tickets)
+    seed_ratings(accounts)
     return True
 
 

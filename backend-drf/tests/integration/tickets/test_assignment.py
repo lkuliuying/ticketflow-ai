@@ -193,6 +193,7 @@ def test_historical_technician_keeps_own_ticket_submitter_actions(
         "can_handle": False,
         "can_assign": False,
         "can_return": False,
+        "can_rate": status == Status.CLOSED,
         "can_reply": True,
         "can_comment_internal": False,
         "can_archive": status == Status.CLOSED,

@@ -6,7 +6,7 @@ from django.core.management.base import CommandError
 from identity.models import UserInfo
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from ops.seed_ticketflow_demo import ADMIN, AGENT, NETWORK_AGENT, REQUESTER, USERNAMES, main, seed
-from tickets.models import Priority, Status, Ticket, Visibility
+from tickets.models import Priority, RatingTag, Status, Ticket, TicketRating, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE, TicketAccess, has_permission
 
 
@@ -48,6 +48,23 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert articles.filter(status=ArticleStatus.PUBLISHED).count() == 2
     assert articles.filter(status=ArticleStatus.DRAFT, creator=agent, source_ticket__status=Status.CLOSED).count() == 1
     assert tickets.filter(status=Status.CLOSED, knowledge_article__isnull=True).exists()
+
+    ratings = TicketRating.objects.select_related("ticket")
+    assert ratings.count() == 2
+    assert set(ratings.values_list("satisfaction", flat=True)) == {2, 5}
+    assert {tag for row in ratings for tag in row.tags} == set(RatingTag.values)
+    assert all(
+        row.ticket.status == Status.CLOSED
+        and row.rater_id == row.ticket.submitter_id
+        and row.handler_id == row.ticket.assignee_id
+        for row in ratings
+    )
+    assert tickets.filter(status=Status.CLOSED, rating__isnull=True).count() == 1
+    ratings.filter(satisfaction=2).delete()
+    ratings.filter(satisfaction=5).update(comment="保留既有评价")
+    assert not seed(passwords)
+    assert ratings.count() == 2
+    assert ratings.get(satisfaction=5).comment == "保留既有评价"
 
     ticket = tickets.get(department_id=agent.dept_id, title="门户密码重置邮件未收到")
     response = client_for(users[ADMIN]).post(

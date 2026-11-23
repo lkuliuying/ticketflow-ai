@@ -17,8 +17,6 @@
 豁免（`EXEMPT_POINTS`，附理由）：复用同一端点、显隐由其他权限点决定的页面级权限点。
 """
 
-import json
-import os
 import re
 from typing import Any
 
@@ -27,12 +25,10 @@ from django.conf import settings as dj_settings
 from demo_seed.permissions import DEMO_ALLOWED_PERMISSION_NAMES
 from system.services.seeding import read_model_rows
 
-LOADJSON_DIR = os.path.join(dj_settings.PROJECT_DIR, "loadjson")
-
-#: 参与守护的角色（内置角色，按种子 name 匹配）。test 为开发自测角色，
+#: 参与守护的角色（内置角色，按稳定的种子 code 匹配）。test 为开发自测角色，
 #: 2026-10 审计发现其「页面 ⇒ 只读子权限点」缺口（角色页预览/回收站、模型字段
 #: 详情、消息订阅详情）后纳入守护，与另两角色同规则。
-GUARDED_ROLES = ("管理员", "演示模式", "test")
+GUARDED_ROLES = ("admin", "demo", "test")
 
 #: 只读与取用类动作名前缀
 READONLY_PREFIXES = (
@@ -59,11 +55,6 @@ EXEMPT_POINTS = {
     # 水印配置读取：与 retrieve:SettingBasic 同端点前缀（api/settings/basic$）且页面入口共用一个
     "retrieve:SettingWatermark",
 }
-
-
-def _load(name: str) -> Any:
-    with open(os.path.join(LOADJSON_DIR, name), encoding="utf-8") as fp:
-        return json.load(fp)
 
 
 def _parent_page(pk: str, by_pk: dict[str, Any]) -> str | None:
@@ -108,24 +99,24 @@ def test_demo_roles_cover_readonly_points_of_owned_pages() -> None:
     menus = [row["fields"] | {"pk": row["pk"]} for row in read_model_rows("system.menu")]
     by_pk = {row["pk"]: row for row in menus}
     points = [row for row in menus if row.get("menu_type") == 2]
-    roles = {row["fields"].get("name"): role_menu_pks(row["fields"].get("code")) for row in _load("userrole.json")}
+    roles = {row["fields"]["code"] for row in read_model_rows("identity.userrole")}
 
     missing: list[str] = []
-    for role_name in GUARDED_ROLES:
-        owned = roles.get(role_name)
-        assert owned is not None, f"种子角色缺失：{role_name}"
+    for role_code in GUARDED_ROLES:
+        assert role_code in roles, f"种子角色缺失：{role_code}"
+        owned = role_menu_pks(role_code)
         for point in points:
             name = point.get("name") or ""
             if not name.startswith(READONLY_PREFIXES) or name in EXEMPT_POINTS:
                 continue
             # 演示模式按 allow-list 收敛：清单外的只读点（回收站/导出等）刻意不授予
-            if role_name == "演示模式" and name not in DEMO_ALLOWED_PERMISSION_NAMES:
+            if role_code == "demo" and name not in DEMO_ALLOWED_PERMISSION_NAMES:
                 continue
             if point["pk"] in owned or _whitelisted(point):
                 continue
             page = _parent_page(point["pk"], by_pk)
             if page and page in owned:
-                missing.append(f"{role_name} × {name}（页面 {by_pk[page].get('title') or by_pk[page].get('name')}）")
+                missing.append(f"{role_code} × {name}（页面 {by_pk[page].get('title') or by_pk[page].get('name')}）")
 
     assert missing == [], (
         "内置演示角色拥有页面，但缺少其下的只读与取用类权限点（按钮会静默消失或入口点击 403）；"

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from common.core.models import DbAuditModel, DbUuidModel
@@ -93,6 +94,46 @@ class TicketAssignment(DbUuidModel):
         indexes = [
             models.Index(fields=["ticket", "assignee"], name="tf_assignment_history_idx"),
             models.Index(fields=["assignee", "-started_at"], name="tf_assignment_latest_idx"),
+        ]
+
+
+class RatingTag(models.TextChoices):
+    FAST = "FAST", "响应快"
+    PROFESSIONAL = "PROFESSIONAL", "专业"
+    FRIENDLY = "FRIENDLY", "态度好"
+    CLEAR = "CLEAR", "沟通清楚"
+
+
+class TicketRating(DbUuidModel):
+    ticket = models.OneToOneField(Ticket, on_delete=models.CASCADE, related_name="rating", verbose_name="工单")
+    rater = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="given_ticket_ratings", verbose_name="评价人"
+    )
+    handler = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="received_ticket_ratings",
+        verbose_name="被评处理人",
+    )
+    resolved = models.BooleanField("是否解决")
+    satisfaction = models.PositiveSmallIntegerField("满意度", validators=[MinValueValidator(1), MaxValueValidator(5)])
+    handler_score = models.PositiveSmallIntegerField(
+        "处理人评分", validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    tags = models.JSONField("标签", default=list, blank=True)
+    comment = models.CharField("文字评价", max_length=500, null=True, blank=True)
+    created_time = models.DateTimeField("评价时间", auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "工单评价"
+        ordering = ("-created_time", "-id")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(satisfaction__range=(1, 5)), name="tf_rating_satisfaction_range"),
+            models.CheckConstraint(
+                condition=models.Q(handler_score__range=(1, 5)), name="tf_rating_handler_score_range"
+            ),
         ]
 
 

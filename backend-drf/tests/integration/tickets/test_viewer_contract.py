@@ -62,6 +62,7 @@ def test_ticket_viewer_matches_role_and_status(users, make_ticket, role, can_han
         "can_comment_internal": can_handle,
         "can_archive": can_handle and status == Status.CLOSED,
         "can_return": role == "agent" and status != Status.CLOSED,
+        "can_rate": role == "requester" and status == Status.CLOSED,
         "read_only": False,
     }
     validate(data["viewer"], "ticketViewer")
@@ -127,6 +128,7 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
         "can_comment_internal": True,
         "can_archive": False,
         "can_return": False,
+        "can_rate": False,
         "read_only": False,
     }
     ticket.submitter = users["agent"]
@@ -140,6 +142,7 @@ def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ti
         "can_comment_internal": False,
         "can_archive": False,
         "can_return": False,
+        "can_rate": True,
         "read_only": False,
     }
 
@@ -368,14 +371,17 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
     assert api.get(resource).data["data"]["source_ticket_id"] == str(closed.pk)
 
 
-def test_article_capabilities_respect_missing_action_grants(users):
+def test_article_capabilities_respect_missing_action_grants(users, client_for):
     article = KnowledgeArticle.objects.create(title="知识", creator=users["agent"])
     role = UserRole.objects.get(code=ADMIN_ROLE)
     role.menu.remove(*Menu.objects.filter(name__in=["partialUpdate:TicketFlowKnowledge", "create:TicketFlowKnowledge"]))
-    api = authenticated(users["admin"])
+    api = client_for(users["admin"])
     response = api.get(f"{ARTICLES}/{article.pk}")
+    assert response.status_code == 200, response.data
     assert response.data["data"]["viewer"] == {"can_edit": False, "can_publish": False}
-    assert api.get(ARTICLES).data["data"]["can_create_standalone"] is False
+    listing = api.get(ARTICLES)
+    assert listing.status_code == 200, listing.data
+    assert listing.data["data"]["can_create_standalone"] is False
 
 
 def test_only_published_article_detail_counts_views(users, api_client):
@@ -416,7 +422,12 @@ def test_ticketflow_directory_contains_visible_pages_in_order(users):
     directory = Menu.objects.get(name="TicketFlow")
     assert directory.menu_type == Menu.MenuChoices.DIRECTORY
     children = list(Menu.objects.filter(parent=directory).select_related("meta").order_by("rank"))
-    assert [page.component for page in children] == ["ticketflow/tickets/index", "ticketflow/knowledge/index"]
+    assert [page.component for page in children] == [
+        "ticketflow/tickets/index",
+        "ticketflow/knowledge/index",
+        "ticketflow/ratings/mine/index",
+        "ticketflow/ratings/stats/index",
+    ]
     assert all(page.meta.is_show_menu for page in children)
     for user in users.values():
         assert user.roles.filter(menu=directory).exists()
