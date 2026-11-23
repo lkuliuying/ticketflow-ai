@@ -222,7 +222,8 @@ class TicketViewSet(
         scope = self.filter_queryset(self.get_queryset())
         values = cast(services.RatingInput, self._values(request))
         rating = services.create_rating(scope, pk, self.actor, **values)
-        return ApiResponse(data=TicketRatingSerializer(rating).data, status=201)
+        data = TicketRatingSerializer(rating, context=self.get_serializer_context()).data
+        return ApiResponse(data=data, status=201)
 
     @extend_schema(responses=ticket_result)
     @action(detail=True, methods=["post"])

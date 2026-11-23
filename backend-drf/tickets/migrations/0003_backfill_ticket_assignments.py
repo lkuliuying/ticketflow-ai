@@ -37,7 +37,7 @@ def segments(ticket, assignment_model):
         )
 
 
-def backfill(apps, schema_editor):
+def backfill_ticket_assignments(apps, schema_editor):
     database = schema_editor.connection.alias
     tickets = apps.get_model("tickets", "Ticket").objects.using(database)
     logs = apps.get_model("tickets", "TicketLog").objects.using(database)
@@ -66,4 +66,4 @@ def backfill(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [("tickets", "0002_alter_ticketlog_operator_ticketassignment")]
 
-    operations = [migrations.RunPython(backfill, migrations.RunPython.noop)]
+    operations = [migrations.RunPython(backfill_ticket_assignments, migrations.RunPython.noop)]

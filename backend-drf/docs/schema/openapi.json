@@ -98015,7 +98015,7 @@
             "in": "query",
             "name": "handler_id",
             "schema": {
-              "type": "number"
+              "type": "integer"
             }
           },
           {

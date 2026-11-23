@@ -141,7 +141,7 @@ PENDING_TICKET_DATA_MIGRATIONS = {
 DATA_CLEANUP_CALLABLES = (
     "rename_default_site_title",
     "rename_default_root_department",
-    "backfill",
+    "backfill_ticket_assignments",
     "migrate_roles",
     "close_registration",
     "import_category_routes",

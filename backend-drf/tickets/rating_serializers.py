@@ -13,6 +13,9 @@ class RatingInputSerializer(serializers.Serializer):
     )
     comment = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
 
+    def validate_comment(self, comment: str | None) -> str | None:
+        return comment or None
+
     def validate_tags(self, tags: list[str]) -> list[str]:
         if len(set(tags)) != len(tags):
             raise serializers.ValidationError("评价标签不能重复")

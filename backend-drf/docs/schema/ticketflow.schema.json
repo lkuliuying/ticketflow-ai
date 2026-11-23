@@ -129,7 +129,7 @@
         "satisfaction": {"$ref": "#/$defs/ticketRatingScore"},
         "handler_score": {"$ref": "#/$defs/ticketRatingScore"},
         "tags": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ticketRatingTag"}},
-        "comment": {"type": ["string", "null"], "maxLength": 500}
+        "comment": {"type": ["string", "null"], "maxLength": 500, "description": "空字符串和纯空白输入按 null 保存。"}
       }
     },
     "ticketRating": {
@@ -153,7 +153,7 @@
     },
     "ticketRatingList": {
       "type": "object",
-      "description": "GET /api/ticket-ratings。员工看本人给出的评价，技术员看本人收到的评价，管理员看全部。按创建时间、主键倒序，支持 handler_id、satisfaction、handler_score、resolved、created_from、created_to 筛选。时间用 ISO 8601，两端均含边界。",
+      "description": "GET /api/ticket-ratings。员工看本人给出的评价，技术员看本人收到的评价，管理员看全部。按创建时间、主键倒序，支持 handler_id、satisfaction、handler_score、resolved、created_from、created_to 筛选。handler_id 为整数，小数或非数字返回 400。时间用 ISO 8601，两端均含边界。",
       "required": ["total", "results"],
       "properties": {
         "total": {"type": "integer", "minimum": 0},

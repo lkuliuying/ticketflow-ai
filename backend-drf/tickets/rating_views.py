@@ -1,10 +1,13 @@
+import re
 from collections import Counter
 from typing import Any
 
 import django_filters as filters
+from django import forms
+from django.core.exceptions import ValidationError
 from django.db.models import Count, F, Q, QuerySet, Sum
 from django.utils.functional import cached_property
-from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema, extend_schema_field, extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
@@ -20,10 +23,23 @@ from tickets.policy import TicketAccess
 from tickets.rating_serializers import RatingSummarySerializer, TicketRatingSerializer
 
 SCORES = [(str(score), str(score)) for score in range(1, 6)]
+HANDLER_ID_LABEL = "处理人 ID"
 
 
 class RatingDateBound(filters.IsoDateTimeFilter):
     input_type = "datetime"
+
+
+class RatingHandlerIdField(forms.IntegerField):
+    def to_python(self, value: Any) -> int | None:
+        if value not in self.empty_values and not re.fullmatch(r"[+-]?[0-9]+", str(value).strip()):
+            raise ValidationError(self.error_messages["invalid"], code="invalid")
+        return super().to_python(value)
+
+
+@extend_schema_field({"type": "integer", "description": HANDLER_ID_LABEL})
+class RatingHandlerIdFilter(filters.Filter):
+    field_class = RatingHandlerIdField
 
 
 class RatingDateFilter(filters.FilterSet):
@@ -36,7 +52,7 @@ class RatingDateFilter(filters.FilterSet):
 
 
 class RatingFilter(RatingDateFilter):
-    handler_id = filters.NumberFilter(label="处理人 ID")
+    handler_id = RatingHandlerIdFilter(label=HANDLER_ID_LABEL)
     satisfaction = filters.TypedChoiceFilter(choices=SCORES, coerce=int, label="满意度")
     handler_score = filters.TypedChoiceFilter(choices=SCORES, coerce=int, label="处理人评分")
     resolved = filters.TypedChoiceFilter(

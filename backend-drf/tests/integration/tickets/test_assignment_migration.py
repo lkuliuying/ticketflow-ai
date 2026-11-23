@@ -34,7 +34,7 @@ def test_existing_assignments_backfill_from_last_log_and_known_assignee(users, m
     )
 
     with connection.schema_editor(atomic=False) as editor:
-        BACKFILL.backfill(apps, editor)
+        BACKFILL.backfill_ticket_assignments(apps, editor)
 
     current = active.assignments.get()
     assert current.assignee_id == active.assignee_id
@@ -99,7 +99,7 @@ def test_structure_alignment_applies_pending_ticket_data_without_repeating_appli
         recorder = MigrationRecorder(connection)
         for node in nodes:
             recorder.record_unapplied(*node)
-        expected = (["backfill", "migrate_roles", "close_registration"], [])
+        expected = (["backfill_ticket_assignments", "migrate_roles", "close_registration"], [])
         assert _run_data_cleanups(loader, schema, nodes) == expected
         original = ticket.assignments.get()
 
