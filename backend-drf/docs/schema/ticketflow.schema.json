@@ -203,6 +203,57 @@
         }
       ]
     },
+    "accountRole": {
+      "enum": ["requester", "agent", "admin"],
+      "x-labels": {"requester": "普通员工", "agent": "技术员", "admin": "管理员"}
+    },
+    "account": {
+      "type": "object",
+      "description": "GET /api/ticketflow/accounts 和 GET /api/ticketflow/accounts/{pk}。仅业务管理员可用。列表支持 q、role、skill_group、is_active 及分页。停用与启用通过 PATCH is_active 完成。",
+      "required": ["pk", "username", "name", "phone", "email", "role", "skill_group", "skill_group_name", "is_active"],
+      "properties": {
+        "pk": {"type": "integer", "readOnly": true},
+        "username": {"type": "string", "minLength": 1, "maxLength": 150},
+        "name": {"type": "string", "minLength": 1, "maxLength": 150},
+        "phone": {"type": "string", "maxLength": 16},
+        "email": {"type": "string", "maxLength": 254},
+        "role": {"$ref": "#/$defs/accountRole"},
+        "skill_group": {"type": ["string", "null"], "format": "uuid", "description": "技术员需指定技能组，其他角色为空。改为其他角色时自动清空。"},
+        "skill_group_name": {"type": ["string", "null"], "readOnly": true},
+        "is_active": {"type": "boolean"}
+      }
+    },
+    "accountPassword": {
+      "type": "object",
+      "description": "创建账号及 POST /api/ticketflow/accounts/{pk}/reset-password 使用 password。启用底座密码加密时，以目标用户名作为加密密钥，沿用系统用户的 AESCipherV2 协议。",
+      "required": ["password"],
+      "properties": {
+        "password": {"type": "string", "minLength": 1, "maxLength": 512, "writeOnly": true}
+      }
+    },
+    "skillGroup": {
+      "type": "object",
+      "description": "GET/POST /api/ticketflow/skill-groups，GET/PATCH /api/ticketflow/skill-groups/{pk}。列表支持 q、is_active 及分页。默认组、仍有在职技术员的组和仍被分类指向的组停用时返回 409。",
+      "required": ["pk", "name", "description", "is_active", "is_default"],
+      "properties": {
+        "pk": {"type": "string", "format": "uuid", "readOnly": true},
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "description": {"type": ["string", "null"], "maxLength": 256},
+        "is_active": {"type": "boolean"},
+        "is_default": {"type": "boolean", "readOnly": true}
+      }
+    },
+    "categoryRoute": {
+      "type": "object",
+      "description": "GET /api/ticketflow/skill-groups/category-routes 返回所有分类的数组。PATCH /api/ticketflow/skill-groups/category-routes/{category} 接收 {skill_group}。null 清除配置并恢复默认组。只影响后续建单。",
+      "required": ["category", "label", "skill_group", "skill_group_name"],
+      "properties": {
+        "category": {"$ref": "#/$defs/category"},
+        "label": {"type": "string"},
+        "skill_group": {"type": ["string", "null"], "format": "uuid"},
+        "skill_group_name": {"type": ["string", "null"]}
+      }
+    },
     "knowledgeReference": {
       "type": "object",
       "required": ["article_id", "title", "excerpt"],

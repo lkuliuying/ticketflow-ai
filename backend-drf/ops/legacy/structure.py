@@ -134,6 +134,7 @@ PREREQUISITE_CALLABLES = (
 PENDING_TICKET_DATA_MIGRATIONS = {
     ("tickets", "0003_backfill_ticket_assignments"),
     ("tickets", "0004_business_roles_and_registration"),
+    ("tickets", "0007_import_category_routes"),
 }
 
 #: 对齐器建表后可安全执行的数据迁移必须使用 schema_editor 的数据库别名。
@@ -143,6 +144,7 @@ DATA_CLEANUP_CALLABLES = (
     "backfill",
     "migrate_roles",
     "close_registration",
+    "import_category_routes",
 )
 
 #: 明确「跳过」的数据迁移登记（仅用于白名单守护：新增数据迁移必须在这里表态，

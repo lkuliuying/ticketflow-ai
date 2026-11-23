@@ -23,6 +23,7 @@ class DeptInfo(DbAuditModel, DbUuidModel):
 
     name = models.CharField(verbose_name=_("Department name"), max_length=128)
     code = models.CharField(max_length=128, verbose_name=_("Department code"), unique=True)
+    is_ticketflow_skill_group = models.BooleanField("工单技能组", default=False, db_default=False)
     parent = models.ForeignKey(
         "identity.DeptInfo",
         on_delete=models.PROTECT,

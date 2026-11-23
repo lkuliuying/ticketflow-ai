@@ -7,10 +7,8 @@ from datetime import datetime, timedelta
 from typing import NamedTuple
 from unittest.mock import patch
 
-from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import transaction
-from django.test import override_settings
 from django.utils import timezone
 
 from identity.models import DeptInfo, UserInfo, UserRole
@@ -18,7 +16,7 @@ from knowledge.models import ArticleStatus
 from knowledge.services import create_article
 from tickets.assignment import dispatch
 from tickets.cache import invalidate_dashboard
-from tickets.models import Category, Priority, RatingTag, Status, Ticket, Visibility
+from tickets.models import Category, CategoryRoute, Priority, RatingTag, Status, Ticket, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE, TicketAccess
 from tickets.services import RatingInput, add_comment, create_rating, create_ticket, transition
 
@@ -172,7 +170,7 @@ def create_accounts(passwords: dict[str, str], support: DeptInfo, network: DeptI
         (REQUESTER, "演示员工", REQUESTER_ROLE, None),
         (AGENT, "工单支持技术员", AGENT_ROLE, support),
         (NETWORK_AGENT, "网络支持技术员", AGENT_ROLE, network),
-        (ADMIN, "演示管理员", ADMIN_ROLE, support),
+        (ADMIN, "演示管理员", ADMIN_ROLE, None),
     ):
         user = UserInfo.objects.create_user(
             username=username,
@@ -332,6 +330,9 @@ def seed(passwords: dict[str, str]) -> bool:
         if set(existing) == set(USERNAMES) and all(
             user.check_password(passwords[name]) for name, user in existing.items()
         ):
+            network = DeptInfo.objects.filter(code="ticketflow_demo_network", is_active=True).first()
+            if network is not None:
+                CategoryRoute.objects.get_or_create(category=Category.NETWORK, defaults={"skill_group": network})
             dispatch_existing_samples(existing)
             seed_ratings(existing)
             return False
@@ -339,15 +340,11 @@ def seed(passwords: dict[str, str]) -> bool:
             "Demo usernames already exist with different credentials; restore the original accounts file"
         )
 
-    network = DeptInfo.objects.create(code="ticketflow_demo_network", name="网络支持组")
+    network = DeptInfo.objects.create(code="ticketflow_demo_network", name="网络支持组", is_ticketflow_skill_group=True)
     accounts = create_accounts(passwords, support, network)
-    routing = {
-        **settings.TICKETFLOW_CATEGORY_DEPARTMENTS,
-        Category.NETWORK: str(network.pk),
-    }
+    CategoryRoute.objects.get_or_create(category=Category.NETWORK, defaults={"skill_group": network})
     now = timezone.now()
-    with override_settings(TICKETFLOW_CATEGORY_DEPARTMENTS=routing):
-        tickets = {sample.title: seed_ticket(sample, accounts, now) for sample in SAMPLES}
+    tickets = {sample.title: seed_ticket(sample, accounts, now) for sample in SAMPLES}
     seed_articles(accounts, tickets)
     seed_ratings(accounts)
     return True

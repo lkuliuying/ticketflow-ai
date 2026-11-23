@@ -5,6 +5,7 @@
     "fields": {
       "code": "ticketflow_support",
       "name": "工单支持组",
+      "is_ticketflow_skill_group": true,
       "is_active": true
     }
   }

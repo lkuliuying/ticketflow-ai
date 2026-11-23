@@ -68,7 +68,20 @@
       "rating:TicketFlowTickets",
       "list:TicketFlowMyRatings",
       "TicketFlowRatingStats",
-      "summary:TicketFlowMyRatings"
+      "summary:TicketFlowMyRatings",
+      "TicketFlowAccounts",
+      "list:TicketFlowAccounts",
+      "create:TicketFlowAccounts",
+      "retrieve:TicketFlowAccounts",
+      "partialUpdate:TicketFlowAccounts",
+      "resetPassword:TicketFlowAccounts",
+      "TicketFlowSkillGroups",
+      "list:TicketFlowSkillGroups",
+      "create:TicketFlowSkillGroups",
+      "retrieve:TicketFlowSkillGroups",
+      "partialUpdate:TicketFlowSkillGroups",
+      "categoryRoutes:TicketFlowSkillGroups",
+      "categoryRoute:TicketFlowSkillGroups"
     ]
   }
 }

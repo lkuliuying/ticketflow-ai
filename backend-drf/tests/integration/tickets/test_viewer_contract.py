@@ -427,7 +427,13 @@ def test_ticketflow_directory_contains_visible_pages_in_order(users):
         "ticketflow/knowledge/index",
         "ticketflow/ratings/mine/index",
         "ticketflow/ratings/stats/index",
+        "ticketflow/accounts/index",
+        "ticketflow/skill-groups/index",
     ]
     assert all(page.meta.is_show_menu for page in children)
     for user in users.values():
         assert user.roles.filter(menu=directory).exists()
+    for page in children[-2:]:
+        assert users["admin"].roles.filter(menu=page).exists()
+        assert not users["agent"].roles.filter(menu=page).exists()
+        assert not users["requester"].roles.filter(menu=page).exists()
