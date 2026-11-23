@@ -1138,6 +1138,8 @@ menus:
   ticketflowRatingStats: 评价统计
   ticketflowAccounts: 账号管理
   ticketflowSkillGroups: 技能组
+  ticketflowAssistant: AI 助手
+  ticketflowAssistantFeedback: AI 反馈
   searchData: 数据查询
   userOnline: 在线用户
   apiApp: API 应用
@@ -4684,6 +4686,76 @@ ticketflow:
     DUE_SOON: 即将超时
     OVERDUE: 已超时
     MET: 按时完成
+  assistant:
+    newSession: 新对话
+    noSessions: 还没有对话
+    sessionActions: 会话操作
+    rename: 重命名
+    remove: 删除
+    renamePrompt: 输入新的会话标题
+    titleInvalid: 标题为 1~200 个字符
+    renamed: 已重命名
+    removeConfirm: 确定删除对话“{title}”吗？删除后不再显示在列表中。
+    removed: 对话已删除
+    welcomeTitle: 有问题先问问 AI 助手
+    welcomeHint: 回答只依据已发布的知识库文章；没解决可以一键转人工提单。
+    emptyChat: 还没有消息，输入问题开始对话
+    placeholder: 描述你遇到的问题，例如：VPN 连不上怎么办？
+    inputHint: Enter 发送，Shift + Enter 换行
+    send: 发送
+    stop: 停止
+    sendFailed: 发送失败，请稍后重试
+    references: 参考了 {count} 篇知识库文章
+    up: 有帮助
+    down: 没帮助
+    reason: 原因
+    comment: 补充说明
+    commentPlaceholder: 选填，告诉我们哪里不对
+    commentTooLong: 补充说明最多 {max} 个字符
+    downTitle: 这条回答哪里不好？
+    feedbackSaved: 感谢反馈
+    reasonValue:
+      INACCURATE: 不准确
+      UNRESOLVED: 没解决
+      IRRELEVANT: 引用不相关
+      OTHER: 其他
+    answerStatus:
+      complete: 已完成
+      interrupted: 回答未完成（已停止或连接中断）
+      failed: 回答生成失败
+    viewTranscript: 查看 AI 对话
+    transcriptTitle: AI 对话
+    transcriptTitleWithNumber: AI 对话 · {number}
+    transcriptHint: 提交人转人工前与 AI 助手的对话，只读
+    transcriptFailed: 对话不存在或无权查看
+  handoff:
+    action: 转人工提单
+    title: 转人工提单
+    hint: AI 已根据对话整理出工单内容，请确认或修改后提交，处理人可以在工单里查看这段对话。
+    titleRequired: 请填写标题
+    descriptionRequired: 请填写问题描述
+    tooLong: 最多 {max} 个字符
+    draftFailed: AI 整理失败，已用你的问题预填，请补充后提交
+    created: 已提交工单 {number}
+  assistantFeedback:
+    summary:
+      sessions: 会话数
+      questions: 问题数
+      upRate: 好评率
+      handoffRate: 转人工率
+    votes: 赞 {up} · 踩 {down}
+    handoffCount: 转人工 {count} 次
+    scopeHint: 只展示被点踩的回答和转人工的会话，其余对话只计入统计
+    downvotes: 被点踩的回答
+    handoffs: 转人工会话
+    noDownvotes: 暂无被点踩的回答
+    noHandoffs: 暂无转人工会话
+    votedAt: 点踩时间
+    user: 提问人
+    question: 问题
+    handedOffAt: 转人工时间
+    sessionTitle: 会话标题
+    operation: 操作
   categoryValue:
     ACCOUNT: 账户
     ACCESS: 权限
@@ -4698,6 +4770,7 @@ workbench:
     afternoon: 下午好，{name}
     evening: 晚上好，{name}
   createTicket: 新建工单
+  assistant: AI 助手
   myTickets: 我的工单
   allTickets: 全部工单
   myTodo: 我的待办

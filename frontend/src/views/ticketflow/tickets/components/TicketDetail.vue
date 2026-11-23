@@ -10,6 +10,7 @@ import TicketReply from "./TicketReply.vue";
 import TicketTimeline from "./TicketTimeline.vue";
 import RatingCard from "../../ratings/components/RatingCard.vue";
 import { openRatingDialog } from "../../ratings/utils/ratingDialog";
+import { openAssistantTranscript } from "../../assistant/utils/transcriptDrawer";
 
 /**
  * 工单详情抽屉：摘要与 SLA、可执行操作、回复框、时间线；处理人在右侧另有 AI 面板。
@@ -128,6 +129,17 @@ function time(value: string | null | undefined) {
             </span>
           </div>
           <h3 class="m-0">{{ detail.title }}</h3>
+          <div v-if="detail.assistant_session_id">
+            <el-button
+              size="small"
+              plain
+              type="primary"
+              data-testid="ticket-assistant-transcript"
+              @click="openAssistantTranscript(detail)"
+            >
+              {{ t("ticketflow.assistant.viewTranscript") }}
+            </el-button>
+          </div>
         </header>
 
         <el-alert

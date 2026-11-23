@@ -6,6 +6,15 @@ import type { RatingPayload, TicketRating } from "./ratings";
 export type TicketStatus =
   "OPEN" | "IN_PROGRESS" | "PENDING_VERIFY" | "CLOSED" | "REOPENED";
 export type TicketPriority = "P0" | "P1" | "P2" | "P3";
+export const TICKET_PRIORITIES: TicketPriority[] = ["P0", "P1", "P2", "P3"];
+/** 工单分类词表（显示名走词条 ticketflow.categoryValue.*） */
+export const TICKET_CATEGORIES = [
+  "ACCOUNT",
+  "ACCESS",
+  "NETWORK",
+  "SERVICE",
+  "OTHER"
+];
 export type TicketSlaState = "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "MET";
 export type CommentVisibility = "PUBLIC" | "INTERNAL";
 
@@ -70,6 +79,8 @@ export type TicketDetail = TicketItem & {
   viewer: TicketViewer;
   /** 评价人、被评处理人与管理员可见，其他人或未评价时为 null */
   rating?: TicketRating | null;
+  /** 由 AI 助手转人工创建且当前用户可查看时为会话 ID，否则为 null */
+  assistant_session_id?: string | null;
   available_transitions: TicketStatus[];
   timeline: { total: number; results: TimelineEntry[] };
 };
@@ -79,6 +90,8 @@ export type TicketCreatePayload = {
   description: string;
   category: string;
   priority: TicketPriority;
+  /** AI 助手转人工：本人会话，建单后关联到工单 */
+  assistant_session_id?: string;
 };
 
 export type TicketDashboard = {
