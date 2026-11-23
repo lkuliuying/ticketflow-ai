@@ -14,9 +14,10 @@ const WALL = 0.8;
 const PILLAR = 3.3;
 const ROLE_TITLE = { claude: "总指导仓", codex: "后端工坊", gemini: "评审质检仓" };
 
-// 每座仓库里各阶段放在哪：货架 A / B、工作台、装货区（Claude 的待合并）
+// 每座仓库里各阶段放在哪：货架 A / B、工作台、装货区（Claude 的待合并）、退回箱（Claude 自己任务的需修改）。
+// 一个区域只放一个阶段，否则标签、点击面和卡片位置会重叠
 const ZONES = {
-  claude: { 待开始: "shelfA", 阻塞: "shelfB", 需修改: "shelfB", 执行中: "bench", 已通过: "dock" },
+  claude: { 待开始: "shelfA", 阻塞: "shelfB", 需修改: "bin", 执行中: "bench", 已通过: "dock" },
   codex: { 需修改: "shelfA", 执行中: "bench" },
   gemini: { 待评审: "shelfA", 评审中: "bench" }
 };
@@ -24,7 +25,8 @@ const AREA = {
   shelfA: new THREE.Vector3(-1.75, 0, -2.15),
   shelfB: new THREE.Vector3(1.6, 0, -2.15),
   desk: new THREE.Vector3(-0.9, 0, 0.6),
-  dock: new THREE.Vector3(2.25, 0, 1.4)
+  dock: new THREE.Vector3(2.0, 0, 1.45),
+  bin: new THREE.Vector3(-2.75, 0, 1.85)
 };
 const SHELF_LEVELS = [0.75, 1.62, 2.49];
 const HAIR = { claude: "#6b4f3a", codex: "#2f2f35", gemini: "#c9a46c" };
@@ -165,7 +167,9 @@ export function buildWarehouse(scene, id, pickables) {
   const racks = { shelfA: rack(group, AREA.shelfA), shelfB: rack(group, AREA.shelfB) };
   if (id === "claude") {
     // 装货区托盘：已通过、等待合并的任务
-    group.add(box(1.5, 0.16, 1.3, mat("#c8a27a"), AREA.dock.x, 0.18, AREA.dock.z));
+    group.add(box(2.9, 0.16, 1.3, mat("#c8a27a"), AREA.dock.x, 0.18, AREA.dock.z));
+    // 退回箱：Claude 自己执行、被评审退回的任务
+    group.add(box(1.4, 0.5, 0.9, mat("#f3c4c4"), AREA.bin.x, 0.25, AREA.bin.z));
   }
 
   const desk = buildDesk(group, id, AREA.desk);
@@ -216,8 +220,9 @@ function zoneAnchor(area) {
     const p = AREA.desk.clone().add(new THREE.Vector3(0.85, 0, 0));
     return { label: p.clone().setY(2.55), pad: p.clone().setY(0.11).add(new THREE.Vector3(0, 0, -0.95)), size: [1.0, 0.5] };
   }
-  if (area === "dock") {
-    return { label: AREA.dock.clone().setY(0.25).add(new THREE.Vector3(0, 0, 0.95)), pad: AREA.dock.clone().setY(0.11), size: [1.7, 1.5] };
+  if (area === "dock" || area === "bin") {
+    const at = AREA[area];
+    return { label: at.clone().setY(0.25).add(new THREE.Vector3(0, 0, 0.8)), pad: at.clone().setY(0.11), size: area === "dock" ? [3.0, 1.5] : [1.6, 1.1] };
   }
   const p = AREA[area];
   return { label: p.clone().setY(3.45), pad: p.clone().setY(0.11).add(new THREE.Vector3(0, 0, 0.75)), size: [2.8, 0.7] };
@@ -248,7 +253,10 @@ export function slotIn(id, stage, index) {
   if (area === "dock") {
     const col = index % 2;
     const row = Math.floor(index / 2);
-    return origin.clone().add(AREA.dock).add(new THREE.Vector3((col - 0.5) * 0.75, 0.68 + row * 0.82, 0));
+    return origin.clone().add(AREA.dock).add(new THREE.Vector3((col - 0.5) * 1.36, 0.68 + row * 0.82, 0));
+  }
+  if (area === "bin") {
+    return origin.clone().add(AREA.bin).add(new THREE.Vector3(0, 0.95 + index * 0.82, 0));
   }
   const at = AREA[area];
   const col = index % 2;

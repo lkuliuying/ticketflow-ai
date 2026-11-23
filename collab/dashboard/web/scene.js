@@ -133,7 +133,8 @@ export class AgentScene {
           card.loc = loc;
           this.cards.set(task.id, card);
         }
-        if (card.stage !== task.stage || card.task.branch !== task.branch) {
+        // 卡面画的是编号、标题、阶段和执行代理，这几项变了才重绘
+        if (card.stage !== task.stage || card.task.title !== task.title || card.task.agent !== task.agent) {
           card.stage = task.stage;
           refreshCard(card, task);
           const zone = this.warehouses[loc]?.zones[task.stage];
@@ -222,7 +223,7 @@ export class AgentScene {
   #fit() {
     const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const { wFrac = 1, hFrac = 1 } = this.visible ?? {};
-    // 宽和高各算一次所需距离，取较大者，保证整间办公室都放得下
+    // 宽和高各算一次所需距离，取较大者，保证三座仓库都放得下
     const byWidth = FIT_WIDTH / 2 / (tanV * this.camera.aspect * Math.max(0.35, wFrac));
     const byHeight = FIT_HEIGHT / 2 / (tanV * Math.max(0.25, hFrac));
     const distance = Math.min(130, Math.max(byWidth, byHeight));
@@ -296,7 +297,7 @@ export class AgentScene {
       // 卡面已是阶段色：描边只用于选中（深色）和处理中（代理色呼吸）
       card.edge.material.color.set(isSel ? "#1f2937" : AGENT_COLORS[ownerOf(card.task)]);
       card.edge.material.opacity = isSel ? 1 : card.active ? 0.4 + pulse * 0.6 : 0;
-      g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, isSel ? 1.3 : card.active ? 1.08 + pulse * 0.05 : 1, 0.12));
+      g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, isSel ? 1.3 : card.active ? 1.08 + pulse * 0.05 : 1, 1 - Math.exp(-8 * dt)));
     }
 
     tickVault(this.scene, this.vault, dt, sel?.kind === "trunk");

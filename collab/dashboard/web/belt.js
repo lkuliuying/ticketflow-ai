@@ -101,6 +101,8 @@ export function buildLanes(scene) {
 
     const packets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.26, 0.34), mat(AGENT_COLORS[spec.from] ?? "#9ca3af"), 4);
     packets.castShadow = true;
+    // 实例分布在整条车道上，几何体本身在原点，关闭视锥裁剪以免镜头移开原点时数据包消失
+    packets.frustumCulled = false;
     packets.count = 0;
     scene.add(packets);
     return { ...spec, d, inA, inB, tex, tag, packets, energy: 0, transit: 0 };
@@ -185,7 +187,7 @@ export function cardTexture(task) {
   canvas.width = 512;
   canvas.height = 300;
   const ctx = canvas.getContext("2d");
-  const color = STAGE_COLORS[task.stage];
+  const color = STAGE_COLORS[task.stage] ?? "#94a3b8";
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, 512, 300);
   ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
