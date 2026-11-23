@@ -7,12 +7,10 @@ import {
   type AssistantMessage
 } from "@/api/ticketflow/assistant";
 import MessageBubble from "./MessageBubble.vue";
+import { fetchAllMessages } from "../utils/messagePages";
 
 /** 工单关联的 AI 对话：只读，不显示评价；提交人、当前处理人与管理员可见 */
 defineOptions({ name: "TicketFlowAssistantTranscript" });
-
-const PAGE_SIZE = 100;
-const MAX_PAGES = 10;
 
 const props = defineProps<{ ticketId: string }>();
 
@@ -24,20 +22,12 @@ const failed = ref(false);
 async function load() {
   loading.value = true;
   failed.value = false;
-  const rows: AssistantMessage[] = [];
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const res = await ticketAssistantSession(props.ticketId, {
-      page,
-      size: PAGE_SIZE
-    }).catch(() => null);
-    if (!res || !isSuccess(res) || !res.data) {
-      failed.value = page === 1;
-      break;
-    }
-    rows.push(...res.data.messages.results);
-    if (rows.length >= res.data.messages.total) break;
-  }
-  messages.value = rows;
+  const rows = await fetchAllMessages(async (page, size) => {
+    const res = await ticketAssistantSession(props.ticketId, { page, size });
+    return isSuccess(res) && res.data ? res.data.messages : null;
+  });
+  failed.value = rows === null;
+  messages.value = rows ?? [];
   loading.value = false;
 }
 

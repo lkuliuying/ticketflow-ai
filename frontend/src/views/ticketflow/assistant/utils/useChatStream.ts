@@ -100,7 +100,8 @@ export function useChatStream() {
     return chat.value;
   }
 
-  onBeforeUnmount(stop);
+  // 卸载时放弃在途的流：send 返回 null，调用方不再刷新或回调
+  onBeforeUnmount(reset);
 
   return { chat, send, stop, reset };
 }

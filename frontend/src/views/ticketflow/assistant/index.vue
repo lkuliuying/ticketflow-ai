@@ -28,6 +28,7 @@ const {
   active,
   loading,
   creating,
+  untitled,
   load,
   create,
   rename,
@@ -69,11 +70,11 @@ async function confirmRemove(session: AssistantSession) {
   }
 }
 
-/** 首个问题记录后用问题开头作标题，便于在侧栏区分会话 */
-function onAsked(pk: string, first: boolean, text: string) {
+/** 首个问题记录后用问题开头作标题（只对本次新建、未手动改名的会话），便于在侧栏区分 */
+function onAsked(pk: string, titleFrom: string | null) {
   touch(pk);
-  if (first && auth.partialUpdate) {
-    void rename(pk, text.replace(/\s+/g, " ").slice(0, AUTO_TITLE_MAX));
+  if (titleFrom && auth.partialUpdate) {
+    void rename(pk, titleFrom.replace(/\s+/g, " ").slice(0, AUTO_TITLE_MAX));
   }
 }
 
@@ -112,7 +113,9 @@ onMounted(load);
         v-if="active"
         :key="active.pk"
         :session="active"
+        :can-read="Boolean(auth.messages)"
         :can-feedback="Boolean(auth.feedback)"
+        :auto-title="untitled.has(active.pk)"
         :can-handoff="Boolean(ticketAuth.create)"
         class="h-full"
         @asked="onAsked"

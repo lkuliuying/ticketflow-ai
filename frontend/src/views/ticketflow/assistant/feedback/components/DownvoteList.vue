@@ -14,7 +14,7 @@ import { openTicketDetail } from "../../../tickets/utils/ticketDetailDrawer";
 defineOptions({ name: "TicketFlowAssistantDownvotes" });
 
 const { t } = useI18n();
-const { rows, total, loading, pager, load, apply } = usePagedRows<
+const { rows, total, loading, pager, load, apply, resize } = usePagedRows<
   DownvoteRow,
   FeedbackRange
 >(params => assistantFeedbackApi.downvotes(params));
@@ -116,7 +116,7 @@ defineExpose({ apply, load });
       :page-sizes="[10, 20, 50]"
       :total="total"
       @current-change="load"
-      @size-change="load"
+      @size-change="resize"
     />
   </div>
 </template>

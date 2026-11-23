@@ -17,6 +17,8 @@ export function useAssistantSessions() {
   const activeId = ref<string | null>(null);
   const loading = ref(false);
   const creating = ref(false);
+  /** 本次进入页面后新建、尚未改过名的会话：首个问题可用来自动命名 */
+  const untitled = ref(new Set<string>());
 
   const active = computed(
     () => sessions.value.find(s => s.pk === activeId.value) ?? null
@@ -44,6 +46,7 @@ export function useAssistantSessions() {
     creating.value = false;
     if (!res || !isSuccess(res) || !res.data) return null;
     sessions.value = [res.data, ...sessions.value];
+    untitled.value = new Set(untitled.value).add(res.data.pk);
     activeId.value = res.data.pk;
     return res.data;
   }
@@ -57,6 +60,11 @@ export function useAssistantSessions() {
   }
 
   async function rename(pk: string, title: string): Promise<boolean> {
+    if (untitled.value.has(pk)) {
+      const next = new Set(untitled.value);
+      next.delete(pk);
+      untitled.value = next;
+    }
     const res = await assistantSessionApi.rename(pk, title).catch(() => null);
     if (!res || !isSuccess(res) || !res.data) return false;
     upsert(res.data);
@@ -90,6 +98,7 @@ export function useAssistantSessions() {
     active,
     loading,
     creating,
+    untitled,
     load,
     create,
     rename,

@@ -14,7 +14,7 @@ import { openAssistantTranscript } from "../../utils/transcriptDrawer";
 defineOptions({ name: "TicketFlowAssistantHandoffs" });
 
 const { t } = useI18n();
-const { rows, total, loading, pager, load, apply } = usePagedRows<
+const { rows, total, loading, pager, load, apply, resize } = usePagedRows<
   FeedbackSession,
   FeedbackRange
 >(params => assistantFeedbackApi.handoffs(params));
@@ -92,7 +92,7 @@ defineExpose({ apply, load });
       :page-sizes="[10, 20, 50]"
       :total="total"
       @current-change="load"
-      @size-change="load"
+      @size-change="resize"
     />
   </div>
 </template>

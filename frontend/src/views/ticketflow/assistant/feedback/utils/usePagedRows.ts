@@ -35,5 +35,11 @@ export function usePagedRows<T, P extends object>(fetcher: Fetcher<T, P>) {
     return load();
   }
 
-  return { rows, total, loading, pager, load, apply };
+  /** 改每页条数：回到第一页再查，避免旧页码越界与重复请求 */
+  function resize() {
+    pager.page = 1;
+    return load();
+  }
+
+  return { rows, total, loading, pager, load, apply, resize };
 }

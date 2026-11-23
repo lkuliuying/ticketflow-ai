@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ScrollbarInstance } from "element-plus";
 import type {
@@ -32,17 +32,23 @@ const QUESTION_MAX = 4000;
 
 const props = defineProps<{
   session: AssistantSession;
+  canRead: boolean;
   canFeedback: boolean;
   canHandoff: boolean;
+  /** 首个问题记录后是否用问题开头自动命名（只对本次新建、未手动改名的会话） */
+  autoTitle: boolean;
 }>();
 const emit = defineEmits<{
-  asked: [pk: string, first: boolean, text: string];
+  asked: [pk: string, titleFrom: string | null];
   handedOff: [pk: string, ticket: TicketItem];
 }>();
 
 const { t } = useI18n();
 const { messages, loading, pending, chat, streaming, ask, stop, setFeedback } =
-  useAssistantChat(() => props.session.pk);
+  useAssistantChat(
+    () => props.session.pk,
+    () => props.canRead
+  );
 const input = ref("");
 const error = ref("");
 const drafting = ref(false);
@@ -51,7 +57,11 @@ const scrollbar = ref<ScrollbarInstance>();
 const questions = computed(() =>
   messages.value.filter(m => m.role === "user").map(m => m.content)
 );
-const busy = computed(() => streaming.value || drafting.value);
+const busy = computed(() => streaming.value || drafting.value || loading.value);
+let alive = true;
+onBeforeUnmount(() => {
+  alive = false;
+});
 
 function scrollToBottom() {
   void nextTick(() => scrollbar.value?.setScrollTop(Number.MAX_SAFE_INTEGER));
@@ -68,14 +78,22 @@ async function send() {
   const pk = props.session.pk;
   input.value = "";
   error.value = "";
-  const recorded = await ask(text);
-  if (recorded) {
-    emit("asked", pk, first, text);
+  const outcome = await ask(text);
+  if (outcome.kind === "cancelled") return;
+  const { state } = outcome;
+  if (outcome.kind === "recorded") {
+    emit("asked", pk, first && props.autoTitle ? text : null);
+    // 问题已记录但回答失败：给出具体原因，回答本身已标为失败
+    if (state.status === "error" && state.error?.detail) {
+      error.value = state.error.detail;
+    }
     return;
   }
   input.value = text;
-  error.value =
-    chat.value.error?.detail || t("ticketflow.assistant.sendFailed");
+  // 问题写入前主动停止：只放回原文，不算失败
+  if (state.status !== "stopped") {
+    error.value = state.error?.detail || t("ticketflow.assistant.sendFailed");
+  }
 }
 
 function onKeydown(event: Event | KeyboardEvent) {
@@ -112,10 +130,12 @@ async function vote(message: AssistantMessage, value: FeedbackVote) {
 
 async function handoff() {
   if (busy.value) return;
-  drafting.value = true;
-  const draft = await loadHandoffDraft(props.session.pk, questions.value);
-  drafting.value = false;
   const pk = props.session.pk;
+  drafting.value = true;
+  const draft = await loadHandoffDraft(pk, questions.value);
+  drafting.value = false;
+  // 草稿生成期间切换了会话或离开页面：不再弹出旧会话的提单框
+  if (!alive || props.session.pk !== pk) return;
   openHandoffDialog(pk, draft, ticket => emit("handedOff", pk, ticket));
 }
 </script>
