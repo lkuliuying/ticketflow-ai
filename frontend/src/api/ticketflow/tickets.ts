@@ -1,6 +1,7 @@
 import { BaseApi } from "@/api/base";
 import { isSuccess } from "@/api/types";
 import type { DetailResult, ListResult } from "@/api/types";
+import type { RatingPayload, TicketRating } from "./ratings";
 
 export type TicketStatus =
   "OPEN" | "IN_PROGRESS" | "PENDING_VERIFY" | "CLOSED" | "REOPENED";
@@ -58,6 +59,8 @@ export type TicketViewer = {
   can_return: boolean;
   /** 技术员查看曾经处理、已转交他人的工单：只读，不显示任何操作 */
   read_only: boolean;
+  /** 提交人可评价：工单已关闭且尚未评价 */
+  can_rate?: boolean;
 };
 
 /** 指派维度：管理员看待分配，技术员看当前处理与历史处理 */
@@ -65,6 +68,8 @@ export type TicketAssignmentScope = "unassigned" | "current" | "history";
 
 export type TicketDetail = TicketItem & {
   viewer: TicketViewer;
+  /** 评价人、被评处理人与管理员可见，其他人或未评价时为 null */
+  rating?: TicketRating | null;
   available_transitions: TicketStatus[];
   timeline: { total: number; results: TimelineEntry[] };
 };
@@ -206,6 +211,16 @@ class TicketApi extends BaseApi {
       },
       undefined,
       `${this.baseApi}/${pk}/assignees`
+    );
+  };
+
+  /** 提交人评价已关闭的工单：每张工单一次，重复或未关闭返回 409 */
+  rate = (pk: string, data: RatingPayload) => {
+    return this.request<DetailResult<TicketRating>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/rating`
     );
   };
 

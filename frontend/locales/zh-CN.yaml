@@ -1134,6 +1134,8 @@ menus:
   ticketflow: TicketFlow
   ticketflowTickets: 工单
   ticketflowKnowledge: 工单知识库
+  ticketflowMyRatings: 我的评价
+  ticketflowRatingStats: 评价统计
   searchData: 数据查询
   userOnline: 在线用户
   apiApp: API 应用
@@ -4425,6 +4427,53 @@ codegen:
   planImported: 方案已导入
   planImportFailed: 导入失败
 ticketflow:
+  rating:
+    section: 评价
+    rate: 评价这次处理
+    rateHint: 工单已关闭，欢迎对处理结果和处理人进行评价（每张工单评价一次）
+    title: 评价工单 {number}
+    afterCloseTitle: 工单已关闭，评价一下这次处理吧（可稍后在工单详情里补评）
+    submitted: 感谢你的评价
+    resolved: 问题是否解决
+    resolvedYes: 已解决
+    resolvedNo: 未解决
+    resolvedRequired: 请选择问题是否解决
+    satisfaction: 满意度
+    handlerScore: 处理人评分
+    handlerScoreFor: 对处理人 {name} 的评分
+    scoreRequired: 请打分
+    scoreText:
+      "1": 很差
+      "2": 较差
+      "3": 一般
+      "4": 满意
+      "5": 非常满意
+    tags: 标签
+    tagValue:
+      FAST: 响应快
+      PROFESSIONAL: 专业
+      FRIENDLY: 态度好
+      CLEAR: 沟通清楚
+    comment: 文字评价
+    commentPlaceholder: 说说这次处理的体验（选填）
+    commentTooLong: 文字评价不能超过 {max} 字
+    handler: 处理人
+    byHandler: 按技术员统计
+    noRatings: 暂无评价
+    periodStart: 开始日期
+    periodEnd: 结束日期
+    ticket_number: 工单号
+    rater_name: 评价人
+    handler_name: 处理人
+    handler_id: 处理人
+    created_time: 评价时间
+    created_from: 评价时间起
+    created_to: 评价时间止
+    summary:
+      count: 评价数
+      avgSatisfaction: 平均满意度
+      avgHandlerScore: 平均处理人评分
+      resolvedRate: 解决率
   ai:
     analysis: AI 分析
     analyze: 分析工单

@@ -1134,6 +1134,8 @@ menus:
   ticketflow: TicketFlow
   ticketflowTickets: Tickets
   ticketflowKnowledge: Ticket Knowledge Base
+  ticketflowMyRatings: My Ratings
+  ticketflowRatingStats: Rating Statistics
   searchData: Data search
   userOnline: Online users
   apiApp: API applications
@@ -4427,6 +4429,53 @@ codegen:
   planImported: Plans imported
   planImportFailed: Import failed
 ticketflow:
+  rating:
+    section: Rating
+    rate: Rate this ticket
+    rateHint: The ticket is closed. Rate the result and the technician (once per ticket)
+    title: Rate ticket {number}
+    afterCloseTitle: The ticket is closed. How did we do? (You can rate later from the ticket details)
+    submitted: Thanks for your feedback
+    resolved: Was the problem solved?
+    resolvedYes: Solved
+    resolvedNo: Not solved
+    resolvedRequired: Please choose whether the problem was solved
+    satisfaction: Satisfaction
+    handlerScore: Technician score
+    handlerScoreFor: Score for {name}
+    scoreRequired: Please give a score
+    scoreText:
+      "1": Very poor
+      "2": Poor
+      "3": Okay
+      "4": Good
+      "5": Excellent
+    tags: Tags
+    tagValue:
+      FAST: Fast response
+      PROFESSIONAL: Professional
+      FRIENDLY: Friendly
+      CLEAR: Clear communication
+    comment: Comment
+    commentPlaceholder: Tell us about your experience (optional)
+    commentTooLong: The comment cannot exceed {max} characters
+    handler: Technician
+    byHandler: By technician
+    noRatings: No ratings yet
+    periodStart: Start date
+    periodEnd: End date
+    ticket_number: Ticket
+    rater_name: Rated by
+    handler_name: Technician
+    handler_id: Technician
+    created_time: Rated at
+    created_from: Rated from
+    created_to: Rated to
+    summary:
+      count: Ratings
+      avgSatisfaction: Avg. satisfaction
+      avgHandlerScore: Avg. technician score
+      resolvedRate: Resolution rate
   ai:
     analysis: AI analysis
     analyze: Analyze

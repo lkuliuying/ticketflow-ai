@@ -1,13 +1,15 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { TicketDetail } from "@/api/ticketflow/tickets";
+import type { TicketDetail, TicketStatus } from "@/api/ticketflow/tickets";
 import { useTicketDetail } from "../utils/useTicketDetail";
 import { PRIORITY_TONE, SLA_TONE, STATUS_TONE } from "../utils/ticketColumns";
 import TicketActions from "./TicketActions.vue";
 import TicketAiPanel from "./TicketAiPanel.vue";
 import TicketReply from "./TicketReply.vue";
 import TicketTimeline from "./TicketTimeline.vue";
+import RatingCard from "../../ratings/components/RatingCard.vue";
+import { openRatingDialog } from "../../ratings/utils/ratingDialog";
 
 /**
  * 工单详情抽屉：摘要与 SLA、可执行操作、回复框、时间线；处理人在右侧另有 AI 面板。
@@ -51,6 +53,22 @@ const showTicketActions = computed(() => {
 const canArchive = computed(() =>
   Boolean(detail.value?.viewer.can_archive && props.onArchive)
 );
+
+function rate(afterClose = false) {
+  if (!detail.value) return;
+  openRatingDialog(detail.value, {
+    afterClose,
+    onRated: () => {
+      void load();
+      props.onChanged?.();
+    }
+  });
+}
+
+/** 提交人确认解决后（流转到已关闭且后端允许评价）自动弹出评价，可跳过稍后补评 */
+function onTransitioned(to: TicketStatus) {
+  if (to === "CLOSED" && detail.value?.viewer.can_rate) rate(true);
+}
 
 /** 能否回复完全由后端 viewer 给出（处理人或提交人，且有评论权限） */
 const canReply = computed(() => Boolean(detail.value?.viewer.can_reply));
@@ -176,6 +194,7 @@ function time(value: string | null | undefined) {
             :ticket="detail"
             :run="run"
             :busy="busy"
+            @transitioned="onTransitioned"
           />
           <div v-if="canArchive">
             <el-button
@@ -186,6 +205,27 @@ function time(value: string | null | undefined) {
             >
               {{ t("ticketflow.detail.archive") }}
             </el-button>
+          </div>
+        </section>
+
+        <section
+          v-if="detail.rating || detail.viewer.can_rate"
+          class="flex flex-col gap-2"
+        >
+          <h4 class="m-0">{{ t("ticketflow.rating.section") }}</h4>
+          <RatingCard v-if="detail.rating" :rating="detail.rating" />
+          <div v-else>
+            <el-button
+              type="primary"
+              plain
+              data-testid="ticket-rate"
+              @click="rate()"
+            >
+              {{ t("ticketflow.rating.rate") }}
+            </el-button>
+            <span class="ml-3 text-sm text-fg-muted">
+              {{ t("ticketflow.rating.rateHint") }}
+            </span>
           </div>
         </section>
 

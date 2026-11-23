@@ -37,7 +37,7 @@ async function mountWith(assignment: Record<string, number> | undefined) {
     props: { active: null },
     global: { stubs: { "el-check-tag": CheckTag } }
   });
-  await (wrapper.vm as unknown as { refresh: () => Promise<void> }).refresh();
+  await wrapper.vm.refresh();
   await flushPromises();
   return wrapper;
 }

@@ -28,6 +28,7 @@ const props = defineProps<{
   busy: boolean;
 }>();
 
+const emit = defineEmits<{ transitioned: [to: TicketStatus] }>();
 const { t } = useI18n();
 const candidates = ref<TicketAssignee[]>([]);
 const searching = ref(false);
@@ -48,7 +49,7 @@ async function transition(to: TicketStatus) {
     .then(result => result.value ?? "")
     .catch(() => null);
   if (note === null) return;
-  await props.run(
+  const ok = await props.run(
     () =>
       ticketApi.transition(props.ticket.pk, {
         target_status: to,
@@ -57,6 +58,8 @@ async function transition(to: TicketStatus) {
       }),
     t("ticketflow.detail.transitioned", { action: label })
   );
+  // run 成功后已重新加载详情，父组件据此决定是否弹出评价
+  if (ok) emit("transitioned", to);
 }
 
 const RETURN_REASON_MAX = 500;
