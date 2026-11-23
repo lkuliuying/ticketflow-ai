@@ -193,7 +193,7 @@ class TestTemplateSanitization:
         mapper = _DummyMessage().get_backend_msg_mapper(["email"])
         assert "<script" not in mapper[BACKEND.EMAIL]["message"]
         assert "onerror" not in mapper[BACKEND.EMAIL]["message"]
-        assert "Xadmin Server" in mapper[BACKEND.EMAIL]["message"]
+        assert "TicketFlow" in mapper[BACKEND.EMAIL]["message"]
 
     def test_variable_value_payload_sanitized(self, superuser):
         """变量值（用户可控业务数据）携带 payload → 渠道渲染后同样被剥离。"""

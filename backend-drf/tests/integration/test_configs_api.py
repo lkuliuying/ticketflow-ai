@@ -11,12 +11,41 @@
 """
 
 import pytest
+from django.core.management import call_command
+from rest_framework.test import APIClient
 
 from common.core.config import UserConfig
+from identity.models import DeptInfo
+from system.models import SystemConfig
 
 pytestmark = pytest.mark.django_db
 
 CONFIG_BASE_URL = "/api/system/configs"
+
+
+@pytest.mark.parametrize(
+    ("title", "department_name"),
+    [("TicketFlow", "TicketFlow管理团队"), ("客户服务平台", "平台运维团队")],
+)
+def test_seeded_branding_survives_reload(title, department_name, seed_creator_user):
+    call_command("load_init_json", verbosity=0)
+    config = SystemConfig.objects.get(key="WEB_SITE_CONFIG")
+    department = DeptInfo.objects.get(code="xadmin")
+    assert config.value["Title"] == "TicketFlow"
+    assert department.name == "TicketFlow管理团队"
+
+    config.value["Title"] = title
+    config.save(update_fields=["value"])
+    department.name = department_name
+    department.save(update_fields=["name"])
+    call_command("load_init_json", verbosity=0)
+
+    response = APIClient().get(f"{CONFIG_BASE_URL}/WEB_SITE_CONFIG")
+    assert response.status_code == 200
+    assert response.json()["config"]["Title"] == title
+    department.refresh_from_db()
+    assert department.name == department_name
+    assert department.code == "xadmin"
 
 
 @pytest.fixture

@@ -255,7 +255,7 @@ class Message:
 
     @cached_property
     def signature(self) -> str:
-        return "Xadmin Server"
+        return "TicketFlow"
 
     # --------------------------------------------------------------
     # 支持不同发送消息的方式定义自己的消息内容，比如有些支持 html 标签

@@ -519,13 +519,13 @@ msgstr "AI 助手未启用或未完成配置"
 msgid "No matching documents found for this question"
 msgstr "知识库中没有与该问题匹配的文档"
 
-#: ai/utils/ai.py:140
+#: ai/services/assistant/ai.py:178
 msgid ""
-"You are the xadmin usage/development assistant. Answer ONLY based on the "
+"You are the TicketFlow usage/development assistant. Answer ONLY based on the "
 "provided reference documents, cite them as [n] markers, and say you don't "
 "know when the documents do not cover the question."
 msgstr ""
-"你是 xadmin 使用/二开助手。仅基于给出的参考文档作答，用 [n] 标注引用出处；文"
+"你是 TicketFlow 使用/二开助手。仅基于给出的参考文档作答，用 [n] 标注引用出处；文"
 "档未覆盖的内容请回答不知道。"
 
 #: ai/utils/ai.py:149 ai/utils/nl_query.py:202

@@ -67,7 +67,7 @@ class TestBackendMsgMapper:
         mapper = HtmlMockMessage().get_backend_msg_mapper(["email"])
         assert set(mapper) == {BACKEND.EMAIL, BACKEND.SITE_MSG}
         # 邮件渲染走注册表指向的 get_email_msg（含签名）
-        assert "Xadmin Server" in mapper[BACKEND.EMAIL]["message"]
+        assert "TicketFlow" in mapper[BACKEND.EMAIL]["message"]
 
 
 class TestMessageRenderers:
@@ -97,7 +97,7 @@ class TestMessageRenderers:
     def test_email_msg_appends_signature(self):
         msg = HtmlMockMessage()
         email_msg = msg.get_email_msg()
-        assert "Xadmin Server" in email_msg["message"]
+        assert "TicketFlow" in email_msg["message"]
 
     def test_site_msg_renderer_returns_html(self):
         msg = HtmlMockMessage()
@@ -106,7 +106,7 @@ class TestMessageRenderers:
     def test_sms_msg_appends_signature(self):
         msg = HtmlMockMessage()
         sms_msg = msg.get_sms_msg()
-        assert "Xadmin Server" in sms_msg["message"]
+        assert "TicketFlow" in sms_msg["message"]
 
 
 class TestSendMsgErrorPaths:

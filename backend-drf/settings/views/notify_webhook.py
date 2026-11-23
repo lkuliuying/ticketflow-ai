@@ -31,7 +31,9 @@ def _test_delivery(url: str, secret: str) -> str:
     from notifications.backends.webhook import DELIVER_TIMEOUT, sign_webhook_payload
     from task.services import outbound_allowed_hosts
 
-    body = b'{"subject": "webhook notification test", "message": "This is a test delivery from xadmin", "users": []}'
+    body = (
+        b'{"subject": "webhook notification test", "message": "This is a test delivery from TicketFlow", "users": []}'
+    )
     headers = {"Content-Type": "application/json"}
     if secret:
         signature, timestamp = sign_webhook_payload(secret, body)

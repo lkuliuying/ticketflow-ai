@@ -8,6 +8,7 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from server.conf.settings_defaults import SETTINGS_CONFIG
 from settings.serializers.contract import SettingSaveContractMixin
 
 
@@ -102,7 +103,7 @@ class SecurityMFASerializer(SettingSaveContractMixin, serializers.Serializer):
 
     SECURITY_MFA_OTP_ISSUER = serializers.CharField(
         max_length=64,
-        default="XAdmin",
+        default=SETTINGS_CONFIG["SECURITY_MFA_OTP_ISSUER"],
         label=_("OTP issuer"),
         help_text=_("The issuer name in the otpauth binding URI"),
     )
