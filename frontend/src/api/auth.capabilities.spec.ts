@@ -74,4 +74,9 @@ describe("登录页能力探测", () => {
       encrypted: false
     });
   });
+
+  it("后端开放自助注册时映射为 register: true", () => {
+    expect(toAuthInfo({ register: { enabled: true } }).register).toBe(true);
+    expect(toAuthInfo({ register: { enabled: false } }).register).toBe(false);
+  });
 });

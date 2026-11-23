@@ -36,12 +36,21 @@ onMounted(load);
 const showActions = computed(() => {
   const ticket = detail.value;
   if (!ticket) return false;
-  return (
-    !ticket.viewer.read_only ||
-    ticket.available_transitions.length > 0 ||
-    ticket.viewer.can_archive
+  return showTicketActions.value || canArchive.value;
+});
+
+/** 只读且没有可用流转时不挂操作组件，避免出现“没有可执行的流转”空态 */
+const showTicketActions = computed(() => {
+  const ticket = detail.value;
+  return Boolean(
+    ticket &&
+    (!ticket.viewer.read_only || ticket.available_transitions.length > 0)
   );
 });
+
+const canArchive = computed(() =>
+  Boolean(detail.value?.viewer.can_archive && props.onArchive)
+);
 
 /** 能否回复完全由后端 viewer 给出（处理人或提交人，且有评论权限） */
 const canReply = computed(() => Boolean(detail.value?.viewer.can_reply));
@@ -162,8 +171,13 @@ function time(value: string | null | undefined) {
 
         <section v-if="showActions" class="flex flex-col gap-2">
           <h4 class="m-0">{{ t("ticketflow.detail.actions") }}</h4>
-          <TicketActions :ticket="detail" :run="run" :busy="busy" />
-          <div v-if="detail.viewer.can_archive && onArchive">
+          <TicketActions
+            v-if="showTicketActions"
+            :ticket="detail"
+            :run="run"
+            :busy="busy"
+          />
+          <div v-if="canArchive && onArchive">
             <el-button
               type="success"
               plain

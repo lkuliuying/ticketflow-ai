@@ -119,9 +119,10 @@ describe("TicketDetail 只读历史工单", () => {
     expect(wrapper.find(".TicketReply").exists()).toBe(true);
   });
 
-  it("只读的已关闭工单可转存时显示转存入口", () => {
+  it("只读的已关闭工单可转存时不挂空的操作组件（转存入口由父级回调决定）", () => {
     const wrapper = mountWith({ read_only: true, can_archive: true });
-    expect(wrapper.find(".TicketActions").exists()).toBe(true);
+    expect(wrapper.find(".TicketActions").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="ticket-archive"]').exists()).toBe(false);
   });
 
   it("非只读时不显示只读提示，操作区照常出现", () => {

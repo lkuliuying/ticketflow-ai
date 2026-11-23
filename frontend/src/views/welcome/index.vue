@@ -10,6 +10,7 @@ import type { TicketItem } from "@/api/ticketflow/tickets";
 import type { ArticleItem } from "@/api/ticketflow/knowledge";
 import { openTicketDetail } from "@/views/ticketflow/tickets/utils/ticketDetailDrawer";
 import { openArticleDetail } from "@/views/ticketflow/knowledge/utils/articleDetailDrawer";
+import ReSkeleton from "@/components/ReSkeleton";
 import WorkbenchStats from "./components/WorkbenchStats.vue";
 import RecentTickets from "./components/RecentTickets.vue";
 import LatestArticles from "./components/LatestArticles.vue";
@@ -37,6 +38,8 @@ const { dashboard, tickets, articles, loading, stats, reload } = useWorkbench({
 /** 视角由看板的指派维度推断：管理员突出待分配，技术员突出我的待办，员工突出建单 */
 const role = computed(() => workbenchRole(dashboard.value));
 const cards = computed(() => cardsFor(role.value));
+/** 看板返回前不渲染随视角变化的卡片与入口，避免先闪出员工视角再跳变；看板失败时按员工视角兜底 */
+const roleReady = computed(() => dashboard.value !== null || !loading.value);
 
 const displayName = computed(() => user.nickname || user.username || "");
 /** 日期用浏览器内置的本地化格式（含星期），随界面语言切换 */
@@ -89,7 +92,7 @@ onActivated(() => {
             </p>
           </div>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div v-if="roleReady" class="flex flex-wrap gap-2">
           <el-button
             v-if="ticketAuth.create && role === 'requester'"
             type="primary"
@@ -131,7 +134,13 @@ onActivated(() => {
       </div>
     </el-card>
 
-    <WorkbenchStats :stats="stats" :cards="cards" @open="goTickets" />
+    <WorkbenchStats
+      v-if="roleReady"
+      :stats="stats"
+      :cards="cards"
+      @open="goTickets"
+    />
+    <ReSkeleton v-else variant="fill" class="h-20!" />
 
     <div class="grid gap-4 lg:grid-cols-3">
       <RecentTickets
