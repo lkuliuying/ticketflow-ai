@@ -85,13 +85,16 @@ describe("applyReplyFrame", () => {
           { title: "无 ID" },
           "legacy-uuid",
           null,
-          { article_id: "a2", title: 42 }
+          { article_id: "a2", title: 42 },
+          { article_id: "  a3 ", title: "  空白标题  " },
+          { article_id: "   " }
         ]
       })
     );
     expect(state.references).toEqual([
       { article_id: "a1", title: "" },
-      { article_id: "a2", title: "" }
+      { article_id: "a2", title: "" },
+      { article_id: "a3", title: "空白标题" }
     ]);
   });
 

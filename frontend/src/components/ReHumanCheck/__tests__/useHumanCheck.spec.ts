@@ -172,7 +172,14 @@ describe("useHumanCheck", () => {
     const outcome = check.obtain().catch((error: unknown) => error);
     await flushPromises();
     expect(check.loading.value).toBe(true);
+    // 直接断言在途的 AbortController 被中止，而不只是 promise 被拒绝
+    const abort = vi.spyOn(AbortController.prototype, "abort");
     scope.stop();
+    expect(abort).toHaveBeenCalled();
+    expect(
+      abort.mock.contexts.some(c => (c as AbortController).signal.aborted)
+    ).toBe(true);
+    abort.mockRestore();
     expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
     expect(mocks.verify).not.toHaveBeenCalled();
     expect(check.loading.value).toBe(false);

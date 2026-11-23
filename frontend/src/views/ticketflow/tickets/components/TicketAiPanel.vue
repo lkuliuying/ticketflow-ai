@@ -43,9 +43,17 @@ function category(value: string) {
   return te(key) ? t(key) : value;
 }
 
+/** 引用文章的显示名：标题缺失时用文章 ID 前 8 位 */
+function referenceLabel(reference: ReplyReference) {
+  return reference.title || reference.article_id.slice(0, 8);
+}
+
 /** 点击引用标题，在知识库详情抽屉里打开对应文章 */
-function openReference(ref: ReplyReference) {
-  openArticleDetail({ pk: ref.article_id, title: ref.title || ref.article_id });
+function openReference(reference: ReplyReference) {
+  openArticleDetail({
+    pk: reference.article_id,
+    title: referenceLabel(reference)
+  });
 }
 </script>
 
@@ -182,16 +190,18 @@ function openReference(ref: ReplyReference) {
             t("ticketflow.ai.references", { count: reply.references.length })
           }}
         </span>
-        <el-link
-          v-for="ref in reply.references"
-          :key="ref.article_id"
+        <el-button
+          v-for="reference in reply.references"
+          :key="reference.article_id"
+          link
           type="primary"
-          :underline="false"
-          class="justify-start! text-xs!"
-          @click="openReference(ref)"
+          size="small"
+          class="justify-start! ml-0! max-w-full"
+          :title="referenceLabel(reference)"
+          @click="openReference(reference)"
         >
-          {{ ref.title || ref.article_id.slice(0, 8) }}
-        </el-link>
+          <span class="truncate">{{ referenceLabel(reference) }}</span>
+        </el-button>
       </div>
       <div class="flex gap-2">
         <el-button

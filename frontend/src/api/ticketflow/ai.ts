@@ -50,8 +50,11 @@ function toReferences(value: unknown): ReplyReference[] {
   return value.flatMap(item => {
     if (!item || typeof item !== "object") return [];
     const { article_id, title } = item as Record<string, unknown>;
-    if (typeof article_id !== "string" || !article_id) return [];
-    return [{ article_id, title: typeof title === "string" ? title : "" }];
+    const id = typeof article_id === "string" ? article_id.trim() : "";
+    if (!id) return [];
+    return [
+      { article_id: id, title: typeof title === "string" ? title.trim() : "" }
+    ];
   });
 }
 
