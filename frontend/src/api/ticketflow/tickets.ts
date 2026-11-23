@@ -54,7 +54,14 @@ export type TicketViewer = {
   can_reply: boolean;
   can_comment_internal: boolean;
   can_archive: boolean;
+  /** 当前处理人可退回给管理员重新分配 */
+  can_return: boolean;
+  /** 技术员查看曾经处理、已转交他人的工单：只读，不显示任何操作 */
+  read_only: boolean;
 };
+
+/** 指派维度：管理员看待分配，技术员看当前处理与历史处理 */
+export type TicketAssignmentScope = "unassigned" | "current" | "history";
 
 export type TicketDetail = TicketItem & {
   viewer: TicketViewer;
@@ -73,6 +80,8 @@ export type TicketDashboard = {
   status: Partial<Record<TicketStatus, number>>;
   priority: Partial<Record<TicketPriority, number>>;
   sla: Record<TicketSlaState, number>;
+  /** 按身份只返回有意义的键：管理员 unassigned，技术员 current / history，员工为空对象 */
+  assignment?: Partial<Record<TicketAssignmentScope, number>>;
 };
 
 export type TicketAssignee = {
@@ -186,14 +195,27 @@ class TicketApi extends BaseApi {
     );
   };
 
-  /** 指派候选人：可见且可处理该工单、并持有指派权限时可用；最多 20 条，按用户名与主键排序 */
-  assignees = (pk: string, q?: string) => {
+  /** 指派候选人（仅管理员）：在职技术员，可按技能组筛选；最多 20 条，按用户名与主键排序 */
+  assignees = (pk: string, q?: string, departmentId?: string) => {
     const keyword = q?.trim();
     return this.request<DetailResult<TicketAssignee[]>>(
       "get",
-      keyword ? { q: keyword } : {},
+      {
+        ...(keyword ? { q: keyword } : {}),
+        ...(departmentId ? { department_id: departmentId } : {})
+      },
       undefined,
       `${this.baseApi}/${pk}/assignees`
+    );
+  };
+
+  /** 当前处理人退回工单：清空处理人、状态不变，进入管理员的待分配；原因必填（1~500 字） */
+  returnTicket = (pk: string, data: { version: number; reason: string }) => {
+    return this.request<DetailResult<TicketItem>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/return`
     );
   };
 

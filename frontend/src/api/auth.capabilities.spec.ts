@@ -54,6 +54,7 @@ describe("登录页能力探测", () => {
       token: false,
       encrypted: true,
       reset: true,
+      register: false,
       email: true,
       sms: false
     });

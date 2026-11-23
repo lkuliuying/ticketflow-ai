@@ -4506,6 +4506,9 @@ ticketflow:
     ASSIGN: 指派
     TRANSITION: 状态流转
     AI_METADATA: 采纳 AI 建议
+    AUTO_ASSIGN: 自动派单
+    REOPEN_ASSIGN: 重开回派
+    RETURN: 退回重派
     OTHER: 操作
   detail:
     open: 工单详情
@@ -4526,6 +4529,14 @@ ticketflow:
     noTimeline: 暂无记录
     loadMore: 加载更多（剩余 {rest} 条）
     archive: 转存为知识库草稿
+    return: 退回重派
+    returnPrompt: 说明退回原因，管理员会据此重新分配
+    returnPlaceholder: 例如：不属于本技能组的问题 / 当前工作量过大
+    returnRequired: 请填写退回原因
+    returnTooLong: 原因不能超过 {max} 字
+    returned: 已退回，等待管理员重新分配
+    readOnly: 只读：这张工单已转交他人处理
+    readOnlyHint: 你曾经处理过这张工单，可以查看完整记录，但不能再操作
   number: 工单号
   title: 标题
   description: 描述
@@ -4534,7 +4545,7 @@ ticketflow:
   status: 状态
   assignee_name: 处理人
   submitter_name: 提交人
-  department_name: 部门
+  department_name: 技能组
   sla_due_at: SLA 截止
   sla_state: SLA 状态
   created_time: 创建时间
@@ -4555,7 +4566,12 @@ ticketflow:
   sla: SLA 状态
   q: 关键字
   assignee_id: 处理人 ID
-  department_id: 部门 ID
+  department_id: 技能组 ID
+  assignment: 指派
+  assignmentValue:
+    unassigned: 待分配
+    current: 处理中（我）
+    history: 历史处理
   slaValue:
     ON_TRACK: 正常
     DUE_SOON: 即将超时
@@ -4576,8 +4592,14 @@ workbench:
     evening: 晚上好，{name}
   createTicket: 新建工单
   myTickets: 我的工单
+  allTickets: 全部工单
+  myTodo: 我的待办
+  unassignedTickets: 待分配工单
   knowledge: 知识库
   stats:
+    unassigned: 待分配
+    current: 处理中（我）
+    history: 历史处理
     open: 待处理
     reopened: 已重开
     inProgress: 处理中

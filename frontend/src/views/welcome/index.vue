@@ -3,7 +3,7 @@ import { computed, onActivated, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import dayjs from "dayjs";
-import { Plus, Reading, Tickets } from "@element-plus/icons-vue";
+import { Plus, Reading, Tickets, User } from "@element-plus/icons-vue";
 import { useUserStoreHook } from "@/store/modules/user";
 import { usePageAuth } from "@/router/utils";
 import type { TicketItem } from "@/api/ticketflow/tickets";
@@ -14,6 +14,7 @@ import WorkbenchStats from "./components/WorkbenchStats.vue";
 import RecentTickets from "./components/RecentTickets.vue";
 import LatestArticles from "./components/LatestArticles.vue";
 import { useWorkbench } from "./useWorkbench";
+import { cardsFor, workbenchRole } from "./cards";
 import { greetingKey } from "./greeting";
 
 defineOptions({
@@ -28,10 +29,14 @@ const router = useRouter();
 const user = useUserStoreHook();
 const ticketAuth = usePageAuth("TicketFlowTickets");
 const articleAuth = usePageAuth("TicketFlowKnowledge");
-const { tickets, articles, loading, stats, reload } = useWorkbench({
+const { dashboard, tickets, articles, loading, stats, reload } = useWorkbench({
   tickets: () => Boolean(ticketAuth.list),
   articles: () => Boolean(articleAuth.list)
 });
+
+/** 视角由看板的指派维度推断：管理员突出待分配，技术员突出我的待办，员工突出建单 */
+const role = computed(() => workbenchRole(dashboard.value));
+const cards = computed(() => cardsFor(role.value));
 
 const displayName = computed(() => user.nickname || user.username || "");
 /** 日期用浏览器内置的本地化格式（含星期），随界面语言切换 */
@@ -86,7 +91,7 @@ onActivated(() => {
         </div>
         <div class="flex flex-wrap gap-2">
           <el-button
-            v-if="ticketAuth.create"
+            v-if="ticketAuth.create && role === 'requester'"
             type="primary"
             :icon="Plus"
             data-testid="workbench-create"
@@ -94,8 +99,30 @@ onActivated(() => {
           >
             {{ t("workbench.createTicket") }}
           </el-button>
+          <el-button
+            v-if="role === 'admin'"
+            type="primary"
+            :icon="User"
+            data-testid="workbench-unassigned"
+            @click="goTickets({ assignment: 'unassigned' })"
+          >
+            {{ t("workbench.unassignedTickets") }}
+          </el-button>
+          <el-button
+            v-if="role === 'agent'"
+            type="primary"
+            :icon="Tickets"
+            data-testid="workbench-current"
+            @click="goTickets({ assignment: 'current' })"
+          >
+            {{ t("workbench.myTodo") }}
+          </el-button>
           <el-button :icon="Tickets" @click="goTickets()">
-            {{ t("workbench.myTickets") }}
+            {{
+              role === "admin"
+                ? t("workbench.allTickets")
+                : t("workbench.myTickets")
+            }}
           </el-button>
           <el-button :icon="Reading" @click="router.push(KNOWLEDGE_PATH)">
             {{ t("workbench.knowledge") }}
@@ -104,7 +131,7 @@ onActivated(() => {
       </div>
     </el-card>
 
-    <WorkbenchStats :stats="stats" @open="goTickets" />
+    <WorkbenchStats :stats="stats" :cards="cards" @open="goTickets" />
 
     <div class="grid gap-4 lg:grid-cols-3">
       <RecentTickets

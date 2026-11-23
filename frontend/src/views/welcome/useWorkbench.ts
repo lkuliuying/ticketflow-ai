@@ -11,6 +11,9 @@ export const RECENT_TICKET_COUNT = 6;
 export const LATEST_ARTICLE_COUNT = 5;
 
 export type WorkbenchStats = {
+  unassigned: number;
+  current: number;
+  history: number;
   open: number;
   reopened: number;
   inProgress: number;
@@ -26,7 +29,11 @@ export type WorkbenchStats = {
 export function summarize(data: TicketDashboard | null): WorkbenchStats {
   const status = data?.status ?? {};
   const sla = data?.sla;
+  const assignment = data?.assignment ?? {};
   return {
+    unassigned: assignment.unassigned ?? 0,
+    current: assignment.current ?? 0,
+    history: assignment.history ?? 0,
     open: status.OPEN ?? 0,
     reopened: status.REOPENED ?? 0,
     inProgress: status.IN_PROGRESS ?? 0,

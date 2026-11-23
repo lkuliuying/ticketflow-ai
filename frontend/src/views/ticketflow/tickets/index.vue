@@ -30,8 +30,8 @@ const { consume: consumeRouteIntent } = useRouteIntent({
   }
 });
 
-const DASHBOARD_KEYS = ["status", "priority", "sla"] as const;
-/** 看板计数随列表筛选变化，但不带看板自身的三个维度与分页参数 */
+const DASHBOARD_KEYS = ["status", "priority", "sla", "assignment"] as const;
+/** 看板计数随列表筛选变化，但不带看板自身的各维度与分页参数 */
 const NON_FILTER_KEYS = new Set<string>([
   ...DASHBOARD_KEYS,
   "page",
@@ -39,7 +39,7 @@ const NON_FILTER_KEYS = new Set<string>([
   "ordering"
 ]);
 
-/** 看板点选：清掉三个看板维度后写入当前条件，回到第 1 页，与搜索表单保持一致再查询 */
+/** 看板点选：清掉看板各维度后写入当前条件，回到第 1 页，与搜索表单保持一致再查询 */
 function applyDashboardFilter(filter: DashboardFilter | null) {
   const fields = tableRef.value?.searchFields as
     Record<string, unknown> | undefined;

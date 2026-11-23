@@ -6,7 +6,7 @@ import Motion from "../utils/motion";
 import { message } from "@/utils/message";
 import { loginRules } from "../utils/rule";
 import type { FormInstance } from "element-plus";
-import { LOGIN_PAGE, operates } from "../utils/enums";
+import { LOGIN_PAGE, visibleOperates } from "../utils/enums";
 import { useUserStoreHook } from "@/store/modules/user";
 import { useLoginPageStoreHook } from "@/store/modules/loginPage";
 import { HumanCheckCancelled, ReHumanCheck } from "@/components/ReHumanCheck";
@@ -56,7 +56,8 @@ const authInfo = reactive<AuthInfoResult["data"]>({
   encrypted: false,
   basic: false,
   lifetime: 1,
-  reset: false
+  reset: false,
+  register: false
 });
 
 const ruleForm = reactive({
@@ -311,11 +312,11 @@ onMounted(() => {
       <Motion v-else :delay="300">
         <el-result icon="error" :title="t('login.serverForbidden')" />
       </Motion>
-      <Motion :delay="300">
+      <Motion v-if="visibleOperates(authInfo).length" :delay="300">
         <el-form-item>
-          <div class="w-full h-5 flex-bc">
+          <div class="w-full h-5 flex-bc gap-3">
             <el-button
-              v-for="item in operates"
+              v-for="item in visibleOperates(authInfo)"
               :key="item.page"
               class="w-full mt-4!"
               size="default"

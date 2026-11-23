@@ -4508,6 +4508,9 @@ ticketflow:
     ASSIGN: Assigned
     TRANSITION: Transitioned
     AI_METADATA: Applied AI Suggestion
+    AUTO_ASSIGN: Auto-assigned
+    REOPEN_ASSIGN: Reassigned on reopen
+    RETURN: Returned for reassignment
     OTHER: Action
   detail:
     open: Ticket Detail
@@ -4528,6 +4531,14 @@ ticketflow:
     noTimeline: No records yet
     loadMore: Load more ({rest} remaining)
     archive: Save as Knowledge Draft
+    return: Return for reassignment
+    returnPrompt: Explain why you are returning it so an admin can reassign it
+    returnPlaceholder: "e.g. not my skill group / too much workload right now"
+    returnRequired: Please enter a reason
+    returnTooLong: The reason cannot exceed {max} characters
+    returned: Returned, waiting for an admin to reassign
+    readOnly: "Read-only: this ticket has been handed over"
+    readOnlyHint: You handled this ticket before. You can view the full record but can no longer act on it
   number: Ticket No.
   title: Title
   description: Description
@@ -4536,7 +4547,7 @@ ticketflow:
   status: Status
   assignee_name: Assignee
   submitter_name: Submitter
-  department_name: Department
+  department_name: Skill group
   sla_due_at: SLA Due
   sla_state: SLA State
   created_time: Created At
@@ -4557,7 +4568,12 @@ ticketflow:
   sla: SLA State
   q: Keyword
   assignee_id: Assignee ID
-  department_id: Department ID
+  department_id: Skill group ID
+  assignment: Assignment
+  assignmentValue:
+    unassigned: Unassigned
+    current: Assigned to me
+    history: Previously handled
   slaValue:
     ON_TRACK: On Track
     DUE_SOON: Due Soon
@@ -4578,8 +4594,14 @@ workbench:
     evening: Good evening, {name}
   createTicket: New ticket
   myTickets: My tickets
+  allTickets: All tickets
+  myTodo: My to-do
+  unassignedTickets: Unassigned tickets
   knowledge: Knowledge base
   stats:
+    unassigned: Unassigned
+    current: Assigned to me
+    history: Previously handled
     open: Open
     reopened: Reopened
     inProgress: In progress

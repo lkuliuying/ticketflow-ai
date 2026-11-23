@@ -2,7 +2,10 @@ import { watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 /** 与 TicketDashboard.vue 导出的看板筛选同形（.ts 无法从 SFC 取类型导出） */
-type DashboardFilter = { key: "status" | "priority" | "sla"; value: string };
+type DashboardFilter = {
+  key: "status" | "priority" | "sla" | "assignment";
+  value: string;
+};
 
 /** 其他页面（如首页工作台）跳转到工单页时可携带的意图参数 */
 export type RouteIntent = {
@@ -10,10 +13,10 @@ export type RouteIntent = {
   create: boolean;
 };
 
-const FILTER_KEYS = ["status", "sla", "priority"] as const;
+const FILTER_KEYS = ["status", "sla", "priority", "assignment"] as const;
 const INTENT_KEYS = [...FILTER_KEYS, "create"];
 
-/** 解析 query：`create=1` 打开新建表单，`status` / `sla` / `priority` 取第一个作为看板筛选 */
+/** 解析 query：`create=1` 打开新建表单，`status` / `sla` / `priority` / `assignment` 取第一个作为看板筛选 */
 export function parseRouteIntent(
   query: Record<string, unknown>
 ): RouteIntent | null {
