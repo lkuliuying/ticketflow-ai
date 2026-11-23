@@ -6,7 +6,15 @@
 
 HTTP 错误统一返回 `{code, error, detail}`。`code` 是与 HTTP 状态码一致的整数，`error` 是机器可读标识，`detail` 是可读说明。例如令牌无效时返回 `{"code":401,"error":"UNAUTHORIZED","detail":"需要有效的 Bearer access token"}`。
 
-SSE 建流前的失败沿用 HTTP 错误信封。建流后的失败以 `error` 事件结束，携带 `{code, error, detail, retryable}`。分析与 SSE 字段见 [工单 AI 契约](../backend-drf/docs/schema/ticketflow-ai.schema.json)。分析缓存使用 `ticketflow:ai:analysis:` 前缀。缓存读写异常时回源，鉴权 Redis 故障时拒绝请求。
+`meta.references` 是 `[{article_id, title}]`，无引用时为 `[]`。调用方需从每个对象的 `article_id` 和 `title` 获取文章 ID 和标题。
+
+```text
+event: meta
+data: {"ticket_id":"2da1c8a8-31ca-40d4-90e3-e3842c849b02","ticket_version":2,"references":[{"article_id":"895ae0b4-b253-47de-80bd-6a4cd642f8eb","title":"VPN 排障"}]}
+
+```
+
+SSE 建流前的失败沿用 HTTP 错误信封。建流后的失败以 `error` 事件结束，携带 `{code, error, detail, retryable}`。分析与 SSE 字段见 [工单 AI 契约](../backend-drf/docs/schema/ticketflow-ai.schema.json)。分析缓存使用 `ticketflow:ai:analysis:` 前缀，知识引用的 ID、标题或摘要变化时重新生成，引用顺序变化时仍可命中。缓存读写异常时回源，鉴权 Redis 故障时拒绝请求。
 
 ## 本地启动
 

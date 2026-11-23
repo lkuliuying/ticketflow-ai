@@ -11,7 +11,7 @@ from starlette.types import Receive, Scope, Send
 from app.core.errors import ProviderError, ServiceError, provider_timeout
 from app.core.resources import Resources
 from app.schemas.context import TicketContext
-from app.schemas.tickets import StreamMeta
+from app.schemas.tickets import StreamMeta, StreamReference
 from app.services.retry import reacquire_slot
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ async def reply_events(
     meta = StreamMeta(
         ticket_id=context.ticket.id,
         ticket_version=context.ticket.version,
-        references=[reference.article_id for reference in context.references],
+        references=[StreamReference(article_id=ref.article_id, title=ref.title) for ref in context.references],
     )
     yield _frame("meta", meta.model_dump_json())
 

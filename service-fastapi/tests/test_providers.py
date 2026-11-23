@@ -37,6 +37,14 @@ async def test_mock_uses_permitted_category_and_is_deterministic(context):
     assert context.ticket.title in "".join(chunks)
 
 
+async def test_mock_adds_a_distinct_tag_when_category_is_ticket(context):
+    context.ticket.category = "工单"
+    context.categories = ["工单"]
+    draft = await MockProvider(Settings(mock_first_delay=0)).analyze(context)
+    assert draft.category == "工单"
+    assert draft.tags == ["工单", "客服"]
+
+
 async def test_real_provider_requires_a_key():
     with pytest.raises(ValidationError, match="LLM_API_KEY is required"):
         Settings(mock_llm=False)
@@ -100,9 +108,19 @@ async def test_upstream_sse_parses_comments_roles_and_multiline_data(settings, c
     assert texts == ["您好", "。"]
 
 
-async def test_truncated_upstream_sse_fails(settings, context):
+@pytest.mark.parametrize("line_ending", ["", "\n", "\r\n"])
+async def test_upstream_sse_accepts_done_without_trailing_blank_line(settings, context, line_ending):
+    body = 'data: {"choices":[{"delta":{"content":"末段"}}]}\r\n\r\ndata: [DONE]' + line_ending
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, text=body))
+    async with httpx.AsyncClient(transport=transport) as http:
+        texts = [text async for text in OpenAICompatibleProvider(settings, http).stream_reply(context)]
+    assert texts == ["末段"]
+
+
+@pytest.mark.parametrize("line_ending", ["", "\n", "\r\n", "\n\n"])
+async def test_truncated_upstream_sse_yields_final_delta_then_fails(settings, context, line_ending):
     def transport(request):
-        return httpx.Response(200, text='data: {"choices":[{"delta":{"content":"partial"}}]}\n\n')
+        return httpx.Response(200, text='data: {"choices":[{"delta":{"content":"partial"}}]}' + line_ending)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http:
         stream = OpenAICompatibleProvider(settings, http).stream_reply(context)
