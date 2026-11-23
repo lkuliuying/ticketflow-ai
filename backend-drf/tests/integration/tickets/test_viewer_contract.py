@@ -371,14 +371,17 @@ def test_agent_archives_only_handled_closed_tickets_and_cannot_publish(users, ma
     assert api.get(resource).data["data"]["source_ticket_id"] == str(closed.pk)
 
 
-def test_article_capabilities_respect_missing_action_grants(users):
+def test_article_capabilities_respect_missing_action_grants(users, client_for):
     article = KnowledgeArticle.objects.create(title="知识", creator=users["agent"])
     role = UserRole.objects.get(code=ADMIN_ROLE)
     role.menu.remove(*Menu.objects.filter(name__in=["partialUpdate:TicketFlowKnowledge", "create:TicketFlowKnowledge"]))
-    api = authenticated(users["admin"])
+    api = client_for(users["admin"])
     response = api.get(f"{ARTICLES}/{article.pk}")
+    assert response.status_code == 200, response.data
     assert response.data["data"]["viewer"] == {"can_edit": False, "can_publish": False}
-    assert api.get(ARTICLES).data["data"]["can_create_standalone"] is False
+    listing = api.get(ARTICLES)
+    assert listing.status_code == 200, listing.data
+    assert listing.data["data"]["can_create_standalone"] is False
 
 
 def test_only_published_article_detail_counts_views(users, api_client):

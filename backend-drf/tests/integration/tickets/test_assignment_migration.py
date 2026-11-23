@@ -4,8 +4,10 @@ import pytest
 from django.apps import apps
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 
 from identity.models import DeptInfo, UserInfo, UserRole
+from ops.legacy.structure import _run_data_cleanups
 from settings.models import Setting
 from tickets.models import Status, TicketLog
 
@@ -74,3 +76,35 @@ def test_retired_role_grants_are_merged_and_legacy_registration_setting_is_close
     assert not UserRole.all_objects.filter(pk=legacy.pk).exists()
     assert list(editor.roles.all()) == list(team.roles.all()) == [admin]
     assert Setting.objects.get(name="SECURITY_REGISTER_ACCESS_ENABLED").cleaned_value is False
+
+
+@pytest.mark.django_db
+def test_structure_alignment_applies_pending_ticket_data_without_repeating_applied_changes(users, make_ticket):
+    ticket = make_ticket(assignee=users["agent"])
+    registration, _ = Setting.objects.update_or_create(
+        name="SECURITY_REGISTER_ACCESS_ENABLED", defaults={"value": "true", "is_active": True}
+    )
+    nodes = [
+        ("tickets", "0003_backfill_ticket_assignments"),
+        ("tickets", "0004_business_roles_and_registration"),
+    ]
+    loader = MigrationExecutor(connection).loader
+
+    with connection.schema_editor(atomic=False) as schema:
+        assert _run_data_cleanups(loader, schema, nodes) == ([], [])
+        registration.refresh_from_db()
+        assert registration.cleaned_value is True
+        assert not ticket.assignments.exists()
+
+        recorder = MigrationRecorder(connection)
+        for node in nodes:
+            recorder.record_unapplied(*node)
+        expected = (["backfill", "migrate_roles", "close_registration"], [])
+        assert _run_data_cleanups(loader, schema, nodes) == expected
+        original = ticket.assignments.get()
+
+        # 结构阶段成功后，后续步骤可能在写账本前中断。重试应保留既有历史。
+        assert _run_data_cleanups(loader, schema, nodes) == expected
+        assert ticket.assignments.get().pk == original.pk
+        registration.refresh_from_db()
+        assert registration.cleaned_value is False

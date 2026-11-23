@@ -47,6 +47,7 @@ def backfill(apps, schema_editor):
     lifecycle = logs.filter(action="TRANSITION", to_status__in=("CLOSED", "REOPENED")).order_by("created_time", "pk")
     rows = (
         tickets.filter(assignee_id__isnull=False)
+        .exclude(pk__in=assignments.values("ticket_id"))
         .annotate(
             assigned_at=Subquery(last_assign.values("created_time")[:1]),
             assigned_by_id=Subquery(last_assign.values("operator_id")[:1]),
