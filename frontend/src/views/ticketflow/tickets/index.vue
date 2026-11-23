@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import { useTickets } from "./utils/hook";
+import { useRouteIntent } from "./utils/useRouteIntent";
 import TicketDashboard, {
   type DashboardFilter
 } from "./components/TicketDashboard.vue";
@@ -11,6 +12,7 @@ defineOptions({
 
 type PageExpose = {
   handleGetData?: () => void;
+  handleAddOrEdit?: (_isAdd?: boolean) => void;
   searchFields?: { value: Record<string, unknown> } | Record<string, unknown>;
 };
 
@@ -19,6 +21,14 @@ const dashboardRef = ref<InstanceType<typeof TicketDashboard>>();
 const activeFilter = ref<DashboardFilter | null>(null);
 const { api, auth, listColumnsFormat, operationButtonsProps } =
   useTickets(tableRef);
+const listReady = ref(false);
+const { consume: consumeRouteIntent } = useRouteIntent({
+  isReady: () => listReady.value,
+  applyFilter: filter => applyDashboardFilter(filter),
+  openCreate: () => {
+    if (auth.create) tableRef.value?.handleAddOrEdit?.(true);
+  }
+});
 
 const DASHBOARD_KEYS = ["status", "priority", "sla"] as const;
 /** 看板计数随列表筛选变化，但不带看板自身的三个维度与分页参数 */
@@ -68,6 +78,10 @@ function onSearchComplete({
     )
   );
   dashboardRef.value?.refresh(filters);
+  if (!listReady.value) {
+    listReady.value = true;
+    consumeRouteIntent();
+  }
 }
 </script>
 

@@ -1,291 +1,134 @@
 <script lang="ts" setup>
-import { markRaw, onMounted, ref } from "vue";
-import { loadEcharts } from "@/plugins/echarts";
-import ReCol from "@/components/ReCol";
-import { ReNormalCountTo } from "@/components/ReCountTo";
-import { useRenderFlicker } from "./components/ReFlicker";
-import ReSkeleton from "@/components/ReSkeleton";
-import { ChartBar, ChartClock, ChartLine, ChartRound } from "./components";
-import Segmented from "@/components/ReSegmented";
-import { epColor, epColorLight, type EpColorName } from "@/utils/chartTheme";
-import { useDashboard } from "@/views/welcome/hook";
-
-/** echarts 懒加载就绪后再渲染图表组件（useECharts 在初始化时同步读取 $echarts） */
-const echartsReady = ref(false);
-onMounted(async () => {
-  await loadEcharts();
-  echartsReady.value = true;
-});
+import { computed, onActivated, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import dayjs from "dayjs";
+import { Plus, Reading, Tickets } from "@element-plus/icons-vue";
+import { useUserStoreHook } from "@/store/modules/user";
+import { usePageAuth } from "@/router/utils";
+import type { TicketItem } from "@/api/ticketflow/tickets";
+import type { ArticleItem } from "@/api/ticketflow/knowledge";
+import { openTicketDetail } from "@/views/ticketflow/tickets/utils/ticketDetailDrawer";
+import { openArticleDetail } from "@/views/ticketflow/knowledge/utils/articleDetailDrawer";
+import WorkbenchStats from "./components/WorkbenchStats.vue";
+import RecentTickets from "./components/RecentTickets.vue";
+import LatestArticles from "./components/LatestArticles.vue";
+import { useWorkbench } from "./useWorkbench";
+import { greetingKey } from "./greeting";
 
 defineOptions({
   name: "Welcome"
 });
 
-const {
-  t,
-  chartData,
-  optionsBasis,
-  userLoginList,
-  operateLogList,
-  userActiveList,
-  userRegisterList
-} = useDashboard();
-let curWeek = ref(1);
+const TICKETS_PATH = "/ticketflow/tickets/index";
+const KNOWLEDGE_PATH = "/ticketflow/knowledge/index";
 
-/** 操作日志时间线节点色：按 EP 语义色循环（原为随机渐变，刷新观感不一致且不跟主题）；
-    组件实例一次性创建——渲染期重复创建会让节点在每次重渲染时闪动 */
-const timelineTones: EpColorName[] = [
-  "primary",
-  "success",
-  "warning",
-  "danger",
-  "info"
-];
-const timelineIcons = timelineTones.map(tone =>
-  markRaw(useRenderFlicker({ background: `var(--el-color-${tone})` }))
+const { t, locale } = useI18n();
+const router = useRouter();
+const user = useUserStoreHook();
+const ticketAuth = usePageAuth("TicketFlowTickets");
+const articleAuth = usePageAuth("TicketFlowKnowledge");
+const { tickets, articles, loading, stats, reload } = useWorkbench({
+  tickets: () => Boolean(ticketAuth.list),
+  articles: () => Boolean(articleAuth.list)
+});
+
+const displayName = computed(() => user.nickname || user.username || "");
+/** 日期用浏览器内置的本地化格式（含星期），随界面语言切换 */
+const today = computed(() =>
+  new Intl.DateTimeFormat(locale.value === "en" ? "en-US" : "zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long"
+  }).format(new Date())
 );
+
+function goTickets(query: Record<string, string> = {}) {
+  router.push({ path: TICKETS_PATH, query });
+}
+
+function openTicket(ticket: TicketItem) {
+  openTicketDetail(ticket, { onChanged: reload });
+}
+
+function openArticle(article: ArticleItem) {
+  openArticleDetail(article);
+}
+
+/** 页面被缓存时，从工单页等处返回首页要刷新计数；首次挂载由 onMounted 负责 */
+let mounted = false;
+onMounted(async () => {
+  await reload();
+  mounted = true;
+});
+onActivated(() => {
+  if (mounted) reload();
+});
 </script>
 
 <template>
-  <div>
-    <el-row :gutter="24" justify="space-around">
-      <re-col
-        v-for="(item, index) in chartData"
-        :key="index"
-        v-motion
-        :enter="{
-          opacity: 1,
-          y: 0,
-          transition: {
-            delay: 80 * (index + 1)
-          }
-        }"
-        :initial="{
-          opacity: 0,
-          y: 100
-        }"
-        :md="12"
-        :sm="12"
-        :value="6"
-        :xs="24"
-        class="mb-4.5"
+  <div class="workbench flex flex-col gap-4">
+    <el-card shadow="never" body-class="p-6!">
+      <div
+        class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
       >
-        <el-card class="app-card line-card group" shadow="never">
-          <div class="flex justify-between">
-            <span class="text-md font-medium">
-              {{ item.name }}
-            </span>
-            <div
-              :style="{ backgroundColor: epColorLight(item.tone) }"
-              class="size-8 flex-c rounded-md group-hover:[&>svg]:animate-scale-bounce"
-            >
-              <IconifyIconOffline
-                :color="epColor(item.tone)"
-                :icon="item.icon"
-                width="18"
-                height="18"
-              />
-            </div>
+        <div class="flex items-center gap-4">
+          <img src="/logo.svg" alt="" class="size-12" />
+          <div>
+            <h2 class="workbench-title" data-testid="workbench-greeting">
+              {{ t(greetingKey(dayjs().hour()), { name: displayName }) }}
+            </h2>
+            <p class="text-sm text-fg-muted mt-1">
+              {{ today }} · {{ t("workbench.subtitle") }}
+            </p>
           </div>
-          <div class="flex justify-between items-start mt-3">
-            <div class="w-1/2">
-              <ReNormalCountTo
-                :duration="item.duration"
-                :endVal="item.value"
-                :fontSize="'1.6em'"
-                :startVal="100"
-              />
-              <p class="font-medium text-(--el-color-success)">
-                {{ item.percent }}
-              </p>
-            </div>
-            <ChartLine
-              v-if="echartsReady && item.data.length > 1"
-              :color="epColor(item.tone)"
-              :data="item.data"
-              class="w-1/2!"
-            />
-            <ChartRound v-else-if="echartsReady" class="w-1/2!" />
-            <!-- echarts 懒加载就绪前：等高骨架占位，防止图表区塌陷（CLS） -->
-            <ReSkeleton v-else variant="fill" class="h-15! w-1/2!" />
-          </div>
-        </el-card>
-      </re-col>
-      <re-col
-        v-motion
-        :enter="{
-          opacity: 1,
-          y: 0,
-          transition: {
-            delay: 80 * 4
-          }
-        }"
-        :initial="{
-          opacity: 0,
-          y: 100
-        }"
-        :md="12"
-        :sm="12"
-        :value="6"
-        :xs="24"
-        class="mb-4.5"
-      >
-        <el-card
-          :body-style="{ padding: '0' }"
-          class="app-card line-card"
-          shadow="never"
-        >
-          <ChartClock />
-        </el-card>
-      </re-col>
-      <re-col
-        v-for="(item, index) in userActiveList"
-        :key="index"
-        v-motion
-        :enter="{
-          opacity: 1,
-          y: 0,
-          transition: {
-            delay: 80 * (index + 1)
-          }
-        }"
-        :initial="{
-          opacity: 0,
-          y: 100
-        }"
-        :md="12"
-        :sm="12"
-        :value="6"
-        :xs="24"
-        class="mb-4.5"
-      >
-        <el-card class="app-card line-card" shadow="never">
-          <div class="flex justify-between">
-            <span class="text-md font-medium"> {{ item.name }}</span>
-          </div>
-          <div class="flex justify-between items-start mt-3">
-            <div class="w-1/2">
-              <ReNormalCountTo
-                :duration="item.duration"
-                :endVal="item.value[1]"
-                :fontSize="'1.6em'"
-                :startVal="100"
-              />
-              <p class="text-sm font-medium text-(--el-color-success-dark-2)">
-                {{ t("welcome.registerUser") }}
-              </p>
-            </div>
-            <div class="w-1/2">
-              <ReNormalCountTo
-                :duration="item.duration"
-                :endVal="item.value[2]"
-                :fontSize="'1.6em'"
-                :startVal="100"
-              />
-              <p class="text-sm font-medium text-(--el-color-primary-dark-2)">
-                {{ t("welcome.activeUser") }}
-              </p>
-            </div>
-          </div>
-        </el-card>
-      </re-col>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <el-button
+            v-if="ticketAuth.create"
+            type="primary"
+            :icon="Plus"
+            data-testid="workbench-create"
+            @click="goTickets({ create: '1' })"
+          >
+            {{ t("workbench.createTicket") }}
+          </el-button>
+          <el-button :icon="Tickets" @click="goTickets()">
+            {{ t("workbench.myTickets") }}
+          </el-button>
+          <el-button :icon="Reading" @click="router.push(KNOWLEDGE_PATH)">
+            {{ t("workbench.knowledge") }}
+          </el-button>
+        </div>
+      </div>
+    </el-card>
 
-      <re-col
-        v-motion
-        :enter="{
-          opacity: 1,
-          y: 0,
-          transition: {
-            delay: 400
-          }
-        }"
-        :initial="{
-          opacity: 0,
-          y: 100
-        }"
-        :value="16"
-        :xs="24"
-        class="mb-4.5"
-      >
-        <el-card class="app-card bar-card" shadow="never">
-          <div class="flex justify-between">
-            <span class="text-md font-medium">{{
-              t("welcome.userAnalysis")
-            }}</span>
-            <Segmented v-model="curWeek" :options="optionsBasis" />
-          </div>
-          <div class="flex justify-between items-start mt-3">
-            <ChartBar
-              v-if="echartsReady"
-              :showData="curWeek ? userLoginList : userRegisterList"
-              :title="optionsBasis[curWeek].label"
-              :variant="curWeek ? 'login' : 'register'"
-            />
-            <ReSkeleton v-else variant="fill" class="h-100!" />
-          </div>
-        </el-card>
-      </re-col>
+    <WorkbenchStats :stats="stats" @open="goTickets" />
 
-      <re-col
-        v-motion
-        :enter="{
-          opacity: 1,
-          y: 0,
-          transition: {
-            delay: 640
-          }
-        }"
-        :initial="{
-          opacity: 0,
-          y: 100
-        }"
-        :value="8"
-        :xs="24"
-        class="mb-4.5"
-      >
-        <el-card class="app-card" shadow="never">
-          <div class="flex justify-between">
-            <span class="text-md font-medium">{{
-              t("welcome.operateLog")
-            }}</span>
-          </div>
-          <el-scrollbar class="mt-3" max-height="410">
-            <el-timeline>
-              <el-timeline-item
-                v-for="(item, index) in operateLogList"
-                :key="index"
-                :icon="timelineIcons[index % timelineIcons.length]"
-                :timestamp="
-                  dayjs(item.created_time).format('YYYY-MM-DD HH:mm:ss')
-                "
-                center
-                placement="top"
-              >
-                <p class="text-fg-muted text-sm">
-                  {{
-                    `${item?.creator?.username ?? ""} ${item.method} ${item.module} ${item.system} ${item?.browser}`
-                  }}
-                </p>
-              </el-timeline-item>
-            </el-timeline>
-          </el-scrollbar>
-        </el-card>
-      </re-col>
-    </el-row>
+    <div class="grid gap-4 lg:grid-cols-3">
+      <RecentTickets
+        class="lg:col-span-2"
+        :tickets="tickets"
+        :loading="loading"
+        @open="openTicket"
+        @more="goTickets()"
+      />
+      <LatestArticles
+        :articles="articles"
+        :loading="loading"
+        @open="openArticle"
+        @more="router.push(KNOWLEDGE_PATH)"
+      />
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-:deep(.el-card) {
-  /* 隐藏 el-scrollbar 滚动条 */
-  .el-scrollbar__bar {
-    display: none;
-  }
-
-  /* el-timeline 每一项上下、左右边距 */
-  .el-timeline-item {
-    margin: 0 6px;
-  }
+.workbench-title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 </style>

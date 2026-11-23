@@ -63,10 +63,10 @@ describe("About 平台信息卡排版", () => {
     expect(firstCard.find(".card-header").exists()).toBe(true);
     // 页头标题来自路由 meta（测试桩为 aboutTitle），版本徽章与之同行
     expect(firstCard.text()).toContain("aboutTitle");
-    expect(firstCard.findAll(".about-chip").length).toBe(6);
+    expect(firstCard.findAll(".about-chip").length).toBe(8);
   });
 
-  it("版本行四项 + 相关链接行四个外链（新窗口打开）", async () => {
+  it("版本行四项 + 相关链接行五个外链（新窗口打开）", async () => {
     const wrapper = await mountAbout();
 
     // 平台信息卡（按卡片标题定位，不依赖卡片顺序）：版本行 4 项，
@@ -85,7 +85,7 @@ describe("About 平台信息卡排版", () => {
     ]);
 
     const links = platformCard.findAll(".about-links a");
-    expect(links.length).toBe(4);
+    expect(links.length).toBe(5);
     links.forEach(link => {
       expect(link.attributes("target")).toBe("_blank");
       expect(link.attributes("href")).toBeTruthy();

@@ -129,6 +129,7 @@ watch(
                 :options="{ strings: [title ?? ''], cursor: false, speed: 100 }"
               />
             </h2>
+            <p class="login-subtitle">{{ t("login.siteSubtitle") }}</p>
           </Motion>
           <!-- 账户密码登录 -->
           <basic v-if="currentPage === LOGIN_PAGE.basic" />
@@ -144,7 +145,7 @@ watch(
     </div>
     <div class="w-full flex-c absolute bottom-3 text-sm text-fg-muted">
       Copyright © 2026-present
-      <a class="hover:text-primary!" :href="SITE_LINKS.author" target="_blank">
+      <a class="hover:text-primary!" :href="SITE_LINKS.repo" target="_blank">
         &nbsp;{{ title }}
       </a>
     </div>

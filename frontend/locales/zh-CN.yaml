@@ -451,7 +451,7 @@ layout:
   general: 通用设置
   siteTitle: 站点标题
   siteTitleTip: 侧栏 / 顶栏品牌区与浏览器标签页的站点名（留空用平台配置的 Title）
-  siteTitlePlaceholder: 如：xAdmin 管理平台
+  siteTitlePlaceholder: 如：TicketFlow 智能工单平台
   siteWideAdminOnly: 站点级外观配置全局生效（所有账号与登录页一致），仅管理员可修改
   language: 语言
   languageTip: 界面语言，与顶栏语言切换为同一入口
@@ -2509,6 +2509,7 @@ chat:
   emptyMembers: 暂无成员
 
 login:
+  siteSubtitle: 智能工单与知识库协作平台
   logoutSuccess: 登出成功
   thirdPartyLogin: 第三方登录
   serverForbidden: 当前服务器不允许登录
@@ -4241,7 +4242,7 @@ aiKnowledge:
 
 oauthAuthorize:
   title: 授权请求
-  appRequest: "{app} 请求访问你的 xadmin 账号"
+  appRequest: "{app} 请求访问你的 TicketFlow 账号"
   user: 当前用户
   scopesTitle: 请求的权限范围
   scopesEmpty: 该应用未限制接口范围（以你在应用中的授权面为准）
@@ -4303,7 +4304,7 @@ systemModule:
   discardConfirm: 有未保存的改动，切换预设将丢弃这些改动，是否继续？
 
 about:
-  intro: xAdmin 是一款开源免费且开箱即用的中后台管理系统模版。完全采用 ECMAScript 模块（ESM）规范来编写和组织代码，使用了最新的 Vue3、Vite、Element-Plus、TypeScript、Pinia、Tailwindcss 等主流技术开发。
+  intro: TicketFlow 是面向企业内部支持团队的智能工单与知识库协作平台：员工提交工单，技术人员处理与回复，AI 辅助分析工单、流式起草回复，解决方案可沉淀为知识库文章。前端基于 xadmin-client（Vue 3 / Element Plus），后端基于 xadmin-server（Django / DRF），AI 能力由独立的 FastAPI 异步服务提供。
   platformInfo: 平台信息
   prodDeps: 生产环境依赖
   devDeps: 开发环境依赖
@@ -4311,10 +4312,11 @@ about:
   buildTime: 构建时间
   nodeVersion: Node 版本
   pnpmVersion: pnpm 版本
-  webRepo: 前端代码地址
-  serverRepo: 后端代码地址
-  docUrl: 文档地址
-  demoUrl: 预览地址
+  repo: 项目仓库
+  docUrl: 使用文档
+  deployDocs: 部署说明
+  upstreamClient: 前端底座 xadmin-client
+  upstreamServer: 后端底座 xadmin-server
 
 pickerShortcuts:
   today: 今天
@@ -4565,3 +4567,25 @@ ticketflow:
     NETWORK: 网络
     SERVICE: 服务
     OTHER: 其他
+
+workbench:
+  subtitle: 智能工单与知识库协作平台
+  greeting:
+    morning: 上午好，{name}
+    afternoon: 下午好，{name}
+    evening: 晚上好，{name}
+  createTicket: 新建工单
+  myTickets: 我的工单
+  knowledge: 知识库
+  stats:
+    open: 待处理
+    reopened: 已重开
+    inProgress: 处理中
+    verifying: 待验收
+    dueSoon: 即将超时
+    overdue: 已超时
+  recentTickets: 最近工单
+  latestArticles: 最新知识
+  viewAll: 查看全部
+  noTickets: 暂无工单
+  noArticles: 暂无已发布的知识文章

@@ -452,7 +452,7 @@ layout:
   general: General settings
   siteTitle: Site title
   siteTitleTip: Site name in the brand area and browser tab (falls back to the platform-config Title when empty)
-  siteTitlePlaceholder: e.g. xAdmin Console
+  siteTitlePlaceholder: e.g. TicketFlow Service Desk
   siteWideAdminOnly: Site-wide appearance settings apply globally (all accounts and the sign-in page); only administrators can change them
   language: Language
   languageTip: Interface language, the same switch as the one in the header
@@ -2509,6 +2509,7 @@ chat:
   emptyMembers: No members
 
 login:
+  siteSubtitle: Smart ticketing and knowledge base platform
   logoutSuccess: Logged out
   thirdPartyLogin: Third-party login
   serverForbidden: Login is not allowed on this server
@@ -4243,7 +4244,7 @@ aiKnowledge:
 
 oauthAuthorize:
   title: Authorization request
-  appRequest: "{app} requests access to your xadmin account"
+  appRequest: "{app} requests access to your TicketFlow account"
   user: Current user
   scopesTitle: Requested scopes
   scopesEmpty: This application has no API scope restriction (limited by your own authorization)
@@ -4305,7 +4306,7 @@ systemModule:
   discardConfirm: You have unsaved changes; switching preset will discard them. Continue?
 
 about:
-  intro: xAdmin is an open-source, free and ready-to-use admin management template. It is written and organized entirely with ECMAScript Modules (ESM) and built with the latest Vue3, Vite, Element-Plus, TypeScript, Pinia, Tailwindcss and other mainstream technologies.
+  intro: TicketFlow is a ticketing and knowledge base platform for internal support teams. Employees submit tickets, technicians handle and reply to them, AI helps analyze tickets and drafts streaming replies, and resolutions can be turned into knowledge articles. The frontend builds on xadmin-client (Vue 3 / Element Plus), the backend on xadmin-server (Django / DRF), and AI runs as a separate asynchronous FastAPI service.
   platformInfo: Platform info
   prodDeps: Production dependencies
   devDeps: Development dependencies
@@ -4313,10 +4314,11 @@ about:
   buildTime: Build time
   nodeVersion: Node version
   pnpmVersion: pnpm version
-  webRepo: Frontend repository
-  serverRepo: Backend repository
+  repo: Project repository
   docUrl: Documentation
-  demoUrl: Live demo
+  deployDocs: Deployment guide
+  upstreamClient: Frontend base xadmin-client
+  upstreamServer: Backend base xadmin-server
 
 pickerShortcuts:
   today: Today
@@ -4567,3 +4569,25 @@ ticketflow:
     NETWORK: Network
     SERVICE: Service
     OTHER: Other
+
+workbench:
+  subtitle: Smart ticketing and knowledge base platform
+  greeting:
+    morning: Good morning, {name}
+    afternoon: Good afternoon, {name}
+    evening: Good evening, {name}
+  createTicket: New ticket
+  myTickets: My tickets
+  knowledge: Knowledge base
+  stats:
+    open: Open
+    reopened: Reopened
+    inProgress: In progress
+    verifying: Pending verification
+    dueSoon: Due soon
+    overdue: Overdue
+  recentTickets: Recent tickets
+  latestArticles: Latest articles
+  viewAll: View all
+  noTickets: No tickets yet
+  noArticles: No published articles yet
