@@ -1,3 +1,4 @@
+import { textFormRenderers } from "./renderers-text";
 import { computed, defineAsyncComponent, h } from "vue";
 import dayjs from "dayjs";
 import {
@@ -38,6 +39,7 @@ const SuggestSelect = defineAsyncComponent(
  * 迁移自 columns.tsx formatAddOrEditColumns 的第一个 switch-case
  */
 export const builtinFormRenderers: PlusColumnRegistry = {
+  ...textFormRenderers,
   integer: numberFormRenderer,
   float: numberFormRenderer,
   string: item => {

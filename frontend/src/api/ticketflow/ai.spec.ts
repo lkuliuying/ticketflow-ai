@@ -52,7 +52,13 @@ describe("applyReplyFrame", () => {
     let state = streaming();
     state = applyReplyFrame(
       state,
-      frame("meta", { ticket_version: 3, references: ["a1", "a2"] })
+      frame("meta", {
+        ticket_version: 3,
+        references: [
+          { article_id: "a1", title: "VPN 排查" },
+          { article_id: "a2", title: "账号解锁" }
+        ]
+      })
     );
     state = applyReplyFrame(state, frame("delta", { text: "您好，" }));
     state = applyReplyFrame(state, frame("ping", {}));
@@ -61,10 +67,35 @@ describe("applyReplyFrame", () => {
     expect(state).toMatchObject({
       status: "done",
       text: "您好，请重启 VPN",
-      references: ["a1", "a2"],
+      references: [
+        { article_id: "a1", title: "VPN 排查" },
+        { article_id: "a2", title: "账号解锁" }
+      ],
       ticketVersion: 3,
       finishReason: "stop"
     });
+  });
+
+  it("keeps only references with an article id and tolerates a missing title", () => {
+    const state = applyReplyFrame(
+      streaming(),
+      frame("meta", {
+        references: [
+          { article_id: "a1" },
+          { title: "无 ID" },
+          "legacy-uuid",
+          null,
+          { article_id: "a2", title: 42 },
+          { article_id: "  a3 ", title: "  空白标题  " },
+          { article_id: "   " }
+        ]
+      })
+    );
+    expect(state.references).toEqual([
+      { article_id: "a1", title: "" },
+      { article_id: "a2", title: "" },
+      { article_id: "a3", title: "空白标题" }
+    ]);
   });
 
   it("ends with the error frame details", () => {

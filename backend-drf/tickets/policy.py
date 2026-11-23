@@ -81,6 +81,9 @@ class TicketAccess:
             self.agent and (ticket.assignee_id == self.user_id or ticket.department_id == self.department_id)
         )
 
+    def can_reply(self, ticket: Ticket) -> bool:
+        return self.user_id == ticket.submitter_id or self.can_handle(ticket)
+
     def targets(self, ticket: Ticket) -> tuple[str, ...]:
         allowed = self.can_handle(ticket)
         if ticket.status in VERIFY_STATES:

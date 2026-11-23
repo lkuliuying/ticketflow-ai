@@ -90,10 +90,10 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | --- | --- | --- |
 | `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`sla`、`q`、分页 | 200，工单分页，含 `version` 和 `sla_state` |
 | `POST /api/tickets` | `Idempotency-Key`，`{title, description, category, priority}` | 201，创建的工单。重放返回 200 和原工单 |
-| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_comment_internal, can_archive}`、原有可执行流转、时间线第一页 |
+| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive}`、原有可执行流转、时间线第一页 |
 | `GET /api/tickets/{id}/timeline` | 分页 | 200，合并排序的流转记录与评论分页 |
 | `POST /api/tickets/{id}/transition` | `{target_status, version, note?}` | 200，更新后的工单 |
-| `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单 |
+| `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单。已关闭工单返回 409 |
 | `GET /api/tickets/{id}/assignees` | `q` 按用户名或昵称搜索 | 200，最多 20 条 `{pk, username, nickname, department_name}`，非管理员限本部门，按用户名和主键排序 |
 | `POST /api/tickets/{id}/comments` | `{body, visibility}` | 201，新评论 |
 | `POST /api/tickets/{id}/ai-metadata` | `{version, summary, tags, category?, priority?}` | 200，采纳建议后的工单 |
@@ -113,7 +113,7 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | `POST /ai/v1/tickets/suggest-reply/stream` | `{ticket_id: UUID}` | 200，`text/event-stream`，可取消 |
 | `GET /ai/v1/health` | 无需 token | 200，`{status: "ok", redis: "ok"}`。Redis 不通返回 503 |
 
-FastAPI 建流前的错误响应统一为 `{code, error, detail}`。`code` 是与 HTTP 状态码一致的整数，`error` 是机器可读标识，`detail` 是可读说明。401 表示令牌失效，403 / 404 对应 DRF 资源授权结果，422 表示请求结构无效，上游繁忙或超时返回对应 503 / 504。SSE 事件顺序为 `meta`（工单版本和引用文章 ID）、零到多个 `delta`（`{text}`）、`done`（`{finish_reason}`）。建流后失败以 `error`（`{code, error, detail, retryable}`）结束，其中 `code` 取该错误对应的整数状态码。有等待但无增量时发送 `ping` 心跳。缺少 `done` 的流按中断处理，自动重试只发生在第一段正文发出之前。
+FastAPI 建流前的错误响应统一为 `{code, error, detail}`。`code` 是与 HTTP 状态码一致的整数，`error` 是机器可读标识，`detail` 是可读说明。401 表示令牌失效，403 / 404 对应 DRF 资源授权结果，422 表示请求结构无效，上游繁忙或超时返回对应 503 / 504。SSE 事件顺序为 `meta`（`{ticket_id, ticket_version, references: [{article_id, title}]}`，无引用时为 `[]`）、零到多个 `delta`（`{text}`）、`done`（`{finish_reason}`）。建流后失败以 `error`（`{code, error, detail, retryable}`）结束，其中 `code` 取该错误对应的整数状态码。有等待但无增量时发送 `ping` 心跳。缺少 `done` 的流按中断处理，自动重试只发生在第一段正文发出之前。
 
 ## JWT 联合鉴权
 

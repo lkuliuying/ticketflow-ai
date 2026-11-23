@@ -6,6 +6,8 @@ import { hasAuth } from "@/router/utils";
 import { message } from "@/utils/message";
 import { useI18n } from "vue-i18n";
 import type { UploadKind } from "./types";
+import { uploadedSyntax } from "./markdownSyntax";
+import { useMarkdownDrop } from "./useMarkdownDrop";
 
 /**
  * Markdown 编辑器上传能力（按钮 / 拖拽 / 粘贴共用）。
@@ -23,8 +25,6 @@ export function useMarkdownUpload({
   const canUpload = computed(() => hasAuth("upload:SystemUploadFile"));
   const uploadingCount = ref(0);
   const uploadConfig = ref({ file_upload_size: 1048576 });
-  const dragActive = ref(false);
-  const dragDepth = ref(0);
   const fileInputRef = ref<HTMLInputElement | null>(null);
   const uploadKind = ref<UploadKind>("image");
 
@@ -96,61 +96,22 @@ export function useMarkdownUpload({
         });
         return;
       }
-      const label = (item.filename || file.name).replace(/[[\]]/g, "");
-      const syntax =
-        kind === "image"
-          ? `![${label}](<${item.access_url}>)`
-          : `[${label}](<${item.access_url}>)`;
-      insertBlock(syntax);
+      insertBlock(
+        uploadedSyntax(item.filename || file.name, item.access_url, kind)
+      );
     } catch {
       message(t("systemNotice.markdownUploadFailed"), { type: "error" });
     }
   }
 
-  function onDragEnter(event: DragEvent) {
-    if (!canUpload.value || !event.dataTransfer?.types.includes("Files")) {
-      return;
-    }
-    dragDepth.value += 1;
-    dragActive.value = true;
-  }
-
-  function onDragLeave() {
-    dragDepth.value = Math.max(0, dragDepth.value - 1);
-    if (!dragDepth.value) dragActive.value = false;
-  }
-
-  async function onDrop(event: DragEvent) {
-    dragDepth.value = 0;
-    dragActive.value = false;
-    if (!canUpload.value) return;
-    const dropped = Array.from(event.dataTransfer?.files ?? []);
-    if (dropped.length) await uploadFiles(dropped);
-  }
-
-  async function onPaste(event: ClipboardEvent) {
-    if (!canUpload.value) return;
-    const pasted = Array.from(event.clipboardData?.items ?? [])
-      .filter(item => item.kind === "file")
-      .map(item => item.getAsFile())
-      .filter((file): file is File => file !== null);
-    if (!pasted.length) return;
-    event.preventDefault();
-    await uploadFiles(pasted);
-  }
-
   return {
     canUpload,
     uploadingCount,
-    dragActive,
     fileInputRef,
     uploadKind,
     accept,
     pickFile,
     onFileChange,
-    onDragEnter,
-    onDragLeave,
-    onDrop,
-    onPaste
+    ...useMarkdownDrop({ canUpload, uploadFiles })
   };
 }

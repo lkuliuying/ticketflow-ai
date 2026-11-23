@@ -39,8 +39,6 @@ git -C F:\Program\ticketflow-ai worktree add ..\ticketflow-ai-be -b be/contract-
 
 - 全局 pnpm 是 10.32，前端要求 pnpm 11：前端命令用 `npx -y pnpm@11 <命令>`，不要升级全局版本。
 - Git Bash 里没有 `docker`，后端测试栈在 WSL2 或 Docker Desktop 下运行。
-- 前端 `check:hook-length` 目前因上游文件 `src/views/system/notice/components/markdown/useMarkdownUpload.ts`
-  失败，与二开无关，暂不处理。
 
 ## 交接流程
 
@@ -65,12 +63,12 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 
 | 编号 | 任务 | 执行 | 依赖 | 状态 |
 | --- | --- | --- | --- | --- |
-| BE-05 | 已关闭工单禁止指派、`viewer.can_reply` | Codex | — | 待开始 |
-| SV-03 | AI 服务鲁棒性（SSE 流尾、缓存键、引用标题、Mock 标签、重试单测） | Codex | — | 待开始 |
-| BE-06 | 测试稳定性（`test_tag_center`、压测缓存包装、Shell 脚本换行符） | Codex | — | 待开始 |
-| FE-08 | 详情跟进契约、AI 引用标题、人机校验卸载中止 | Claude | BE-05、SV-03 | 待开始 |
-| FE-09 | E2E 健壮性 | Claude | — | 待开始 |
-| FE-10 | 前端门禁清零 | Claude | — | 待开始 |
+| BE-05 | 已关闭工单禁止指派、`viewer.can_reply` | Codex | — | 已通过 |
+| SV-03 | AI 服务鲁棒性（SSE 流尾、缓存键、引用标题、Mock 标签、重试单测） | Codex | — | 已通过 |
+| BE-06 | 测试稳定性（`test_tag_center`、压测缓存包装、Shell 脚本换行符） | Codex | — | 已通过 |
+| FE-08 | 详情跟进契约、AI 引用标题、人机校验卸载中止 | Claude | BE-05、SV-03 | 已通过 |
+| FE-09 | E2E 健壮性 | Claude | — | 已通过 |
+| FE-10 | 前端门禁清零 | Claude | — | 已通过 |
 
 Codex 按 BE-05 → SV-03 → BE-06 顺序执行；Claude 先做 FE-09、FE-10，FE-08 等契约就绪。
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)，

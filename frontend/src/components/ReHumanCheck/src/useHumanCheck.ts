@@ -1,4 +1,4 @@
-import { ref, shallowRef } from "vue";
+import { getCurrentScope, onScopeDispose, ref, shallowRef } from "vue";
 import type { CaptchaChallenge } from "@/api/identity/captcha";
 import type { VerifyExtra } from "@/utils/captcha/flow";
 import { solvePow } from "@/utils/captcha/protocol";
@@ -7,6 +7,7 @@ import {
   HumanCheckCancelled,
   isAbort,
   MAX_FAILURES,
+  type Pending,
   verifyAnswer,
   type HumanCheckOptions
 } from "./humanCheckSteps";
@@ -16,16 +17,14 @@ export { HumanCheckCancelled, type HumanCheckOptions };
 /**
  * 出题 → 作答 → 换取一次性 ticket。PoW 题不弹窗，后台算完直接校验；
  * 图片题附带的 PoW 在用户输入期间并行计算；答错自动换题，连续答错达上限才放弃。
- * 每一轮挑战有自己的 AbortController：关闭弹窗、换题都会让在途的出题、PoW 与校验结果作废。
+ * 每一轮挑战有自己的 AbortController：关闭弹窗、换题、组件卸载都会让在途的出题、PoW 与校验结果作废
+ * （卸载时按“取消”收尾等待中的调用方）。
  */
 export function useHumanCheck(options: HumanCheckOptions) {
   const visible = ref(false);
   const loading = ref(false);
   const challenge = shallowRef<CaptchaChallenge | null>(null);
-  let pending: {
-    resolve: (v: string) => void;
-    reject: (e: Error) => void;
-  } | null = null;
+  let pending: Pending | null = null;
   let controller: AbortController | null = null;
   let powTask: Promise<number> | null = null;
   let failures = 0;
@@ -41,6 +40,8 @@ export function useHumanCheck(options: HumanCheckOptions) {
     if (ticket) current?.resolve(ticket);
     else current?.reject(error ?? new HumanCheckCancelled());
   }
+
+  if (getCurrentScope()) onScopeDispose(() => settle(null));
 
   async function load(fallback = false): Promise<void> {
     controller?.abort();

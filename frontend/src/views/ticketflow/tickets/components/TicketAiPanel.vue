@@ -5,6 +5,8 @@ import type { TicketDetail } from "@/api/ticketflow/tickets";
 import type { TicketRun } from "../utils/useTicketDetail";
 import { useReplyStream, useTicketAnalysis } from "../utils/useTicketAi";
 import { PRIORITY_TONE } from "../utils/ticketColumns";
+import type { ReplyReference } from "@/api/ticketflow/ai";
+import { openArticleDetail } from "../../knowledge/utils/articleDetailDrawer";
 
 /**
  * 详情右侧 AI 面板：工单分析与一键采纳、流式回复建议。
@@ -39,6 +41,19 @@ const statusText = computed(() => {
 function category(value: string) {
   const key = `ticketflow.categoryValue.${value}`;
   return te(key) ? t(key) : value;
+}
+
+/** 引用文章的显示名：标题缺失时用文章 ID 前 8 位 */
+function referenceLabel(reference: ReplyReference) {
+  return reference.title || reference.article_id.slice(0, 8);
+}
+
+/** 点击引用标题，在知识库详情抽屉里打开对应文章 */
+function openReference(reference: ReplyReference) {
+  openArticleDetail({
+    pk: reference.article_id,
+    title: referenceLabel(reference)
+  });
 }
 </script>
 
@@ -165,12 +180,29 @@ function category(value: string) {
           {{ t("ticketflow.ai.retry") }}
         </el-button>
       </div>
-      <span
+      <div
         v-if="reply.references.length"
-        class="text-xs text-(--el-text-color-secondary)"
+        class="flex flex-col gap-1 text-xs"
+        data-testid="ai-references"
       >
-        {{ t("ticketflow.ai.references", { count: reply.references.length }) }}
-      </span>
+        <span class="text-(--el-text-color-secondary)">
+          {{
+            t("ticketflow.ai.references", { count: reply.references.length })
+          }}
+        </span>
+        <el-button
+          v-for="reference in reply.references"
+          :key="reference.article_id"
+          link
+          type="primary"
+          size="small"
+          class="justify-start! ml-0! max-w-full"
+          :title="referenceLabel(reference)"
+          @click="openReference(reference)"
+        >
+          <span class="truncate">{{ referenceLabel(reference) }}</span>
+        </el-button>
+      </div>
       <div class="flex gap-2">
         <el-button
           type="primary"

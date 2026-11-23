@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { TicketDetail } from "@/api/ticketflow/tickets";
-import { useUserStoreHook } from "@/store/modules/user";
 import { useTicketDetail } from "../utils/useTicketDetail";
 import { PRIORITY_TONE, SLA_TONE, STATUS_TONE } from "../utils/ticketColumns";
 import TicketActions from "./TicketActions.vue";
@@ -30,14 +29,8 @@ const { detail, loading, busy, notFound, load, run } = useTicketDetail(
 
 onMounted(load);
 
-const userStore = useUserStoreHook();
-/** 处理人可回复；提交人只能对自己的工单发对外回复（与后端评论校验一致） */
-const canReply = computed(
-  () =>
-    Boolean(detail.value) &&
-    (detail.value!.viewer.can_handle ||
-      detail.value!.submitter_id === Number(userStore.pk))
-);
+/** 能否回复完全由后端 viewer 给出（处理人或提交人，且有评论权限） */
+const canReply = computed(() => Boolean(detail.value?.viewer.can_reply));
 
 const replyRef = ref<InstanceType<typeof TicketReply>>();
 

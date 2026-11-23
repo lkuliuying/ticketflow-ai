@@ -184,6 +184,81 @@ async def test_cache_keys_bind_user_text_categories_model_and_prompt(harness, co
     assert resources.provider.analyzed == len(resources.redis.values) == 6
 
 
+async def test_analysis_cache_binds_reference_content_but_ignores_order(harness, context_response):
+    http, _, resources, bearer, _, _ = harness
+    references = context_response["data"]["references"]
+    body = {"ticket_id": str(TICKET)}
+    headers = bearer()
+
+    async def check_generations(count):
+        response = await http.post(ANALYZE, json=body, headers=headers)
+        assert response.status_code == 200
+        assert resources.provider.analyzed == len(resources.redis.values) == count
+
+    await check_generations(1)
+    references.append({"article_id": str(uuid4()), "title": "网络接入", "excerpt": "检查网络配置"})
+    await check_generations(2)
+    references.reverse()
+    await check_generations(2)
+    references[0]["excerpt"] = "更新了网络配置"
+    await check_generations(3)
+    references[0]["article_id"] = str(uuid4())
+    await check_generations(4)
+    references[0]["title"] = "网络接入与配置"
+    await check_generations(5)
+
+
+@pytest.mark.parametrize(
+    ("statuses", "expected_status", "expected_error"),
+    [
+        ((httpx.ConnectError, 200), 200, None),
+        ((429, 200), 200, None),
+        ((500, 200), 200, None),
+        ((400,), 503, "LLM_UNAVAILABLE"),
+        (("invalid",), 502, "LLM_INVALID_OUTPUT"),
+        ((429, 503), 503, "LLM_UNAVAILABLE"),
+        ((httpx.ConnectTimeout, 504), 504, "LLM_TIMEOUT"),
+    ],
+)
+async def test_analysis_retries_only_transient_provider_failures(
+    harness, monkeypatch, statuses, expected_status, expected_error
+):
+    http, application, resources, bearer, _, _ = harness
+    calls, delays = [], []
+    content = resources.provider.draft.model_dump_json()
+    settings = resources.settings.model_copy(update={"llm_api_key": resources.settings.jwt_signing_key})
+
+    def upstream(request):
+        status = statuses[len(calls)]
+        calls.append(status)
+        if isinstance(status, type):
+            raise status("upstream connection failed", request=request)
+        if status == "invalid":
+            return httpx.Response(200, text="bad JSON")
+        return httpx.Response(status, json={"choices": [{"message": {"content": content}}]})
+
+    async def pause(delay):
+        assert not resources.upstream_slots.locked()
+        delays.append(delay)
+
+    monkeypatch.setattr(retry, "sleep", pause)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as llm_http:
+        application.state.resources = replace(resources, provider=OpenAICompatibleProvider(settings, llm_http))
+        result = await http.post(ANALYZE, json={"ticket_id": str(TICKET)}, headers=bearer())
+
+    assert tuple(calls) == statuses
+    assert len(delays) == len(statuses) - 1
+    assert result.status_code == expected_status
+    assert not resources.upstream_slots.locked()
+    if expected_error is None:
+        assert result.json()["summary"] == resources.provider.draft.summary
+        assert len(resources.redis.values) == 1
+    else:
+        assert result.json()["code"] == expected_status
+        assert result.json()["error"] == expected_error
+        assert not resources.redis.values
+
+
 @pytest.mark.parametrize(
     "invalid",
     [
@@ -253,7 +328,14 @@ async def test_reply_frames_headers_and_openapi(harness):
     assert result.headers["cache-control"] == "no-cache"
     assert result.headers["x-accel-buffering"] == "no"
     assert frames(result.text) == [
-        ("meta", {"ticket_id": str(TICKET), "ticket_version": 2, "references": [str(ARTICLE)]}),
+        (
+            "meta",
+            {
+                "ticket_id": str(TICKET),
+                "ticket_version": 2,
+                "references": [{"article_id": str(ARTICLE), "title": "VPN 排障"}],
+            },
+        ),
         ("delta", {"text": "您好"}),
         ("delta", {"text": "。"}),
         ("done", {"finish_reason": "stop"}),

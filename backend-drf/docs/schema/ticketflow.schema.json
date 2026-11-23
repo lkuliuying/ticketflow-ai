@@ -13,12 +13,13 @@
     "ticketViewer": {
       "type": "object",
       "description": "GET /api/tickets/{id} 的 viewer；能力由服务端按当前用户、权限点及工单状态计算。",
-      "required": ["can_handle", "can_assign", "can_comment_internal", "can_archive"],
+      "required": ["can_handle", "can_assign", "can_reply", "can_comment_internal", "can_archive"],
       "additionalProperties": false,
       "properties": {
         "can_handle": {"type": "boolean"},
-        "can_assign": {"type": "boolean", "description": "可处理工单，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
-        "can_comment_internal": {"type": "boolean"},
+        "can_assign": {"type": "boolean", "description": "工单未关闭、可处理工单，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
+        "can_reply": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。"},
+        "can_comment_internal": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"},
         "can_archive": {"type": "boolean", "description": "已关闭、可处理、有知识库创建权限且尚未转存。"}
       }
     },

@@ -32,7 +32,12 @@ class AnalysisResponse(AnalysisDraft):
     ticket_version: Annotated[int, Field(ge=1)]
 
 
+class StreamReference(BaseModel):
+    article_id: UUID
+    title: str
+
+
 class StreamMeta(BaseModel):
     ticket_id: UUID
     ticket_version: Annotated[int, Field(ge=1)]
-    references: list[UUID]
+    references: list[StreamReference]
