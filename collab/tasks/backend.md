@@ -592,3 +592,78 @@ DeepSeek 的 Chat Completions **默认开启思考模式**，关闭方式是请�
 完成标准：`backend-drf/AGENTS.md` 第六节门禁全部通过；工单与知识库相关测试全绿，新增用例覆盖三种身份的范围、
 历史只读（403）、自动派单的选人与并列规则、无候选、提交人排除、并发建单、退回、重开回派、kb_editor 迁移、
 注册关闭、AI 上下文拒绝历史只读；在交付栈之外的隔离库验证迁移在有数据的库上可执行。交付栈由 Claude 在评审后重建。
+
+## BE-09 工单评价
+
+分支：`be/ratings`，从合入 BE-08 后的 `integration/iter6` 切出。口径见改造方案第 5 节。
+
+1. 模型（建议 `TicketRating`）：工单一对一、评价人（提交人）、被评处理人（关闭时的处理人，可空）、`resolved`（是否解决）、
+   `satisfaction` 1~5、`handler_score` 1~5、`tags`（固定词表编码数组，如 `FAST / PROFESSIONAL / FRIENDLY / CLEAR`，
+   中英文标签进契约或业务字典）、`comment`（≤500，可空）、创建时间。
+2. `POST /api/tickets/{id}/rating`：只有提交人、工单 `CLOSED`、尚未评价时 201；重复评价或非关闭状态 409；
+   无权 403 / 不可见 404。工单重开再关闭不产生第二次评价，也不能修改。详情 `viewer.can_rate`，详情响应带 `rating`
+   （评价人、被评处理人、管理员可见，其他人为 `null`）。
+3. `GET /api/ticket-ratings`：列表（RePlusPage 元数据齐全），范围：员工看自己给出的、技术员看被评处理人是自己的、
+   管理员看全部；筛选处理人、分数、是否解决、时间段。
+4. `GET /api/ticket-ratings/summary`：技术员返回本人 `{count, avg_satisfaction, avg_handler_score, resolved_rate, tags}`；
+   管理员返回整体汇总加按处理人的明细数组（可按时间段筛选）。
+5. 菜单与权限点：技术员“我的评价”（组件名 `TicketFlowMyRatings`，路由 `ticketflow/ratings/mine/index`），
+   管理员“评价统计”（`TicketFlowRatingStats`，`ticketflow/ratings/stats/index`），按应用种子规范登记并授权给对应角色。
+6. 演示数据：给几张已关闭演示工单补评价，覆盖不同分数与标签。
+
+完成标准：第六节门禁通过；新增用例覆盖权限矩阵、状态约束、重复评价、重开后不可再评、汇总口径；报告给出接口示例。
+
+## BE-10 账号与技能组管理
+
+分支：`be/accounts`。口径见改造方案第 7 节。
+
+1. `api/ticketflow/accounts`（列表、详情、新建、编辑、停用 / 启用、`reset-password`）：字段用户名、姓名、手机、邮箱、
+   `role`（`requester / agent / admin` 三选一）、`skill_group`（技术员必填，其他角色为空）、`is_active`。
+   只能管理三种业务角色的账号：不能创建或修改超级管理员、不能授予其他角色、不能改自己的角色或停用自己。
+   新建时由管理员设初始密码（走底座密码策略校验）。重置密码、停用、改角色后撤销该用户已有会话（复用底座撤销机制）。
+2. 技术员停用或改为非技术员：名下未完成工单结束指派历史（`DEACTIVATED`）、进入待分配、写日志。
+3. `api/ticketflow/skill-groups`：新建、改名、描述、启用 / 停用；分类路由配置（每个分类对应一个技能组，未配置走默认组），
+   改为可编辑并替换现有硬编码或配置来源。停用仍有在职技术员或被路由指向的技能组时返回 409 并说明原因。
+4. 菜单与权限点：管理员“账号管理”（`TicketFlowAccounts`，`ticketflow/accounts/index`）、“技能组”
+   （`TicketFlowSkillGroups`，`ticketflow/skill-groups/index`）；列表元数据齐全，可直接用 RePlusPage。
+5. 审计：账号与技能组变更写底座操作日志。
+
+完成标准：第六节门禁通过；用例覆盖越权（改超管、授予其他角色、改自己）、停用释放工单、会话撤销、技能组停用约束、路由生效。
+
+## BE-11 AI 知识问答（DRF 部分）
+
+分支：`be/assistant`。口径见改造方案第 6 节；FastAPI 部分是 SV-05。
+
+1. 模型：会话（用户、标题、创建 / 更新时间、软删除、转人工后关联的工单）、消息（会话、角色 `user / assistant`、内容、
+   引用 `[{article_id, title}]`、状态 `complete / interrupted / failed`、时间）、反馈（回答消息一对一、`up / down`、
+   原因 `INACCURATE / UNRESOLVED / IRRELEVANT / OTHER`、补充 ≤300、时间，可改投）。
+2. 员工接口（`api/assistant/...`）：本人会话列表、新建、改标题、删除；会话消息分页（时间正序）；对本人会话里的回答提交反馈。
+   只有普通员工可用（管理员只读反馈页，见第 4 点）。
+3. 转人工：建单接口接受可选 `assistant_session_id`（必须是本人会话），建单后会话关联工单；工单详情对提交人、当前处理人、
+   管理员给出会话入口，新增只读接口 `GET /api/tickets/{id}/assistant-session` 返回该会话消息。
+4. 管理员接口：被点踩回答列表（带对应问题和会话信息）、转人工会话列表、统计 `{sessions, questions, up, down, handoffs}`
+   （时间段筛选）。菜单：员工“AI 助手”（`TicketFlowAssistant`，`ticketflow/assistant/index`）、管理员“AI 反馈”
+   （`TicketFlowAssistantFeedback`，`ticketflow/assistant/feedback/index`）。
+5. 内网接口（FastAPI 用用户 token 调用，网关返回 404，`deploy/nginx` 同步拦截并补网关验收）：
+   - 提问：校验会话归属与角色后写入用户消息，返回 `{user_message_id, history（最近若干轮，按字数截断）, references
+     （已发布知识 Top-K 片段，复用 ai-context 的检索）, categories}`；
+   - 写回：`{user_message_id, content, references, status}` 写入回答消息并返回 `assistant_message_id`；同一问题只能写回一次。
+   限流复用 AI 入口的滑动窗口。
+6. 契约：`docs/schema/` 与 OpenAPI 同步，报告给出 SV-05 和前端需要的全部示例。
+
+完成标准：第六节门禁通过；用例覆盖会话归属、角色限制、软删除、反馈改投、转人工关联与可见性、内网接口授权与网关拦截、写回幂等。
+
+## SV-05 AI 知识问答（FastAPI 部分）
+
+分支：`be/assistant-ai`，依赖 BE-11 的内网接口。工作目录 `service-fastapi/`（网关验收在 `tests/`）。
+
+1. `POST /ai/v1/assistant/chat/stream` `{session_id, message}`：鉴权与现有 AI 接口一致；调用 DRF 提问接口取上下文后流式生成，
+   帧序 `meta {session_id, user_message_id, references:[{article_id,title}]}` → `delta+` → `done {finish_reason, assistant_message_id}`，
+   失败以 `error` 结束。结束、失败或客户端断开都写回（断开写 `interrupted` 和已生成部分）。
+   提示词：只依据给出的知识片段回答；没有相关片段时明确说明知识库中没有找到，并建议使用“转人工提单”；中文、简洁、分步骤。
+2. `POST /ai/v1/assistant/handoff-draft` `{session_id}`：读取会话，JSON 模式生成 `{title, description, category}`，
+   分类必须在 DRF 给出的词表内，长度校验同建单。
+3. Mock 提供方对两个接口给出确定性输出，`LLM_THINKING` 等现有配置同样生效；并发槽位、排队超时、重试沿用现有实现。
+4. 测试：单测覆盖帧序、断开写回、无引用时的提示、草稿校验；网关验收补对话流与草稿各一条。
+
+完成标准：`service-fastapi` 门禁通过；在 Mock 模式的交付栈上跑网关验收并贴输出。
