@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 
 const mocks = vi.hoisted(() => ({ openArticleDetail: vi.fn() }));
@@ -20,7 +20,7 @@ vi.mock("../../../knowledge/utils/articleDetailDrawer", () => ({
   openArticleDetail: mocks.openArticleDetail
 }));
 
-const reply = ref({
+const initialReply = () => ({
   status: "done",
   text: "您好",
   references: [
@@ -28,6 +28,7 @@ const reply = ref({
     { article_id: "9a8b7c6d5e4f3a2b", title: "" }
   ]
 });
+const reply = ref(initialReply());
 vi.mock("../../utils/useTicketAi", () => ({
   useTicketAnalysis: () => ({
     analysis: ref(null),
@@ -54,6 +55,11 @@ function mountPanel() {
 }
 
 describe("TicketAiPanel 引用文章", () => {
+  beforeEach(() => {
+    reply.value = initialReply();
+    mocks.openArticleDetail.mockReset();
+  });
+
   it("列出引用标题，标题缺失时显示 ID 前 8 位", () => {
     const refs = mountPanel().get('[data-testid="ai-references"]');
     const buttons = refs.findAll("el-button");
@@ -65,7 +71,6 @@ describe("TicketAiPanel 引用文章", () => {
   });
 
   it("点击引用用同一显示名打开文章抽屉", async () => {
-    mocks.openArticleDetail.mockReset();
     const buttons = mountPanel().findAll(
       '[data-testid="ai-references"] el-button'
     );

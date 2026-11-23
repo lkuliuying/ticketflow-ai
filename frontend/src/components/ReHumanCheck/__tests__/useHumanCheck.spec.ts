@@ -1,6 +1,6 @@
 import { flushPromises } from "@vue/test-utils";
 import { SHA256 } from "crypto-es";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { effectScope } from "vue";
 import { leadingZeroBits } from "@/utils/captcha/protocol";
 
@@ -32,6 +32,11 @@ function setup(types: string[] = ["slide", "image"]) {
 beforeEach(() => {
   mocks.challenge.mockReset();
   mocks.verify.mockReset();
+});
+
+// 原型上的 spy 要在每个用例后恢复，断言失败时也不影响后续用例
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("useHumanCheck", () => {
@@ -179,7 +184,6 @@ describe("useHumanCheck", () => {
     expect(
       abort.mock.contexts.some(c => (c as AbortController).signal.aborted)
     ).toBe(true);
-    abort.mockRestore();
     expect(await outcome).toBeInstanceOf(HumanCheckCancelled);
     expect(mocks.verify).not.toHaveBeenCalled();
     expect(check.loading.value).toBe(false);
