@@ -120,7 +120,7 @@ function loadCollapsed() {
   } catch {
     /* 读不到偏好时用默认值 */
   }
-  // 窄屏默认收起左侧代理面板，把空间留给办公室
+  // 窄屏默认收起左侧代理面板，把空间留给仓库
   return window.innerWidth < 1300 ? ["left"] : [];
 }
 function applyCollapsed(list) {

@@ -227,7 +227,7 @@ function stageDetail(stage, data) {
 export function renderDetail(data, selected) {
   const el = $("tab-detail");
   if (!selected) {
-    el.innerHTML = `<p class="muted pad">在办公室里点击代理、传送带上的任务卡片、阶段牌或 main 归档柜，或在左右面板中点击条目查看详情。</p>`;
+    el.innerHTML = `<p class="muted pad">点击仓库（代理）、货架或传送带上的任务卡片、仓库里的阶段区域或中央的 main 归档库，或在左右面板中点击条目查看详情。</p>`;
     return;
   }
   if (selected.kind === "task") {

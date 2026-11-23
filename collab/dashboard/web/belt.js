@@ -1,171 +1,237 @@
-// 传送带：阶段分段、“需修改”回流带、任务卡片与 main 归档柜。
+// 传送带：仓库之间的三角环线、流动的数据包、任务卡片与中央的 main 归档库。
 import * as THREE from "three";
 import { AGENT_COLORS, STAGE_COLORS, esc } from "./theme.js";
-import { box, label, mat } from "./office.js";
+import { HALF, WAREHOUSES, box, label, mat } from "./warehouse.js";
 
-export const BELT_Z = 3;
-const BELT_DEPTH = 2.6;
-const BELT_TOP = 0.9;
-const SEG = 3.4;
-export const MAIN_STAGES = ["待开始", "阻塞", "执行中", "待评审", "评审中", "已通过", "已合并"];
-const LANE = { z: 0.2, from: 3.4, to: -3.4, top: 0.45 };
-const CABINET = new THREE.Vector3(14.8, 0, BELT_Z);
+const BELT_TOP = 0.95;
+const BELT_WIDTH = 1.1;
+const LANE_GAP = 0.72;
+const CARRY_Y = BELT_TOP + 0.45;
+export const VAULT = new THREE.Vector3(0, 0, -0.6);
+const VAULT_HALF = { x: 1.3, z: 1.1 };
+const PALLET = new THREE.Vector3(0, 0, 1.75);
 const DRAWERS = 8;
 
-const stageX = stage => (MAIN_STAGES.indexOf(stage) - (MAIN_STAGES.length - 1) / 2) * SEG;
+// 双向的边各走一条车道；车道在前进方向右侧，所以往返两条自动错开
+export const LANES = [
+  { id: "brief", from: "claude", to: "codex", label: "任务书", gap: 0 },
+  { id: "report", from: "codex", to: "gemini", label: "完成报告", gap: LANE_GAP },
+  { id: "rework", from: "gemini", to: "codex", label: "退回修改", gap: LANE_GAP },
+  { id: "verdict", from: "gemini", to: "claude", label: "评审结论", gap: LANE_GAP },
+  { id: "submit", from: "claude", to: "gemini", label: "提交评审", gap: LANE_GAP },
+  { id: "merge", from: "claude", to: "vault", label: "合并", gap: 0 }
+];
 
-function stripeTexture(color = "#5b616e", stripe = "#6b7280") {
+const nodeCenter = id => (id === "vault" ? VAULT : WAREHOUSES[id]);
+const nodeHalf = id => (id === "vault" ? VAULT_HALF : HALF);
+
+/** 从节点内一点沿方向 d 走到边界的距离 */
+function exitDistance(point, center, half, d) {
+  const tx = d.x ? ((d.x > 0 ? half.x : -half.x) - (point.x - center.x)) / d.x : Infinity;
+  const tz = d.z ? ((d.z > 0 ? half.z : -half.z) - (point.z - center.z)) / d.z : Infinity;
+  return Math.min(tx, tz);
+}
+
+function chevronTexture(base, mark) {
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 64;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = color;
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, 128, 64);
-  ctx.fillStyle = stripe;
-  for (let x = 0; x < 128; x += 32) ctx.fillRect(x, 0, 10, 64);
+  ctx.strokeStyle = mark;
+  ctx.lineWidth = 9;
+  for (const x of [24, 88]) {
+    ctx.beginPath();
+    ctx.moveTo(x, 12);
+    ctx.lineTo(x + 18, 32);
+    ctx.lineTo(x, 52);
+    ctx.stroke();
+  }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
+// ------------------------------------------------------------------ 传送带
+
+export function buildLanes(scene) {
+  return LANES.map(spec => {
+    const a = nodeCenter(spec.from);
+    const b = nodeCenter(spec.to);
+    const d = b.clone().sub(a).setY(0).normalize();
+    const n = new THREE.Vector3(d.z, 0, -d.x);
+    const sa = a.clone().addScaledVector(n, spec.gap);
+    const sb = b.clone().addScaledVector(n, spec.gap);
+    const start = sa.clone().addScaledVector(d, exitDistance(sa, a, nodeHalf(spec.from), d));
+    const end = sb.clone().addScaledVector(d, -exitDistance(sb, b, nodeHalf(spec.to), d.clone().negate()));
+    // 两端各伸进仓库一段，卡片在仓库里上带、在下一个仓库里下带
+    const inA = start.clone().addScaledVector(d, -0.9).setY(CARRY_Y);
+    const inB = end.clone().addScaledVector(d, 0.9).setY(CARRY_Y);
+    const length = start.distanceTo(end) + 1.2;
+    const mid = start.clone().add(end).multiplyScalar(0.5);
+
+    const group = new THREE.Group();
+    group.position.copy(mid);
+    group.rotation.y = -Math.atan2(d.z, d.x);
+    const frame = mat("#9aa1ad");
+    group.add(box(length, 0.5, BELT_WIDTH, frame, 0, BELT_TOP - 0.3, 0));
+    for (const side of [-1, 1]) group.add(box(length, 0.16, 0.1, mat("#c4c9d2"), 0, BELT_TOP, side * (BELT_WIDTH / 2 - 0.02)));
+    for (let x = -length / 2 + 0.6; x < length / 2; x += 1.8) group.add(box(0.12, BELT_TOP - 0.45, 0.6, frame, x, (BELT_TOP - 0.45) / 2, 0));
+    const rework = spec.id === "rework";
+    const tex = chevronTexture(rework ? "#7a5560" : "#5b616e", rework ? "#f2a3a3" : "#9aa3b2");
+    tex.repeat.set(length / 1.1, 1);
+    const surface = new THREE.Mesh(new THREE.PlaneGeometry(length, BELT_WIDTH - 0.2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+    surface.rotation.x = -Math.PI / 2;
+    surface.position.y = BELT_TOP + 0.01;
+    surface.receiveShadow = true;
+    group.add(surface);
+    // 两端的装卸门框
+    for (const x of [-length / 2 + 0.6, length / 2 - 0.6]) {
+      for (const side of [-1, 1]) group.add(box(0.12, 2.0, 0.12, mat("#6b7280"), x, 1.0, side * (BELT_WIDTH / 2 + 0.12)));
+      group.add(box(0.14, 0.18, BELT_WIDTH + 0.4, mat("#f0b429"), x, 2.0, 0));
+    }
+    scene.add(group);
+
+    const tag = label(`<i></i>${esc(spec.label)}`, "label lane-tag");
+    tag.body.style.setProperty("--c", spec.to === "vault" ? STAGE_COLORS["已合并"] : AGENT_COLORS[spec.from]);
+    tag.position.copy(mid).setY(BELT_TOP + 0.55);
+    scene.add(tag);
+
+    const packets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.26, 0.34), mat(AGENT_COLORS[spec.from] ?? "#9ca3af"), 4);
+    packets.castShadow = true;
+    packets.count = 0;
+    scene.add(packets);
+    return { ...spec, d, inA, inB, tex, tag, packets, energy: 0, transit: 0 };
+  });
+}
+
+/** 在车道图上找从一个节点到另一个节点的车道序列（广度优先） */
+export function route(from, to) {
+  if (from === to) return [];
+  const queue = [[from, []]];
+  const seen = new Set([from]);
+  while (queue.length) {
+    const [node, path] = queue.shift();
+    for (const lane of LANES) {
+      if (lane.from !== node || seen.has(lane.to)) continue;
+      const next = [...path, lane.id];
+      if (lane.to === to) return next;
+      seen.add(lane.to);
+      queue.push([lane.to, next]);
+    }
+  }
+  return null;
+}
+
+/** 卡片换仓库时的路径点：先升到带面，沿各段车道运输，最后落到目标位置 */
+export function travelPath(lanes, from, to, slot) {
+  const ids = route(from, to);
+  if (!ids) return { points: [slot.clone()], lanes: [] };
+  const points = [];
+  for (const id of ids) {
+    const lane = lanes.find(l => l.id === id);
+    points.push(lane.inA.clone(), lane.inB.clone());
+  }
+  points.push(slot.clone());
+  return { points, lanes: ids };
+}
+
+/** 各车道当前的“流量”：决定数据包数量和带速 */
+export function laneEnergy(lane, data) {
+  const has = new Set(data.tasks.flatMap(t => [t.stage, `${t.agent}:${t.stage}`]));
+  const running = id => data.agents[id]?.state === "running";
+  switch (lane.id) {
+    case "brief": return running("claude") ? 2 : has.has("待开始") ? 1 : 0;
+    case "report": return running("codex") ? 3 : has.has("codex:待评审") ? 1 : 0;
+    case "rework": return has.has("codex:需修改") ? 2 : 0;
+    case "verdict": return running("gemini") ? 3 : has.has("已通过") ? 1 : 0;
+    case "submit": return running("claude") && has.has("claude:执行中") ? 2 : has.has("claude:待评审") ? 1 : 0;
+    case "merge": return has.has("已通过") ? 1 : 0;
+    default: return 0;
+  }
+}
+
+const UP = new THREE.Vector3(0, 1, 0);
+
+export function tickLanes(lanes, t, dt) {
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3(1, 1, 1);
+  const p = new THREE.Vector3();
+  for (const lane of lanes) {
+    const active = lane.energy > 0 || lane.transit > 0;
+    const speed = lane.transit > 0 ? 0.9 : lane.energy > 1 ? 0.55 : active ? 0.25 : 0.04;
+    lane.tex.offset.x -= dt * speed;
+    lane.tag.body.classList.toggle("hot", active);
+    // 数据包沿车道循环流动
+    lane.packets.count = lane.energy;
+    q.setFromAxisAngle(UP, -Math.atan2(lane.d.z, lane.d.x));
+    for (let i = 0; i < lane.energy; i++) {
+      const u = (t * 0.12 * (1 + lane.energy * 0.3) + i / lane.energy) % 1;
+      p.lerpVectors(lane.inA, lane.inB, u).setY(BELT_TOP + 0.14);
+      lane.packets.setMatrixAt(i, m.compose(p, q, s));
+    }
+    lane.packets.instanceMatrix.needsUpdate = true;
+  }
+}
+
+// ------------------------------------------------------------------ 任务卡片
+
+// 卡面用阶段色做底、白字，缩小后也能一眼看出阶段
 export function cardTexture(task) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 300;
   const ctx = canvas.getContext("2d");
   const color = STAGE_COLORS[task.stage];
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, 512, 300);
   ctx.fillStyle = color;
-  ctx.fillRect(0, 0, 512, 22);
-  ctx.strokeStyle = "#e5e7eb";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(3, 3, 506, 294);
+  ctx.fillRect(0, 0, 512, 300);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+  ctx.fillRect(0, 210, 512, 90);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, 504, 292);
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(458, 74, 28, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = AGENT_COLORS[task.agent] ?? "#999";
   ctx.beginPath();
-  ctx.arc(462, 78, 20, 0, Math.PI * 2);
+  ctx.arc(458, 74, 19, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "700 76px 'JetBrains Mono', monospace";
-  ctx.fillText(task.id, 32, 108);
-  ctx.font = "500 38px 'Noto Sans SC', sans-serif";
-  ctx.fillStyle = "#374151";
-  const title = task.title.length > 12 ? `${task.title.slice(0, 12)}…` : task.title;
-  ctx.fillText(title, 32, 182);
-  ctx.fillStyle = color;
-  ctx.font = "700 34px 'Noto Sans SC', sans-serif";
-  ctx.fillText(task.stage, 32, 258);
-  ctx.fillStyle = "#9ca3af";
-  ctx.font = "400 26px 'JetBrains Mono', monospace";
-  const branch = task.branch ?? "—";
-  ctx.fillText(branch.length > 18 ? `${branch.slice(0, 18)}…` : branch, 190, 258);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 96px 'JetBrains Mono', monospace";
+  ctx.fillText(task.id, 28, 116);
+  ctx.font = "500 40px 'Noto Sans SC', sans-serif";
+  ctx.fillText(task.title.length > 11 ? `${task.title.slice(0, 11)}…` : task.title, 30, 186);
+  ctx.font = "700 36px 'Noto Sans SC', sans-serif";
+  ctx.fillText(task.stage, 30, 268);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   return tex;
 }
 
-// ------------------------------------------------------------------ 传送带
-
-export function buildBelt(scene, pickables) {
-  const frame = mat("#9aa1ad");
-  const length = MAIN_STAGES.length * SEG + 1.2;
-  scene.add(box(length, 0.7, BELT_DEPTH, frame, 0, 0.45, BELT_Z));
-  const tex = stripeTexture();
-  tex.repeat.set(length / 1.2, 1);
-  const surface = new THREE.Mesh(new THREE.PlaneGeometry(length, BELT_DEPTH - 0.3), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
-  surface.rotation.x = -Math.PI / 2;
-  surface.position.set(0, BELT_TOP - 0.09, BELT_Z);
-  surface.receiveShadow = true;
-  scene.add(surface);
-  for (const dz of [-1, 1]) scene.add(box(length, 0.2, 0.16, mat("#c4c9d2"), 0, BELT_TOP, BELT_Z + dz * (BELT_DEPTH / 2 - 0.05)));
-  for (let x = -length / 2 + 1; x < length / 2; x += 2.4) {
-    for (const dz of [-1, 1]) scene.add(box(0.16, 0.5, 0.16, frame, x, 0.25, BELT_Z + dz * (BELT_DEPTH / 2 - 0.25)));
-  }
-
-  const gates = {};
-  for (const stage of MAIN_STAGES) {
-    const x = stageX(stage);
-    const color = new THREE.Color(STAGE_COLORS[stage]);
-    const strip = box(SEG - 0.25, 0.5, 0.08, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.1, roughness: 0.6 }),
-      x, 0.5, BELT_Z + BELT_DEPTH / 2 + 0.05);
-    scene.add(strip);
-    const pad = new THREE.Mesh(new THREE.PlaneGeometry(SEG - 0.3, 1.1), new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.18 }));
-    pad.rotation.x = -Math.PI / 2;
-    pad.position.set(x, 0.02, BELT_Z + BELT_DEPTH / 2 + 0.75);
-    scene.add(pad);
-    const tag = label(`<i></i><b>${stage}</b><span class="count">0</span>`, "label gate-label");
-    tag.body.style.setProperty("--c", STAGE_COLORS[stage]);
-    tag.position.set(x, 0.15, BELT_Z + BELT_DEPTH / 2 + 0.85);
-    scene.add(tag);
-    for (const m of [strip, pad]) {
-      m.userData = { kind: "stage", id: stage };
-      pickables.push(m);
-    }
-    gates[stage] = { strip, pad, tag, pulse: 0 };
-  }
-
-  // “需修改”回流带：在主传送带和工位之间，方向从评审段指回 Codex
-  const laneLen = LANE.from - LANE.to + 1.6;
-  const laneX = (LANE.from + LANE.to) / 2;
-  const red = new THREE.Color(STAGE_COLORS["需修改"]);
-  scene.add(box(laneLen, 0.3, 1.3, mat("#b8bec8"), laneX, 0.2, LANE.z));
-  const laneTex = stripeTexture("#f3d0d0", "#ef9a9a");
-  laneTex.repeat.set(laneLen / 1.2, 1);
-  const lane = new THREE.Mesh(new THREE.PlaneGeometry(laneLen, 1.1), new THREE.MeshStandardMaterial({ map: laneTex, roughness: 0.8 }));
-  lane.rotation.x = -Math.PI / 2;
-  lane.position.set(laneX, LANE.top - 0.08, LANE.z);
-  lane.receiveShadow = true;
-  scene.add(lane);
-  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 3), new THREE.MeshStandardMaterial({ color: red, emissive: red, emissiveIntensity: 0.2, flatShading: true }));
-  arrow.rotation.z = Math.PI / 2;
-  arrow.position.set(LANE.to - 1.3, 0.45, LANE.z);
-  scene.add(arrow);
-  const laneTag = label(`<i></i><b>需修改</b><span class="count">0</span><span class="muted">退回 Codex</span>`, "label gate-label");
-  laneTag.body.style.setProperty("--c", STAGE_COLORS["需修改"]);
-  laneTag.position.set(laneX, 0.1, LANE.z - 0.95);
-  scene.add(laneTag);
-  lane.userData = { kind: "stage", id: "需修改" };
-  pickables.push(lane);
-  gates["需修改"] = { strip: arrow, pad: lane, tag: laneTag, pulse: 0 };
-
-  return { gates, textures: [tex, laneTex] };
-}
-
-// 每个阶段两列排开，后排逐级抬高，像阶梯看台一样不互相遮挡
-export function slotPosition(stage, index, total) {
-  if (stage === "需修改") {
-    const step = Math.min(1.7, (LANE.from - LANE.to) / Math.max(1, total - 1));
-    return new THREE.Vector3(LANE.from - index * step, LANE.top + 0.6, LANE.z);
-  }
-  const cols = total > 1 ? 2 : 1;
-  const col = index % cols;
-  const row = Math.floor(index / cols);
-  const x = stageX(stage) + (cols === 2 ? (col - 0.5) * 1.72 : 0);
-  return new THREE.Vector3(x, BELT_TOP + 0.6 + row * 0.5, BELT_Z + 0.75 - row * 0.62);
-}
-
 export function createCard(scene, task, slot, pickables) {
   const group = new THREE.Group();
   const side = mat("#e5e7eb");
   const face = new THREE.MeshBasicMaterial({ map: cardTexture(task) });
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.05, 0.06), [side, side, side, side, face, side]);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.76, 0.05), [side, side, side, side, face, side]);
   mesh.castShadow = true;
   group.add(mesh);
   const edge = new THREE.LineSegments(
     new THREE.EdgesGeometry(mesh.geometry),
-    new THREE.LineBasicMaterial({ color: STAGE_COLORS[task.stage], transparent: true, opacity: 0.6 })
+    new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0 })
   );
-  edge.scale.setScalar(1.04);
+  edge.scale.setScalar(1.05);
   group.add(edge);
-  // 底座：卡片立在传送带上
-  group.add(box(0.5, 0.06, 0.3, mat("#d1d5db"), 0, -0.56, 0));
   mesh.userData = { kind: "task", id: task.id };
   pickables.push(mesh);
   group.position.copy(slot);
   scene.add(group);
-  return { group, mesh, edge, stage: task.stage, task, target: slot.clone(), bob: Math.random() * 6, link: null };
+  return { group, mesh, edge, stage: task.stage, task, target: slot.clone(), path: [], pathLanes: [], bob: Math.random() * 6 };
 }
 
 export function refreshCard(card, task) {
@@ -173,7 +239,6 @@ export function refreshCard(card, task) {
   face.map?.dispose();
   face.map = cardTexture(task);
   face.needsUpdate = true;
-  card.edge.material.color.set(STAGE_COLORS[task.stage]);
 }
 
 export function disposeCard(scene, card, pickables) {
@@ -183,41 +248,28 @@ export function disposeCard(scene, card, pickables) {
     o.geometry?.dispose();
     for (const m of [o.material].flat()) m?.dispose();
   });
-  if (card.link) {
-    scene.remove(card.link);
-    card.link.geometry.dispose();
-    card.link.material.dispose();
-  }
   const i = pickables.indexOf(card.mesh);
   if (i >= 0) pickables.splice(i, 1);
 }
 
-// 被处理中的卡片到工位的虚线
-export function linkLine(from, to, color) {
-  const mid = from.clone().add(to).multiplyScalar(0.5);
-  mid.y += 2.2;
-  const points = new THREE.QuadraticBezierCurve3(from, mid, to).getPoints(40);
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(points),
-    new THREE.LineDashedMaterial({ color, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.8 })
-  );
-  line.computeLineDistances();
-  return line;
+/** 已合并的任务码放在归档库前的托盘上 */
+export function vaultSlot(index) {
+  const col = index % 3;
+  const row = Math.floor(index / 3);
+  return PALLET.clone().add(new THREE.Vector3((col - 1) * 1.32, 0.66 + row * 0.8, 0));
 }
 
-// ------------------------------------------------------------------ main 归档柜
+// ------------------------------------------------------------------ main 归档库
 
-export function buildCabinet(scene, pickables) {
+export function buildVault(scene, pickables) {
   const group = new THREE.Group();
-  group.position.copy(CABINET);
-  const body = box(2.4, 4, 2, mat("#dfe3e8"), 0, 2, 0);
+  group.position.copy(VAULT);
+  const body = box(2.4, 3.4, 2, mat("#dfe3e8"), 0, 1.7, 0);
   group.add(body);
-  group.add(box(2.6, 0.12, 2.2, mat("#c2c8d0"), 0, 4.06, 0));
-  // 入口滑槽：传送带末端进入归档柜
-  group.add(box(1.0, 0.1, 2.0, mat("#9aa1ad"), -1.6, 0.95, 0));
+  group.add(box(2.6, 0.12, 2.2, mat("#6cbf4a"), 0, 3.46, 0));
   const drawers = [];
   for (let i = 0; i < DRAWERS; i++) {
-    const drawer = box(2.0, 0.38, 0.3, mat("#f3f4f6"), 0, 3.7 - i * 0.45, 1.05);
+    const drawer = box(2.0, 0.32, 0.3, mat("#f3f4f6"), 0, 3.12 - i * 0.39, 1.05);
     const handle = box(0.5, 0.06, 0.08, mat("#9ca3af"), 0, 0, 0.18);
     drawer.add(handle);
     drawer.userData = { kind: "trunk" };
@@ -227,59 +279,60 @@ export function buildCabinet(scene, pickables) {
   }
   body.userData = { kind: "trunk" };
   pickables.push(body);
-  const tag = label("", "label trunk-label");
-  tag.position.set(0, 4.6, 0.6);
-  group.add(tag);
   scene.add(group);
+  scene.add(box(4.2, 0.16, 1.2, mat("#c8a27a"), PALLET.x, 0.18, PALLET.z));
+  const tag = label("", "label trunk-label");
+  tag.position.set(VAULT.x, 4.25, VAULT.z);
+  scene.add(tag);
   return { group, drawers, tag, known: null, confetti: [] };
 }
 
-export function updateCabinet(scene, cab, git) {
+export function updateVault(scene, vault, git) {
   const main = git.branches.find(b => b.name === "main");
   const ahead = git.branches.filter(b => b.name !== "main" && b.ahead > 0);
-  cab.tag.body.innerHTML = `
+  vault.tag.body.innerHTML = `
     <div class="trunk-title">main <code>${esc(main?.sha ?? "")}</code></div>
     <div class="trunk-sub">${esc(main?.subject ?? "")}</div>
     <div class="trunk-sub">${ahead.length} 个分支领先 · 检出 <code>${esc(git.current)}</code></div>`;
   const commits = git.commits.slice(0, DRAWERS);
   commits.forEach((c, i) => {
-    const d = cab.drawers[i];
+    const d = vault.drawers[i];
     const color = new THREE.Color(AGENT_COLORS[c.author] ?? "#c9d3e6");
     d.mesh.material.color.copy(color).lerp(new THREE.Color("#ffffff"), 0.55);
     d.handle.material.color.copy(color);
-    if (cab.known && !cab.known.has(c.sha)) {
+    if (vault.known && !vault.known.has(c.sha)) {
       d.pop = 1;
-      confetti(scene, cab, AGENT_COLORS[c.author] ?? "#9ca3af");
+      confetti(scene, vault, AGENT_COLORS[c.author] ?? "#9ca3af");
     }
   });
-  cab.known = new Set(commits.map(c => c.sha));
+  vault.known = new Set(commits.map(c => c.sha));
 }
 
 const CONFETTI_GEOMETRY = new THREE.PlaneGeometry(0.16, 0.1);
 
-function confetti(scene, cab, color) {
+function confetti(scene, vault, color) {
   const palette = [color, "#f0a92e", "#2fb383", "#3b7ddd", "#e07a3f"];
   const pieces = Array.from({ length: 36 }, (_, i) => {
     const piece = new THREE.Mesh(
       CONFETTI_GEOMETRY,
       new THREE.MeshBasicMaterial({ color: palette[i % palette.length], side: THREE.DoubleSide, transparent: true })
     );
-    piece.position.set(cab.group.position.x, 4.4, cab.group.position.z);
+    piece.position.set(VAULT.x, 3.8, VAULT.z);
     piece.userData.vel = new THREE.Vector3((Math.random() - 0.5) * 4, 3 + Math.random() * 3, (Math.random() - 0.5) * 4);
     piece.userData.spin = new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8);
     scene.add(piece);
     return piece;
   });
-  cab.confetti.push({ pieces, life: 0 });
+  vault.confetti.push({ pieces, life: 0 });
 }
 
-export function tickCabinet(scene, cab, dt, t, selected) {
-  for (const d of cab.drawers) {
+export function tickVault(scene, vault, dt, selected) {
+  for (const d of vault.drawers) {
     d.pop = Math.max(0, d.pop - dt * 0.5);
     d.mesh.position.z = d.base + Math.sin(d.pop * Math.PI) * 0.6;
   }
-  cab.tag.body.classList.toggle("selected", selected);
-  cab.confetti = cab.confetti.filter(burst => {
+  vault.tag.body.classList.toggle("selected", selected);
+  vault.confetti = vault.confetti.filter(burst => {
     burst.life += dt;
     for (const p of burst.pieces) {
       p.userData.vel.y -= dt * 6;

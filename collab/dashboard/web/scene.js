@@ -1,25 +1,28 @@
-// 代理办公室场景：渲染器、相机、灯光、拾取与动画循环。房间与工位见 office.js，传送带与归档柜见 belt.js。
+// 代理仓库场景：渲染器、相机、灯光、拾取与动画循环。仓库见 warehouse.js，传送带与归档库见 belt.js。
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
-import { AGENT_COLORS, STAGE_COLORS, ownerOf } from "./theme.js";
-import { DESKS, buildDesk, buildRoom, drawWhiteboard, tickDesk, updateDesk } from "./office.js";
+import { AGENT_COLORS, ownerOf } from "./theme.js";
+import { WAREHOUSES, buildWarehouse, buildYard, locationOf, slotIn, tickWarehouse, updateWarehouse } from "./warehouse.js";
 import {
-  buildBelt,
-  buildCabinet,
+  buildLanes,
+  buildVault,
   createCard,
   disposeCard,
-  linkLine,
+  laneEnergy,
   refreshCard,
-  slotPosition,
-  tickCabinet,
-  updateCabinet
+  tickLanes,
+  tickVault,
+  travelPath,
+  updateVault,
+  vaultSlot
 } from "./belt.js";
 
-// 默认视角：斜前方俯视；距离按可见区域宽度自动计算，让整间办公室（约 32 个单位宽）放得下
-const HOME = { direction: new THREE.Vector3(7, 22, 27).normalize(), target: new THREE.Vector3(1.4, 0.5, 0.8) };
-const FIT_WIDTH = 37;
-const FIT_HEIGHT = 17;
+// 默认视角：斜前方俯视；距离按可见区域自动计算，让三座仓库都放得下
+const HOME = { direction: new THREE.Vector3(3, 24, 21).normalize(), target: new THREE.Vector3(0, 0.8, -1.8) };
+const FIT_WIDTH = 34;
+const FIT_HEIGHT = 19;
+const TRAVEL_SPEED = 5;
 
 export class AgentScene {
   constructor(container, { onSelect, onHover }) {
@@ -31,16 +34,12 @@ export class AgentScene {
     this.cards = new Map();
     this.selected = null;
     this.data = null;
-    this.busy = false;
 
     this.#setup();
-    const room = buildRoom(this.scene);
-    this.board = room.board;
-    this.desks = Object.fromEntries(Object.keys(DESKS).map(id => [id, buildDesk(this.scene, id, this.pickables)]));
-    const belt = buildBelt(this.scene, this.pickables);
-    this.gates = belt.gates;
-    this.beltTextures = belt.textures;
-    this.cabinet = buildCabinet(this.scene, this.pickables);
+    buildYard(this.scene);
+    this.warehouses = Object.fromEntries(Object.keys(WAREHOUSES).map(id => [id, buildWarehouse(this.scene, id, this.pickables)]));
+    this.lanes = buildLanes(this.scene);
+    this.vault = buildVault(this.scene, this.pickables);
     this.#bindPointer();
     window.addEventListener("resize", () => this.resize());
     this.resize();
@@ -86,10 +85,10 @@ export class AgentScene {
     sun.position.set(12, 26, 16);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -22;
-    sun.shadow.camera.right = 22;
-    sun.shadow.camera.top = 16;
-    sun.shadow.camera.bottom = -16;
+    sun.shadow.camera.left = -24;
+    sun.shadow.camera.right = 24;
+    sun.shadow.camera.top = 20;
+    sun.shadow.camera.bottom = -20;
     sun.shadow.bias = -0.0005;
     sun.shadow.radius = 4;
     scene.add(sun);
@@ -102,72 +101,80 @@ export class AgentScene {
 
   update(data) {
     this.data = data;
-    for (const [id, view] of Object.entries(this.desks)) if (data.agents[id]) updateDesk(view, data.agents[id]);
+    const counts = {};
+    for (const t of data.tasks) {
+      const loc = locationOf(t, ownerOf(t));
+      ((counts[loc] ??= {})[t.stage] = (counts[loc]?.[t.stage] ?? 0) + 1);
+    }
+    for (const [id, view] of Object.entries(this.warehouses)) {
+      if (data.agents[id]) updateWarehouse(view, data.agents[id], counts[id] ?? {});
+    }
     this.#updateTasks(data);
-    updateCabinet(this.scene, this.cabinet, data.git);
-    drawWhiteboard(this.board, data);
-    this.busy =
-      Object.values(data.agents).some(a => a.state === "running") ||
-      data.tasks.some(t => t.stage === "执行中" || t.stage === "评审中");
+    for (const lane of this.lanes) lane.energy = laneEnergy(lane, data);
+    updateVault(this.scene, this.vault, data.git);
   }
 
   #updateTasks(data) {
-    const byStage = {};
-    for (const t of data.tasks) (byStage[t.stage] ??= []).push(t);
-    for (const [stage, gate] of Object.entries(this.gates)) {
-      const count = byStage[stage]?.length ?? 0;
-      gate.tag.body.querySelector(".count").textContent = count;
-      gate.tag.body.classList.toggle("empty", count === 0);
+    // 按“所在仓库 + 阶段”分组，组内依次排到货架、工作台或托盘上
+    const groups = {};
+    for (const t of data.tasks) {
+      const loc = locationOf(t, ownerOf(t));
+      (groups[loc === "vault" ? "vault" : `${loc}|${t.stage}`] ??= []).push(t);
     }
     const seen = new Set();
-    for (const [stage, list] of Object.entries(byStage)) {
+    for (const [key, list] of Object.entries(groups)) {
       list.forEach((task, i) => {
         seen.add(task.id);
-        const slot = slotPosition(stage, i, list.length);
+        const loc = key === "vault" ? "vault" : key.split("|")[0];
+        const slot = loc === "vault" ? vaultSlot(i) : slotIn(loc, task.stage, i);
         let card = this.cards.get(task.id);
         if (!card) {
           card = createCard(this.scene, task, slot, this.pickables);
+          card.loc = loc;
           this.cards.set(task.id, card);
-        } else if (card.stage !== task.stage || card.task.branch !== task.branch) {
-          if (card.stage !== task.stage && this.gates[task.stage]) this.gates[task.stage].pulse = 1;
+        }
+        if (card.stage !== task.stage || card.task.branch !== task.branch) {
           card.stage = task.stage;
           refreshCard(card, task);
+          const zone = this.warehouses[loc]?.zones[task.stage];
+          if (zone) zone.pulse = 1;
         }
         card.task = task;
+        if (card.loc !== loc) {
+          // 换仓库：沿传送带运过去
+          const trip = travelPath(this.lanes, card.loc, loc, slot);
+          this.#endTrip(card);
+          card.path = trip.points;
+          card.pathLanes = trip.lanes;
+          for (const id of trip.lanes) this.lanes.find(l => l.id === id).transit += 1;
+          card.loc = loc;
+        } else if (card.path.length) {
+          card.path[card.path.length - 1] = slot.clone();
+        }
         card.target = slot;
-        this.#updateLink(card, data);
+        const agent = data.agents[ownerOf(task)];
+        card.active =
+          agent?.state === "running" &&
+          loc !== "vault" &&
+          (agent.task === task.id || (ownerOf(task) === "gemini" && task.stage === "评审中"));
       });
     }
     for (const [id, card] of this.cards) {
       if (!seen.has(id)) {
+        this.#endTrip(card);
         disposeCard(this.scene, card, this.pickables);
         this.cards.delete(id);
       }
     }
   }
 
-  // 代理正在处理这张卡片时，画一条到工位的虚线
-  #updateLink(card, data) {
-    const owner = ownerOf(card.task);
-    const agent = data.agents[owner];
-    const active =
-      agent?.state === "running" &&
-      card.task.stage !== "已合并" &&
-      (agent.task === card.task.id || (owner === "gemini" && card.task.stage === "评审中"));
-    card.active = Boolean(active);
-    const key = active ? `${owner}|${card.target.toArray().join(",")}` : "";
-    if (card.linkKey === key) return;
-    card.linkKey = key;
-    if (card.link) {
-      this.scene.remove(card.link);
-      card.link.geometry.dispose();
-      card.link.material.dispose();
-      card.link = null;
+  #endTrip(card) {
+    for (const id of card.pathLanes ?? []) {
+      const lane = this.lanes.find(l => l.id === id);
+      lane.transit = Math.max(0, lane.transit - 1);
     }
-    if (!active) return;
-    const desk = DESKS[owner].clone().setY(2.6).add(new THREE.Vector3(0, 0, 1.3));
-    card.link = linkLine(desk, card.target.clone().setY(card.target.y + 0.5), AGENT_COLORS[owner]);
-    this.scene.add(card.link);
+    card.pathLanes = [];
+    card.path = [];
   }
 
   // ------------------------------------------------------------ 交互
@@ -242,7 +249,7 @@ export class AgentScene {
     this.camera.setViewOffset(w, h, offsetX, offsetY, w, h);
     this.camera.updateProjectionMatrix();
     this.visible = { wFrac: (w - left - right) / w, hFrac: (bottom - top) / h };
-    // 可见区域窄时同步缩小场景标签，避免标签盖住整个办公室
+    // 可见区域窄时同步缩小场景标签，避免标签盖住仓库
     const zoom = Math.min(1, Math.max(0.62, Math.min((w - left - right) / 1000, (bottom - top) / 520)));
     this.labels.domElement.style.setProperty("--label-zoom", String(zoom));
     if (!this.userMoved) this.#fit();
@@ -257,38 +264,42 @@ export class AgentScene {
     const t = this.clock.elapsedTime;
     const sel = this.selected;
 
-    for (const view of Object.values(this.desks)) tickDesk(view, t, sel?.kind === "agent" ? sel.id : null);
-
-    // 传送带滚动：有任务在处理时转得快一些
-    const speed = this.busy ? 0.35 : 0.06;
-    this.beltTextures[0].offset.x -= dt * speed;
-    this.beltTextures[1].offset.x += dt * speed;
+    for (const view of Object.values(this.warehouses)) tickWarehouse(view, t, dt, sel);
+    tickLanes(this.lanes, t, dt);
 
     for (const card of this.cards.values()) {
       const g = card.group;
-      // 与帧率无关的阻尼，后台节流或低帧率时滑动速度一致
-      g.position.lerp(card.target, 1 - Math.exp(-3.6 * dt));
-      g.position.y += Math.sin(t * 1.4 + card.bob) * 0.004;
+      if (card.path.length) {
+        // 沿路径点匀速运输：上带 → 各段车道 → 落到目标位置
+        let step = TRAVEL_SPEED * dt;
+        while (step > 0 && card.path.length) {
+          const next = card.path[0];
+          const dist = g.position.distanceTo(next);
+          if (dist <= step) {
+            g.position.copy(next);
+            card.path.shift();
+            step -= dist;
+          } else {
+            g.position.addScaledVector(next.clone().sub(g.position).normalize(), step);
+            step = 0;
+          }
+        }
+        if (!card.path.length) this.#endTrip(card);
+      } else {
+        // 同一仓库内换位置：与帧率无关的阻尼
+        g.position.lerp(card.target, 1 - Math.exp(-3.6 * dt));
+      }
       // 卡片始终朝向镜头（只绕竖轴转）
       g.rotation.y = Math.atan2(this.camera.position.x - g.position.x, this.camera.position.z - g.position.z);
       const isSel = sel?.kind === "task" && sel.id === card.task.id;
       const pulse = 0.5 + 0.5 * Math.sin(t * 4);
-      card.edge.material.color.set(isSel ? "#1f2937" : card.active ? AGENT_COLORS[ownerOf(card.task)] : STAGE_COLORS[card.task.stage]);
-      card.edge.material.opacity = isSel ? 1 : card.active ? 0.5 + pulse * 0.5 : 0.6;
-      g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, isSel ? 1.25 : card.active ? 1.06 + pulse * 0.04 : 1, 0.12));
-      if (card.link) card.link.material.opacity = 0.45 + pulse * 0.45;
+      // 卡面已是阶段色：描边只用于选中（深色）和处理中（代理色呼吸）
+      card.edge.material.color.set(isSel ? "#1f2937" : AGENT_COLORS[ownerOf(card.task)]);
+      card.edge.material.opacity = isSel ? 1 : card.active ? 0.4 + pulse * 0.6 : 0;
+      g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, isSel ? 1.3 : card.active ? 1.08 + pulse * 0.05 : 1, 0.12));
     }
 
-    for (const [stage, gate] of Object.entries(this.gates)) {
-      gate.pulse = Math.max(0, gate.pulse - dt * 0.7);
-      const isSel = sel?.kind === "stage" && sel.id === stage;
-      if (gate.strip.material.emissiveIntensity !== undefined) {
-        gate.strip.material.emissiveIntensity = 0.1 + gate.pulse * 0.9 + (isSel ? 0.35 : 0);
-      }
-      gate.tag.body.classList.toggle("selected", isSel);
-    }
-
-    tickCabinet(this.scene, this.cabinet, dt, t, sel?.kind === "trunk");
+    tickVault(this.scene, this.vault, dt, sel?.kind === "trunk");
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);

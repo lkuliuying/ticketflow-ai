@@ -315,6 +315,12 @@ body.collapsed-bottom .legend, body.collapsed-bottom .events { display: none; }
 }
 .trunk-title { font-weight: 700; color: #3f8f2a; font-size: 13px; }
 .trunk-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-tag {
+  font-size: 11px; padding: 2px 9px; border-radius: 6px; color: var(--muted); background: rgba(255, 255, 255, 0.85);
+  border: 1px dashed color-mix(in srgb, var(--c) 50%, transparent); display: flex; gap: 5px; align-items: center; white-space: nowrap;
+}
+.lane-tag i { width: 7px; height: 7px; border-radius: 2px; background: var(--c); }
+.lane-tag.hot { color: #1f2937; border-style: solid; border-color: var(--c); box-shadow: 0 2px 8px color-mix(in srgb, var(--c) 30%, transparent); }
 .trunk-label.selected { box-shadow: 0 0 0 2px #6cbf4a, 0 4px 14px rgba(31, 41, 55, 0.1); }
 
 .tooltip {
