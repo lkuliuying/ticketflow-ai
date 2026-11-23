@@ -39,8 +39,6 @@ git -C F:\Program\ticketflow-ai worktree add ..\ticketflow-ai-be -b be/contract-
 
 - 全局 pnpm 是 10.32，前端要求 pnpm 11：前端命令用 `npx -y pnpm@11 <命令>`，不要升级全局版本。
 - Git Bash 里没有 `docker`，后端测试栈在 WSL2 或 Docker Desktop 下运行。
-- 前端 `check:hook-length` 目前因上游文件 `src/views/system/notice/components/markdown/useMarkdownUpload.ts`
-  失败，与二开无关，暂不处理。
 
 ## 交接流程
 
