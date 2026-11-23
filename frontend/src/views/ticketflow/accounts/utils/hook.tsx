@@ -1,7 +1,6 @@
 import { reactive, shallowRef, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePageAuth } from "@/router/utils";
-import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import type { OperationProps } from "@/components/RePlusPage";
 import { accountApi, type BusinessAccount } from "@/api/ticketflow/accounts";
 import {
@@ -11,6 +10,7 @@ import {
 } from "./accountDialogs";
 import { useAccountOptions } from "./accountOptions";
 import { useAccountColumns } from "./accountColumns";
+import { rowButton } from "./accountButtons";
 import EditPen from "~icons/ep/edit-pen";
 import Key from "~icons/ep/key";
 import SwitchButton from "~icons/ep/switch-button";
@@ -35,37 +35,24 @@ export function useAccounts(tableRef: PageRef) {
     batchDestroy: false
   });
 
-  const { groups, passwordRules } = useAccountOptions();
+  const { groups, passwordRules, loadOptions } = useAccountOptions();
   const reload = () => tableRef.value?.handleGetData?.();
-  const openForm = (initial?: BusinessAccount) =>
+  /** 打开前重新拉取技能组与密码规则：页面被缓存或刚打开时都拿到最新选项 */
+  const openForm = async (initial?: BusinessAccount) => {
+    await loadOptions();
     openAccountForm({
       initial,
       groups: groups.value,
       passwordRules: passwordRules.value,
       onSaved: reload
     });
-
-  const rowButton = (
-    code: string,
-    type: "primary" | "warning" | "danger",
-    icon: typeof EditPen,
-    tip: string,
-    index: number,
-    show: boolean,
-    onClick: (row: BusinessAccount) => unknown
-  ) => ({
-    code,
-    props: { type, icon: useRenderIcon(icon), link: true },
-    tooltip: { content: t(tip) },
-    onClick: ({ row }: { row: unknown }) => onClick(row as BusinessAccount),
-    index,
-    show
-  });
+  };
 
   const operationButtonsProps = shallowRef<OperationProps>({
     hideEdit: true,
     buttons: [
       rowButton(
+        t,
         "editAccount",
         "primary",
         EditPen,
@@ -75,15 +62,20 @@ export function useAccounts(tableRef: PageRef) {
         openForm
       ),
       rowButton(
+        t,
         "resetPassword",
         "warning",
         Key,
         "ticketflow.account.resetPassword",
         -9,
         Boolean(auth.resetPassword),
-        row => openResetPassword(row, passwordRules.value)
+        async row => {
+          await loadOptions();
+          openResetPassword(row, passwordRules.value);
+        }
       ),
       rowButton(
+        t,
         "toggleActive",
         "danger",
         SwitchButton,

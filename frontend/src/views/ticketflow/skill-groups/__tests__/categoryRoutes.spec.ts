@@ -118,4 +118,25 @@ describe("CategoryRoutes", () => {
     expect(mocks.updateRoute).toHaveBeenCalledWith("NETWORK", null);
     expect(route.skill_group).toBeNull();
   });
+
+  it("同一分类保存中再次修改被忽略，不会并发提交", async () => {
+    let resolve: (value: unknown) => void = () => undefined;
+    mocks.updateRoute.mockReturnValueOnce(new Promise(r => (resolve = r)));
+    const wrapper = await mountRoutes();
+    const route = {
+      category: "NETWORK",
+      label: "网络",
+      skill_group: null,
+      skill_group_name: null
+    };
+    const first = wrapper.vm.change(route, "g1");
+    await wrapper.vm.change(route, "g2");
+    expect(mocks.updateRoute).toHaveBeenCalledTimes(1);
+    resolve({
+      code: 1000,
+      data: { ...route, skill_group: "g1", skill_group_name: "工单支持组" }
+    });
+    await first;
+    expect(route.skill_group).toBe("g1");
+  });
 });

@@ -58,17 +58,17 @@ export function openAccountForm(options: {
         closeLoading();
         return;
       }
-      if (payload.password && payload.username) {
-        payload.password = await AesEncrypted(
-          payload.username,
-          payload.password
-        );
-      }
-      const res = await (
-        editing
+      const res = await (async () => {
+        if (payload.password && payload.username) {
+          payload.password = await AesEncrypted(
+            payload.username,
+            payload.password
+          );
+        }
+        return editing
           ? accountApi.partialUpdate<BusinessAccount>(editing.pk, payload)
-          : accountApi.create<BusinessAccount>(payload)
-      ).catch(() => null);
+          : accountApi.create<BusinessAccount>(payload);
+      })().catch(() => null);
       closeLoading();
       if (res && isSuccess(res)) {
         message(t("ticketflow.account.saved"), { type: "success" });
@@ -103,10 +103,10 @@ export function openResetPassword(
         closeLoading();
         return;
       }
-      const res = await accountApi
-        .resetPassword(account.pk, {
-          password: await AesEncrypted(account.username, password)
-        })
+      const res = await AesEncrypted(account.username, password)
+        .then(encrypted =>
+          accountApi.resetPassword(account.pk, { password: encrypted })
+        )
         .catch(() => null);
       closeLoading();
       if (res && isSuccess(res)) {

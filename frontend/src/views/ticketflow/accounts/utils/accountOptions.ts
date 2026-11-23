@@ -18,7 +18,7 @@ export function useAccountOptions() {
     if (ruleRes && isSuccess(ruleRes))
       passwordRules.value = ruleRes.data?.password_rules ?? [];
   }
-  onMounted(loadOptions);
+  onMounted(() => void loadOptions());
 
   return { groups, passwordRules, loadOptions };
 }

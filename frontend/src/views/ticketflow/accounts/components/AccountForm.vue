@@ -30,6 +30,7 @@ const props = defineProps<{
 const { t } = useI18n();
 const formRef = ref<FormInstance>();
 const isCreate = computed(() => !props.initial);
+const USERNAME_PATTERN = /^[A-Za-z0-9_.@+-]{3,64}$/;
 const form = reactive({
   username: props.initial?.username ?? "",
   name: props.initial?.name ?? "",
@@ -63,8 +64,10 @@ const rules = computed<FormRules>(() => ({
           message: t("ticketflow.account.usernameRequired")
         },
         {
-          pattern: /^[A-Za-z0-9_.@+-]{3,64}$/,
-          message: t("ticketflow.account.usernameInvalid")
+          validator: (_rule, value: string, callback) =>
+            USERNAME_PATTERN.test(value)
+              ? callback()
+              : callback(new Error(t("ticketflow.account.usernameInvalid")))
         }
       ]
     : [],
@@ -110,7 +113,10 @@ function generatePassword() {
 async function getPayload(): Promise<AccountPayload | null> {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return null;
+  // 表单校验之外按同一口径兜底，保证提交数据始终满足后端约束
   if (form.role === "agent" && !form.skill_group) return null;
+  if (isCreate.value && !USERNAME_PATTERN.test(form.username.trim()))
+    return null;
   return {
     ...(isCreate.value
       ? { username: form.username.trim(), password: form.password }
@@ -123,7 +129,7 @@ async function getPayload(): Promise<AccountPayload | null> {
   };
 }
 
-defineExpose({ getPayload, form, generatePassword });
+defineExpose({ getPayload, form, generatePassword, groupOptions });
 </script>
 
 <template>
@@ -136,7 +142,7 @@ defineExpose({ getPayload, form, generatePassword });
   >
     <el-form-item :label="t('ticketflow.account.username')" prop="username">
       <el-input
-        v-model="form.username"
+        v-model.trim="form.username"
         :disabled="!isCreate"
         maxlength="64"
         autocomplete="off"
@@ -172,10 +178,10 @@ defineExpose({ getPayload, form, generatePassword });
       </el-select>
     </el-form-item>
     <el-form-item :label="t('ticketflow.account.phone')" prop="phone">
-      <el-input v-model="form.phone" maxlength="32" />
+      <el-input v-model.trim="form.phone" maxlength="32" />
     </el-form-item>
     <el-form-item :label="t('ticketflow.account.email')" prop="email">
-      <el-input v-model="form.email" maxlength="128" />
+      <el-input v-model.trim="form.email" maxlength="128" />
     </el-form-item>
     <el-form-item
       v-if="isCreate"

@@ -85,7 +85,7 @@ class SkillGroupApi extends BaseApi {
       "patch",
       {},
       { skill_group: skillGroup },
-      `${this.baseApi}/category-routes/${category}`
+      `${this.baseApi}/category-routes/${encodeURIComponent(category)}`
     );
   };
 }

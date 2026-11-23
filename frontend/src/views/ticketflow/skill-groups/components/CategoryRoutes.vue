@@ -20,7 +20,8 @@ const props = defineProps<{ groups: SkillGroup[]; canEdit: boolean }>();
 const { t, te } = useI18n();
 const routes = ref<CategoryRoute[]>([]);
 const loading = ref(false);
-const saving = ref<string | null>(null);
+/** 正在保存的分类；保存期间该分类下拉禁用，避免同一分类并发提交互相覆盖 */
+const saving = ref(new Set<string>());
 
 const activeGroups = computed(() => props.groups.filter(g => g.is_active));
 const defaultGroup = computed(() => props.groups.find(g => g.is_default));
@@ -33,13 +34,16 @@ async function load() {
 }
 
 async function change(route: CategoryRoute, value: string | null) {
+  if (saving.value.has(route.category)) return;
   const previous = route.skill_group;
   route.skill_group = value;
-  saving.value = route.category;
+  saving.value = new Set(saving.value).add(route.category);
   const res = await skillGroupApi
     .updateRoute(route.category, value)
     .catch(() => null);
-  saving.value = null;
+  const next = new Set(saving.value);
+  next.delete(route.category);
+  saving.value = next;
   if (res && isSuccess(res)) {
     Object.assign(route, res.data);
     message(t("ticketflow.skillGroup.routeSaved"), { type: "success" });
@@ -78,13 +82,15 @@ onMounted(load);
         class="flex items-center gap-3"
         :data-testid="`route-${route.category}`"
       >
-        <span class="w-16 shrink-0 text-sm">{{ categoryLabel(route) }}</span>
+        <span class="w-24 shrink-0 text-sm truncate">{{
+          categoryLabel(route)
+        }}</span>
         <el-select
           :model-value="route.skill_group"
           class="flex-1"
           clearable
-          :disabled="!canEdit"
-          :loading="saving === route.category"
+          :disabled="!canEdit || saving.has(route.category)"
+          :loading="saving.has(route.category)"
           :placeholder="t('ticketflow.skillGroup.useDefault')"
           @update:model-value="
             (value: string | null | undefined) => change(route, value ?? null)

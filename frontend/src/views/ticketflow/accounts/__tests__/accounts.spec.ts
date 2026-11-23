@@ -116,7 +116,7 @@ describe("AccountForm", () => {
   it("新建：返回去空白的载荷，非技术员技能组为空", async () => {
     const wrapper = mountForm();
     Object.assign(wrapper.vm.form, {
-      username: " new_user ",
+      username: "new_user",
       name: " 新员工 ",
       role: "requester",
       skill_group: "g1",
@@ -145,12 +145,27 @@ describe("AccountForm", () => {
     expect(payload?.role).toBe("admin");
   });
 
-  it("编辑：当前所在的已停用技能组仍在选项中，其他停用组不出现", () => {
-    const wrapper = mountForm(agent);
-    expect(wrapper.text()).not.toContain("工单支持组 已停用组");
-    const other = mountForm({ ...agent, skill_group: "g1" });
-    other.vm.form.role = "agent";
-    expect(other.findAll(".el-select").length).toBe(1);
+  it("技能组选项：只列启用组，编辑时保留当前所在的已停用组", () => {
+    const create = mountForm();
+    expect(
+      create.vm.groupOptions.map((group: { pk: string }) => group.pk)
+    ).toEqual(["g1"]);
+    const edit = mountForm(agent);
+    expect(
+      edit.vm.groupOptions.map((group: { pk: string }) => group.pk)
+    ).toEqual(["g1", "g2"]);
+  });
+
+  it("新建：非法用户名被拦截", async () => {
+    const wrapper = mountForm();
+    Object.assign(wrapper.vm.form, {
+      username: "坏 名字",
+      name: "员工",
+      role: "requester",
+      password: "Secret-123456"
+    });
+    await flushPromises();
+    expect(await wrapper.vm.getPayload()).toBeNull();
   });
 });
 

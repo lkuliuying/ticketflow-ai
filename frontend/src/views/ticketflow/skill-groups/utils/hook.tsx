@@ -1,4 +1,4 @@
-import { h, onMounted, reactive, ref, shallowRef, type Ref } from "vue";
+import { h, reactive, ref, shallowRef, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElTag } from "element-plus";
 import { usePageAuth } from "@/router/utils";
@@ -15,7 +15,7 @@ type PageRef = Ref<{ handleGetData?: () => void } | undefined>;
 /**
  * 技能组管理：新建与编辑走后端元数据表单（名称、描述、启用），不提供删除；
  * 停用约束（默认组、仍有在职技术员、仍被分类路由使用）由后端 409 给出原因。
- * 技能组列表同时供分类路由下拉使用，列表变化后一并刷新。
+ * 技能组列表同时供分类路由下拉使用：列表每次查询完成（含首次）后一并刷新。
  */
 export function useSkillGroups(tableRef: PageRef) {
   const { t } = useI18n();
@@ -32,7 +32,6 @@ export function useSkillGroups(tableRef: PageRef) {
       .catch(() => null);
     if (res && isSuccess(res)) groups.value = res.data?.results ?? [];
   }
-  onMounted(loadGroups);
 
   const listColumnsFormat = (columns: PageTableColumn[]) =>
     formatPageColumns(columns, {
