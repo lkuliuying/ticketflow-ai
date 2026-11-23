@@ -184,6 +184,20 @@ async def test_cache_keys_bind_user_text_categories_model_and_prompt(harness, co
     assert resources.provider.analyzed == len(resources.redis.values) == 6
 
 
+async def test_analysis_cache_keys_distinguish_thinking_modes(harness, context_response, claims):
+    _, _, resources, _, _, _ = harness
+    context = TicketContext.model_validate(context_response["data"])
+    keys = {
+        analysis_cache_key(
+            replace(resources, settings=resources.settings.model_copy(update={"llm_thinking": mode})),
+            claims["user_id"],
+            context,
+        )
+        for mode in ("default", "enabled", "disabled")
+    }
+    assert len(keys) == 3
+
+
 async def test_analysis_cache_binds_reference_content_but_ignores_order(harness, context_response):
     http, _, resources, bearer, _, _ = harness
     references = context_response["data"]["references"]
@@ -378,6 +392,42 @@ async def test_reply_retries_only_before_first_delta(harness, monkeypatch, parti
     events = frames(result.text)
     assert [name for name, _ in events] == ["meta", "delta", "error"]
     assert events[-1][1] == {"code": 503, "error": "LLM_UNAVAILABLE", "detail": "upstream error", "retryable": True}
+    assert not resources.upstream_slots.locked()
+
+
+async def test_reply_can_retry_after_reasoning_without_a_delta(harness, monkeypatch):
+    http, application, resources, bearer, _, _ = harness
+    settings = Settings(
+        mock_llm=False, llm_api_key="test-upstream-key", llm_base_url="https://model.test/v1", llm_thinking="enabled"
+    )
+    calls = 0
+
+    class ReasoningThenFailure(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield b'data: {"choices":[{"delta":{"reasoning_content":"working","content":null}}]}\n\n'
+            raise httpx.ConnectError("retryable connection failure")
+
+    def upstream(request):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(200, stream=ReasoningThenFailure())
+        return httpx.Response(200, text='data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: [DONE]\n\n')
+
+    async def pause(delay):
+        assert not resources.upstream_slots.locked()
+
+    monkeypatch.setattr(retry, "sleep", pause)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as llm_http:
+        provider = OpenAICompatibleProvider(settings, llm_http)
+        application.state.resources = replace(resources, settings=settings, provider=provider)
+        result = await http.post(STREAM, json={"ticket_id": str(TICKET)}, headers=bearer())
+
+    assert result.status_code == 200
+    assert calls == 2
+    events = frames(result.text)
+    assert [name for name, _ in events] == ["meta", "delta", "done"]
+    assert events[1] == ("delta", {"text": "hello"})
     assert not resources.upstream_slots.locked()
 
 

@@ -127,6 +127,7 @@ class OpenAICompatibleProvider:
     def __init__(self, settings: Settings, http: httpx.AsyncClient) -> None:
         self.http = http
         self.model = settings.llm_model
+        self.thinking = settings.llm_thinking
         self.url = f"{str(settings.llm_base_url).rstrip('/')}/chat/completions"
         self.timeout = httpx.Timeout(
             settings.llm_timeout, connect=settings.http_connect_timeout, pool=settings.upstream_slot_timeout
@@ -135,12 +136,15 @@ class OpenAICompatibleProvider:
             raise ValueError("LLM_API_KEY is required")
         self.headers = {"Authorization": f"Bearer {settings.llm_api_key.get_secret_value()}"}
 
+    def _payload(self, prompt: str, context: TicketContext) -> dict[str, object]:
+        payload: dict[str, object] = {"model": self.model, "messages": prompts.messages(prompt, context)}
+        if self.thinking != "default":
+            payload["thinking"] = {"type": self.thinking}
+        return payload
+
     async def analyze(self, context: TicketContext) -> AnalysisDraft:
-        payload = {
-            "model": self.model,
-            "messages": prompts.messages(prompts.ANALYSIS_PROMPT, context),
-            "response_format": {"type": "json_object"},
-        }
+        payload = self._payload(prompts.ANALYSIS_PROMPT, context)
+        payload["response_format"] = {"type": "json_object"}
         try:
             response = await self.http.post(self.url, headers=self.headers, json=payload, timeout=self.timeout)
             _check_status(response)
@@ -152,7 +156,8 @@ class OpenAICompatibleProvider:
             raise invalid_output() from exc
 
     async def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]:
-        payload = {"model": self.model, "messages": prompts.messages(prompts.REPLY_PROMPT, context), "stream": True}
+        payload = self._payload(prompts.REPLY_PROMPT, context)
+        payload["stream"] = True
         headers = {**self.headers, "Accept": "text/event-stream"}
         try:
             async with self.http.stream(

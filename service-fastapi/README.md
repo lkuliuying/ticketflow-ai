@@ -54,7 +54,10 @@ uv run uvicorn app.main:app --port 8897
 | `MOCK_CHUNKS` | `8` | Mock 回复分段数，范围 1–100 |
 | `LLM_BASE_URL` | `https://api.openai.com/v1` | 兼容服务 API 根地址，服务追加 `/chat/completions` |
 | `LLM_MODEL` | `gpt-4o-mini` | 兼容服务模型名 |
+| `LLM_THINKING` | `default` | `default` 沿用上游默认行为并省略请求体的 `thinking` 字段。`enabled` / `disabled` 为支持该字段的提供方显式开启 / 关闭思考模式。Mock 生成忽略该项 |
 | `LLM_API_KEY` | — | 关闭 Mock 时必填 |
+
+分析缓存按模型和思考模式区分。流式和非流式响应均从上游的 `content` 读取正文。
 
 ## 容器
 

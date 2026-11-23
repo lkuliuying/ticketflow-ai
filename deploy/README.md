@@ -36,6 +36,27 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps -a
 
 网关对 `/api-docs` 和 `/api-docs/` 下的路径返回 404。Mock 回复默认每隔 0.12 秒发送一段，可通过 `MOCK_CHUNK_DELAY` 调整。
 
+### 接入 DeepSeek
+
+在 `deploy/.env` 中设置以下值，并填入自己的 API 密钥。
+
+```dotenv
+MOCK_LLM=false
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-flash
+LLM_THINKING=disabled
+LLM_API_KEY=<自行填写>
+```
+
+DeepSeek 默认开启思考模式。示例显式关闭思考模式，也可设为 `enabled` 开启。留空使用 `default`，由提供方决定。详见 [DeepSeek 思考模式文档](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/)。
+可通过 `LLM_TIMEOUT` 调整分析总预算和上游 HTTP 读写超时，通过 `STREAM_TIMEOUT` 调整流式生成总预算。单位为秒，留空分别使用 30 和 90。
+
+交付栈已运行时，应用环境变量变更只需重新创建 AI 容器。
+
+```sh
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --no-deps ai
+```
+
 ## 演示数据
 
 ```sh
