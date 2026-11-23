@@ -26,7 +26,8 @@ const AREA = {
   shelfB: new THREE.Vector3(1.6, 0, -2.15),
   desk: new THREE.Vector3(-0.9, 0, 0.6),
   dock: new THREE.Vector3(2.0, 0, 1.45),
-  bin: new THREE.Vector3(-2.75, 0, 1.85)
+  // 退回箱放在工作台左侧，避开从前墙进来的“评审结论”车道
+  bin: new THREE.Vector3(-2.85, 0, 0.45)
 };
 const SHELF_LEVELS = [0.75, 1.62, 2.49];
 const HAIR = { claude: "#6b4f3a", codex: "#2f2f35", gemini: "#c9a46c" };
@@ -167,9 +168,14 @@ export function buildWarehouse(scene, id, pickables) {
   const racks = { shelfA: rack(group, AREA.shelfA), shelfB: rack(group, AREA.shelfB) };
   if (id === "claude") {
     // 装货区托盘：已通过、等待合并的任务
-    group.add(box(2.9, 0.16, 1.3, mat("#c8a27a"), AREA.dock.x, 0.18, AREA.dock.z));
+    // 托盘和退回箱本身也可点击，打开对应阶段
+    const pallet = box(2.9, 0.16, 1.3, mat("#c8a27a"), AREA.dock.x, 0.18, AREA.dock.z);
+    pallet.userData = { kind: "stage", id: "已通过" };
     // 退回箱：Claude 自己执行、被评审退回的任务
-    group.add(box(1.4, 0.5, 0.9, mat("#f3c4c4"), AREA.bin.x, 0.25, AREA.bin.z));
+    const bin = box(1.2, 0.5, 0.9, mat("#f3c4c4"), AREA.bin.x, 0.25, AREA.bin.z);
+    bin.userData = { kind: "stage", id: "需修改" };
+    group.add(pallet, bin);
+    pickables.push(pallet, bin);
   }
 
   const desk = buildDesk(group, id, AREA.desk);
