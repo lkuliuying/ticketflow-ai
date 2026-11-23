@@ -49,16 +49,26 @@ export async function openTickets(page: Page) {
  */
 export async function openTicket(page: Page, title: string): Promise<Locator> {
   await openTickets(page);
-  // “关键字”默认收在搜索区的“展开”里；标签带冒号，按前缀匹配
+  // “关键字”默认收在搜索区的“展开”里；标签带冒号，按前缀匹配。
+  // 搜索区的字段来自元数据，可能晚于看板渲染：先等它出现，再决定要不要展开
   const keyword = page.getByRole("textbox", { name: /^关键字/ });
   const expand = page.getByRole("link", { name: "展开", exact: true });
-  if (!(await keyword.isVisible()) && (await expand.isVisible())) {
-    await expand.click();
-  }
+  await expect(keyword.or(expand).first()).toBeVisible();
+  if (!(await keyword.isVisible())) await expand.click();
+  await expect(keyword).toBeVisible();
   await keyword.fill(title);
+  // 等带关键字的列表请求返回再找行，既确认筛选真的发出，也避开表格重绘时点到旧行
+  const filtered = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === "GET" &&
+      /\/api\/tickets\/?$/.test(url.pathname) &&
+      url.searchParams.get("q") === title
+    );
+  });
   await keyword.press("Enter");
-  const rows = page.locator(".el-table__row");
-  const row = rows.filter({ hasText: title }).first();
+  expect((await filtered).ok()).toBe(true);
+  const row = page.locator(".el-table__row").filter({ hasText: title }).first();
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "工单详情" }).click();
   const drawer = page.locator(".el-drawer").last();
@@ -86,6 +96,7 @@ export async function transition(page: Page, drawer: Locator, action: string) {
 /**
  * 选择 el-select 的选项：只在这个下拉框自己弹出的列表里找。
  * 输入框的 aria-controls 指向它的选项列表，页面上同时存在别的下拉层或同名选项时不会点错。
+ * 仅用于单选：选中后断言下拉已收起，多选下拉框选完不会自动收起。
  */
 export async function choose(page: Page, select: Locator, option: string) {
   const combobox = select.getByRole("combobox");
