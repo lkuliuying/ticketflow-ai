@@ -129,10 +129,13 @@ class AssistantInternalViewSet(EmployeeAssistantViewSet):
     """助手内网调用"""
 
     @extend_schema(
-        description="仅供 FastAPI 从内网转发同一用户 Bearer token。返回历史和发布知识片段，历史排除本次问题。",
+        description=(
+            "仅供 FastAPI 从内网转发同一用户 Bearer token。返回历史和发布知识片段，历史排除本次问题。"
+            "会话已转人工时返回 409，请新建对话。"
+        ),
         request=QuestionInputSerializer,
         parameters=[session_id_parameter, *internal_headers],
-        responses={201: schema.question_result, **schema.internal_errors},
+        responses={201: schema.question_result, **schema.internal_errors, 409: schema.ticket_error_result},
     )
     @action(detail=True, methods=["post"])
     def question(self, request: Request, pk: UUID) -> ApiResponse:
@@ -145,7 +148,7 @@ class AssistantInternalViewSet(EmployeeAssistantViewSet):
         )
 
     @extend_schema(
-        description="仅供 FastAPI 内网调用。重放返回首次保存的回答 ID。",
+        description="仅供 FastAPI 内网调用。转人工后仍可写回已有提问的回答，重放返回首次保存的回答 ID。",
         request=AnswerInputSerializer,
         parameters=[session_id_parameter, *internal_headers],
         responses={200: schema.answer_result, **schema.internal_errors},

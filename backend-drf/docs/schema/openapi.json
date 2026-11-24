@@ -34331,7 +34331,7 @@
     },
     "/api/assistant/internal/sessions/{id}/answer": {
       "post": {
-        "description": "仅供 FastAPI 内网调用。重放返回首次保存的回答 ID。",
+        "description": "仅供 FastAPI 内网调用。转人工后仍可写回已有提问的回答，重放返回首次保存的回答 ID。",
         "operationId": "api_assistant_internal_sessions_answer_create",
         "parameters": [
           {
@@ -34571,7 +34571,7 @@
     },
     "/api/assistant/internal/sessions/{id}/question": {
       "post": {
-        "description": "仅供 FastAPI 从内网转发同一用户 Bearer token。返回历史和发布知识片段，历史排除本次问题。",
+        "description": "仅供 FastAPI 从内网转发同一用户 Bearer token。返回历史和发布知识片段，历史排除本次问题。会话已转人工时返回 409，请新建对话。",
         "operationId": "api_assistant_internal_sessions_question_create",
         "parameters": [
           {
@@ -34657,6 +34657,16 @@
             "description": ""
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {

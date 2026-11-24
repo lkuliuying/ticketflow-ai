@@ -46,7 +46,8 @@ async def assistant(application, signing_key, claims):
         calls.append((action, json.loads(request.content) if request.content else None))
         if action in errors:
             status = errors[action]
-            return httpx.Response(status, json={"detail": "DRF error"}, headers={"Retry-After": "9"})
+            detail = "会话已转人工，请新建对话" if status == 409 else "DRF error"
+            return httpx.Response(status, json={"detail": detail}, headers={"Retry-After": "9"})
         if action == "/question":
             assert request.method == "POST"
             return httpx.Response(201, json={"code": 1000, "data": question})
@@ -270,6 +271,19 @@ async def test_chat_and_draft_propagate_authorization_and_throttling(assistant):
     assert draft.headers["Retry-After"] == "9"
 
 
+async def test_handed_off_chat_returns_json_conflict_before_streaming(assistant, application):
+    ai, headers, _, calls, errors = assistant
+    errors["/question"] = 409
+
+    response = await ai.post(CHAT, headers=headers, json={"session_id": SESSION, "message": MESSAGE})
+
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/json"
+    assert response.json() == {"code": 409, "error": "CONFLICT", "detail": "会话已转人工，请新建对话"}
+    assert calls == [("/question", {"message": MESSAGE})]
+    assert not application.state.resources.upstream_slots.locked()
+
+
 @pytest.mark.parametrize(
     "fields",
     [
@@ -291,8 +305,20 @@ async def test_handoff_draft_uses_json_mode_and_validates_output(assistant, appl
         payload = json.loads(request.content)
         assert payload["thinking"] == {"type": "enabled"}
         assert payload["response_format"] == {"type": "json_object"}
-        assert json.loads(payload["messages"][-1]["content"]) == {
-            "history": HISTORY,
+        instruction, source = payload["messages"]
+        assert instruction["role"] == "system" and source["role"] == "user"
+        for constraint in (
+            "只能陈述员工消息中明确提供的信息",
+            "严禁把助手建议写成员工已执行的操作或结果",
+            "AI 助手曾建议……（员工未反馈执行结果）",
+            "版本、时间、错误码等信息直接省略",
+        ):
+            assert constraint in instruction["content"]
+        assert json.loads(source["content"]) == {
+            "history": [
+                {**HISTORY[0], "source": "员工陈述"},
+                {**HISTORY[1], "source": "AI 助手建议或回答（非员工陈述）"},
+            ],
             "categories": ["NETWORK", "OTHER"],
         }
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({**valid, **fields})}}]})

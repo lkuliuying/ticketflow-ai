@@ -304,6 +304,30 @@ def test_handoff_create_replay_scope_and_retained_transcript(users, employee, te
     assert_error(client_for(teammate).get(f"{path}/assistant-session"), 404)
 
 
+def test_handed_off_session_rejects_new_question_but_accepts_pending_answer(employee, details):
+    session_id = new_session(employee)["pk"]
+    question_id = ask(employee, session_id, "VPN 连接超时")["user_message_id"]
+    data(
+        employee.post(
+            "/api/tickets",
+            {**details, "assistant_session_id": session_id},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+        ),
+        201,
+    )
+
+    path = f"{INTERNAL}/{session_id}"
+    response = employee.post(f"{path}/question", {"message": "补充提问"}, format="json")
+    assert_error(response, 409)
+    assert response.json()["detail"] == "会话已转人工，请新建对话"
+    assert list(AssistantMessage.objects.filter(session_id=session_id).values_list("role", flat=True)) == ["user"]
+
+    answer_id = answer(employee, session_id, question_id)
+    assert answer(employee, session_id, question_id, content="重复写回") == answer_id
+    assert AssistantMessage.objects.get(pk=answer_id).content == "连接 VPN 后重试"
+
+
 def test_assistant_rate_limits_and_fails_closed(employee, users, monkeypatch):
     session_id = new_session(employee)["pk"]
     path = f"{INTERNAL}/{session_id}"

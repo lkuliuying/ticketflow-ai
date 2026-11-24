@@ -27,6 +27,28 @@
       "required": ["code", "error", "detail"],
       "properties": {"code": {"type": "integer"}, "error": {"type": "string"}, "detail": {"type": "string"}}
     },
+    "assistantChatConflict": {
+      "description": "POST /ai/v1/assistant/chat/stream 的会话已转人工，在建立 SSE 流之前返回 HTTP 409 和此 JSON 对象。",
+      "allOf": [
+        {"$ref": "#/$defs/httpError"},
+        {"properties": {
+          "code": {"const": 409},
+          "error": {"const": "CONFLICT"},
+          "detail": {"const": "会话已转人工，请新建对话"}
+        }}
+      ]
+    },
+    "assistantHandoffDraft": {
+      "description": "POST /ai/v1/assistant/handoff-draft 的成功响应。员工事实来自员工明确提供的信息，助手建议如需保留须注明来源和员工是否反馈执行结果。",
+      "type": "object",
+      "required": ["title", "description", "category"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 200},
+        "description": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "category": {"$ref": "ticketflow.schema.json#/$defs/category"}
+      }
+    },
     "streamMeta": {
       "description": "HTTP 200 text/event-stream 的首帧 meta，references 为引用文章的 ID 和标题。",
       "type": "object",
