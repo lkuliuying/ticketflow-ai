@@ -20,7 +20,7 @@ tests/conftest.py 预检 fail-fast 并给出恢复指引。
 
 Redis 的 xdist 隔离（方案 §3.2，本迁移核心风险点）：FakeRedis 是进程内的天然隔离，
 真 Redis 被全部 worker 共享，采用「db 编号 + 键前缀」双保险：
-- db 编号：Redis 16 个逻辑库，db0 兜底保留，worker gwN → DEFAULT_CACHE_ID = 1 + N%15。
+- db 编号：Redis 16 个逻辑库，db0 留给 channel layer，worker gwN → DEFAULT_CACHE_ID = 1 + N%15。
   get_redis_connection（ReentrantLock / metrics / CacheList 等裸连接消费面）与 django
   cache 同池同库，一并隔离；
 - 键前缀：django cache 全部键（含限流计数器、magic 缓存）经 test_redis_key_func 加
@@ -28,10 +28,10 @@ Redis 的 xdist 隔离（方案 §3.2，本迁移核心风险点）：FakeRedis 
   走 KEY_FUNCTION 覆盖而非 KEY_PREFIX；delete_pattern / keys 经 make_pattern /
   reverse_key 同源拼前缀，SCAN 命中范围与逻辑键回读天然自洽。**裸连接自管键不经
   前缀**（locker / pending / 限流等自管键名），跨 worker 唯一性依赖独库——pytest.ini
-  以 --maxprocesses 把 worker 数封顶在 15（默认 8）的库容量内（db0 兜底保留），
+  以 --maxprocesses 把 worker 数封顶在 15（默认 8）的库容量内，
   共库复用分支不发生；
   conftest._clean_cache 只按前缀清理、永不 flushdb；
-- channel layer：共享 CHANNEL_LAYERS_CACHE_ID 逻辑库，按 worker 加 asgi 前缀隔离
+- channel layer：使用独立的 db0，避免 Django cache.clear() 清除聊天组；按 worker 加 asgi 前缀隔离
   （channels_redis prefix 参数）；在线用户索引键 online_users_key 同源于 prefix，
   无需额外处理。
 
@@ -57,6 +57,8 @@ _pg_database = os.environ.get("DB_DATABASE", "xadmin_realtest")
 _real_config = Config()
 _real_config["SECRET_KEY"] = "test-only-secret-key-0123456789abcdef"
 _real_config["XADMIN_APPS"] = ["tickets", "knowledge", "demo"]
+# 容忍虚拟机墙钟回跳，保留签发时间用于令牌撤销判断。
+_real_config["JWT_LEEWAY_SECONDS"] = 30
 # 前置 Config 注入（loadtest/settings_loadtest.py 同款形态）：让 base settings 的
 # DATABASES / CACHES / CHANNEL_LAYERS 按真实 PG + Redis 参数构造——psycopg3 连接池
 # （OPTIONS.pool）与 django_redis（生产同款 backend 与参数）由此被测试首次真实创建。
@@ -69,8 +71,9 @@ _real_config["DB_PASSWORD"] = os.environ.get("DB_PASSWORD", "pgtest")
 _real_config["REDIS_HOST"] = os.environ.get("REDIS_HOST", "127.0.0.1")
 _real_config["REDIS_PORT"] = int(os.environ.get("REDIS_PORT", "56379"))
 _real_config["REDIS_PASSWORD"] = os.environ.get("REDIS_PASSWORD", "")
-# worker 独立逻辑库：db0 兜底保留，gwN → 1 + N%15（Redis 共 16 库，循环复用由前缀兜底）
+# worker 独立逻辑库：db0 留给通道层，gwN → 1 + N%15（Redis 共 16 库）
 _real_config["DEFAULT_CACHE_ID"] = 1 + (_worker_num % 15)
+_real_config["CHANNEL_LAYERS_CACHE_ID"] = 0
 
 ConfigManager.load_user_config = classmethod(lambda cls, root_path=None, config_class=None: _real_config)
 

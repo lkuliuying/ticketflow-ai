@@ -10,9 +10,21 @@ from identity.models import DeptInfo, UserInfo, UserRole
 from ops.legacy.structure import _run_data_cleanups
 from settings.models import Setting
 from tickets.models import Status, TicketLog
+from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE
 
 BACKFILL = import_module("tickets.migrations.0003_backfill_ticket_assignments")
 BUSINESS_ROLES = import_module("tickets.migrations.0004_business_roles_and_registration")
+
+
+@pytest.fixture
+def users(db):
+    """迁移通过 ORM 和历史模型运行，只需要旧记录涉及的角色和用户。"""
+    dept = DeptInfo.objects.create(code="migration-support", name="迁移测试技能组")
+    accounts = {}
+    for name, code in (("requester", REQUESTER_ROLE), ("agent", AGENT_ROLE), ("admin", ADMIN_ROLE)):
+        accounts[name] = UserInfo.objects.create_user(username=name, dept=dept)
+        accounts[name].roles.add(UserRole.objects.create(code=code, name=name))
+    return accounts
 
 
 @pytest.mark.django_db

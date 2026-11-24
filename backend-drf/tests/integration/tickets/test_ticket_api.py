@@ -12,6 +12,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from common.cache.storage import UserTokenRevokedCache
 from identity.models import DeptInfo, UserInfo
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from system.models import FieldPermission, Menu
@@ -34,8 +35,9 @@ TICKETS = "/api/tickets"
 
 
 def authenticated(user: UserInfo) -> APIClient:
+    token = RefreshToken.for_user(user).access_token
     client = APIClient()
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client
 
 
@@ -44,6 +46,22 @@ def assert_error(response, status):
     payload = response.json()
     assert payload["code"] != 1000
     assert isinstance(payload["detail"], str) and payload["detail"]
+
+
+def test_user_revocation_rejects_old_token_and_accepts_new_token(users):
+    user = users["requester"]
+    issued_at = datetime.now(UTC).replace(microsecond=0)
+    revoked_at = issued_at - timedelta(seconds=1)
+    with patch("rest_framework_simplejwt.tokens.aware_utcnow", return_value=revoked_at):
+        old_client = authenticated(user)
+    assert old_client.get(TICKETS).status_code == 200
+
+    UserTokenRevokedCache(user.pk).set_storage_cache(revoked_at.timestamp())
+
+    assert_error(old_client.get(TICKETS), 401)
+    with patch("rest_framework_simplejwt.tokens.aware_utcnow", return_value=issued_at):
+        new_client = authenticated(user)
+    assert new_client.get(TICKETS).status_code == 200
 
 
 @pytest.mark.parametrize("cache_result", [False, True], ids=["database-replay", "redis-replay"])

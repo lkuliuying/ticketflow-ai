@@ -10,15 +10,43 @@ from django.apps import apps
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import activate
 from django.utils.translation import gettext_lazy as _
 
 from common.core.models import DbAuditModel
 from common.core.serializers import BaseModelSerializer
+from common.signal_handlers import on_create_set_creator, on_update_set_modifier
 from common.utils import get_logger
 from system.models import ModelLabelField
 
 logger = get_logger(__name__)
+
+
+def _sync_children(parent: ModelLabelField, labels: dict[str, Any]) -> set[Any]:
+    """按父节点批量写入字段，保留现有主键和字段白名单引用。"""
+    existing = {
+        row.name: row
+        for row in ModelLabelField.objects.filter(parent=parent, field_type=parent.field_type).only("name", "modifier")
+    }
+    created, updated = [], []
+    updated_time = timezone.now()
+    for name, label in labels.items():
+        row = existing.get(name)
+        if row is None:
+            row = ModelLabelField(name=name, parent=parent, field_type=parent.field_type, label=label)
+            # bulk_create 跳过模型信号；新建节点沿用请求用户的审计字段。
+            on_create_set_creator(ModelLabelField, row)
+            on_update_set_modifier(ModelLabelField, row)
+            created.append(row)
+        else:
+            row.label = label
+            row.updated_time = updated_time
+            on_update_set_modifier(ModelLabelField, row)
+            updated.append(row)
+    ModelLabelField.objects.bulk_create(created)
+    ModelLabelField.objects.bulk_update(updated, ["label", "updated_time", "modifier"])
+    return {row.pk for row in created + updated}
 
 
 def _prune_stale(field_type: Any, kept_pks: Any, enabled: Any, skip_models: set[str] | None = None) -> Any:
@@ -45,6 +73,7 @@ def _prune_stale(field_type: Any, kept_pks: Any, enabled: Any, skip_models: set[
     return count
 
 
+@transaction.atomic  # type: ignore[untyped-decorator]
 def get_sub_serializer_fields() -> Any:
     """按序列化器定义重建 ROLE 字段树（角色页字段权限勾选的数据源）。
 
@@ -86,17 +115,14 @@ def get_sub_serializer_fields() -> Any:
             defaults={"label": model._meta.verbose_name},
         )
         kept.add(obj.pk)
-        for name, field in instance.fields.items():
-            _obj, _created = ModelLabelField.objects.update_or_create(
-                name=name, parent=obj, field_type=field_type, defaults={"label": field.label}
-            )
-            kept.add(_obj.pk)
+        kept.update(_sync_children(obj, {name: field.label for name, field in instance.fields.items()}))
 
     deleted = _prune_stale(field_type, kept, enabled=processed > 0, skip_models=failed_models)
     logger.info(f"sync role field tree done. kept:{len(kept)} deleted:{deleted} failed:{failed}")
     return {"kept": len(kept), "deleted": deleted, "failed_serializers": failed}
 
 
+@transaction.atomic  # type: ignore[untyped-decorator]
 def get_app_model_fields() -> Any:
     """按 PERMISSION_DATA_AUTH_APPS 重建「模型/字段」数据权限树（NULL 安全清理）。"""
     field_type = ModelLabelField.FieldChoices.DATA
@@ -105,19 +131,8 @@ def get_app_model_fields() -> Any:
         name="*", field_type=field_type, parent=None, defaults={"label": _("All tables")}
     )
     kept.add(root.pk)
-    all_fields, _created = ModelLabelField.objects.update_or_create(
-        name="*", field_type=field_type, parent=root, defaults={"label": _("All fields")}
-    )
-    kept.add(all_fields.pk)
-
-    for field in DbAuditModel._meta.fields:
-        _obj, _created = ModelLabelField.objects.update_or_create(
-            name=field.name,
-            field_type=field_type,
-            parent=root,
-            defaults={"label": getattr(field, "verbose_name", field.name)},
-        )
-        kept.add(_obj.pk)
+    labels = {field.name: getattr(field, "verbose_name", field.name) for field in DbAuditModel._meta.fields}
+    kept.update(_sync_children(root, {"*": _("All fields"), **labels}))
 
     processed = 0
     failed_models: set[Any] = set()
@@ -132,18 +147,18 @@ def get_app_model_fields() -> Any:
             processed += 1
             model_key = f"{app_name}.{model._meta.model_name}"
             try:
-                obj, _created = ModelLabelField.objects.update_or_create(
-                    name=model_key,
-                    field_type=field_type,
-                    parent=None,
-                    defaults={"label": model._meta.verbose_name},
-                )
-                kept.add(obj.pk)
-                for field in model._meta.fields + model._meta.many_to_many:
-                    _obj, _created = ModelLabelField.objects.update_or_create(
-                        name=field.name, parent=obj, field_type=field_type, defaults={"label": field.verbose_name}
+                with transaction.atomic():
+                    obj, _created = ModelLabelField.objects.update_or_create(
+                        name=model_key,
+                        field_type=field_type,
+                        parent=None,
+                        defaults={"label": model._meta.verbose_name},
                     )
-                    kept.add(_obj.pk)
+                    child_pks = _sync_children(
+                        obj, {field.name: field.verbose_name for field in model._meta.fields + model._meta.many_to_many}
+                    )
+                kept.add(obj.pk)
+                kept.update(child_pks)
             except Exception:  # noqa: BLE001 单模型字段树失败不阻断其余模型，且不误删其既有节点
                 failed_models.add(model_key)
                 logger.warning("sync model field tree failed: %s", model_key, exc_info=True)

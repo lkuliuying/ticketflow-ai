@@ -4,6 +4,7 @@
 import pytest
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from common.local import set_current_request
 from system.services.modelfield import get_extra_field_lookups, get_field_lookup_info
 from system.views.admin.modelfield import ModelLabelFieldViewSet
 
@@ -124,20 +125,44 @@ def test_parent_filter_accepts_parent_name(superuser):
 
 @pytest.mark.django_db
 class TestSyncModelField:
-    def test_sync_model_field_creates_label_fields(self):
+    def test_sync_model_field_batches_writes_and_preserves_existing_fields(self, normal_user, superuser):
+        from django.db import connection
+
         from system.models import ModelLabelField
         from system.services.modelfield import sync_model_field
 
-        sync_model_field()
+        table = ModelLabelField._meta.db_table
+        writes = {"INSERT INTO": 0, "UPDATE": 0}
+
+        def count_writes(execute, sql, params, many, context):
+            for command in writes:
+                writes[command] += sql.startswith(f'{command} "{table}"')
+            return execute(sql, params, many, context)
+
+        request = APIRequestFactory().post("/api/system/field/sync")
+        request.user = normal_user
+        set_current_request(request)
+        with connection.execute_wrapper(count_writes):
+            sync_model_field()
         # 数据权限维度：所有表/所有字段节点存在
         assert ModelLabelField.objects.filter(field_type=ModelLabelField.FieldChoices.DATA, parent=None).exists()
         # 角色字段权限维度：按序列化器生成
         assert ModelLabelField.objects.filter(field_type=ModelLabelField.FieldChoices.ROLE).exists()
 
-        # 幂等：重复执行不报错且数量收敛（旧记录被清理）
         count = ModelLabelField.objects.count()
-        sync_model_field()
+        assert 0 < writes["INSERT INTO"] < count // 2, writes
+        children = ModelLabelField.objects.filter(field_type=ModelLabelField.FieldChoices.DATA, parent__name="*")
+        before = dict(children.values_list("pk", "modifier_id"))
+        assert before and set(before.values()) == {normal_user.pk}
+
+        request.user = superuser
+        writes["UPDATE"] = 0
+        with connection.execute_wrapper(count_writes):
+            sync_model_field()
+
+        assert 0 < writes["UPDATE"] < count // 2, writes
         assert ModelLabelField.objects.count() <= count
+        assert dict(children.values_list("pk", "modifier_id")) == dict.fromkeys(before, superuser.pk)
 
     def test_get_app_model_fields_includes_system_models(self):
         from system.models import ModelLabelField

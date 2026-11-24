@@ -10,8 +10,9 @@ WS 上行 chat_recall 按未知 action 关闭。
 import json
 
 import pytest
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from channels.layers import get_channel_layer
+from django.core.cache import cache
 from django.utils.translation import gettext as _
 
 from message import chat as chat_service
@@ -389,9 +390,9 @@ class TestSendPrivate:
         assert pushes[0][1]["message_type"] == "chat_private"
         assert pushes[0][1]["room_id"] == room.pk
 
-    def test_private_message_skips_push_when_peer_in_chat(self, ws_layer, alice, bob, monkeypatch):
+    def test_private_message_skips_push_when_peer_in_chat(self, ws_layer, alice, bob, monkeypatch, chat_push_enabled):
         room = chat_service.get_or_create_private_room(alice, bob)
-        _capture_group_send(ws_layer, monkeypatch)
+        sent = _capture_group_send(ws_layer, monkeypatch)
         pushes = []
 
         async def fake_push(user_pk, message, **kwargs):
@@ -401,11 +402,20 @@ class TestSendPrivate:
 
         async def scenario():
             # 对端聊天连接在线（页面打开）：消息已实时送达，不再重复弹站内信
-            await ws_layer.group_add(get_chat_user_group_name(bob.pk), "specific.bob-chat")
+            group = get_chat_user_group_name(bob.pk)
+            await ws_layer.group_add(group, "specific.bob-chat")
+            # 用真实缓存清理验证通道层与 Django 缓存的逻辑库隔离。
+            await sync_to_async(cache.clear)()
+            assert "specific.bob-chat" in await ws_layer.get_layers(group)
             consumer, __, ___ = _make_consumer(ws_layer, alice)
             await consumer.handle_send({"room_id": room.pk, "content": "你在看吗"})
 
         async_to_sync(scenario)()
+        assert ChatMessage.objects.filter(room=room, content="你在看吗").exists()
+        assert any(
+            event["group"] == get_chat_user_group_name(bob.pk) and event["message"]["type"] == "chat_message"
+            for event in sent
+        )
         assert pushes == []
 
     def test_client_msg_id_idempotent(self, ws_layer, alice, bob, monkeypatch):

@@ -96,32 +96,24 @@ class TestReentrantLock:
         lock.release()
 
     def test_watchdog_extends_lock(self, lock_name):
-        """看门狗续期：持锁期间 TTL 被看门狗周期性重置（长任务不逾期）。
-
-        不用「睡过 timeout 后锁仍在」的墙钟推断：xdist 高并发负载下看门狗线程可能
-        被调度延迟，墙钟断言偶发误判为逾期。改为直接观测续期事件——TTL 在两次采样
-        间只会衰减（int 秒粒度下不回升），任何回升都只能是看门狗 extend 重置所致，
-        与线程调度快慢无关；观测到续期后锁必然仍在持有期，互斥断言随之确定性成立。
-        """
+        """看门狗续期推进 Redis 锁的绝对到期时间，竞争者仍拿不到锁。"""
         from django_redis import get_redis_connection
 
-        lock = ReentrantLock(lock_name, timeout=5)
+        # 虚拟机墙钟跳变会影响相对 TTL。20 秒租期为首轮续期留出余量。
+        lock = ReentrantLock(lock_name, timeout=20)
         conn = get_redis_connection("default")
         assert lock.acquire(blocking=False) is True
         try:
-            last_ttl = conn.ttl(lock.name)
-            assert last_ttl > 0, f"锁键 TTL 异常：{last_ttl}"
-            deadline = time.monotonic() + 30  # 首次续期在 ~timeout/3s；30s 容忍极端调度延迟
-            extended = False
+            expires_at = conn.pexpiretime(lock.name)
+            assert expires_at > 0, f"锁键到期时间异常：{expires_at}"
+            deadline = time.monotonic() + 30
             while time.monotonic() < deadline:
-                time.sleep(0.05)
-                ttl = conn.ttl(lock.name)
-                if ttl > last_ttl:
-                    extended = True
+                if conn.pexpiretime(lock.name) > expires_at:
                     break
-                last_ttl = ttl
-            assert extended, "看门狗未在窗口内重置锁 TTL（续期事件未观测到）"
-            other = ReentrantLock(lock_name, timeout=5)
+                time.sleep(0.2)
+            else:
+                pytest.fail("看门狗未在窗口内推进锁的到期时间")
+            other = ReentrantLock(lock_name, timeout=20)
             assert other.acquire(blocking=False) is False
         finally:
             lock.release()
