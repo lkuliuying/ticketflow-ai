@@ -4731,6 +4731,9 @@ ticketflow:
     transcriptHint: The submitter's chat with the AI assistant before handing off. Read only.
     transcriptFailed: Chat not found or not visible to you
   handoff:
+    linked: This chat was handed off as a ticket; the handler can view it there. Start a new chat to ask more.
+    viewTicket: View ticket
+    tag: Handed off
     action: Hand off to human
     title: Hand off to a human
     hint: The AI drafted this ticket from the chat. Review or edit it before submitting; the handler can view the chat in the ticket.

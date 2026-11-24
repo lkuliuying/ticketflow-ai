@@ -4729,6 +4729,9 @@ ticketflow:
     transcriptHint: 提交人转人工前与 AI 助手的对话，只读
     transcriptFailed: 对话不存在或无权查看
   handoff:
+    linked: 这段对话已转人工提单，处理人可在工单里查看。如需继续咨询，请新建对话。
+    viewTicket: 查看工单
+    tag: 已转人工
     action: 转人工提单
     title: 转人工提单
     hint: AI 已根据对话整理出工单内容，请确认或修改后提交，处理人可以在工单里查看这段对话。

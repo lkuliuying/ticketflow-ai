@@ -87,11 +87,15 @@ export function useAssistantSessions() {
     return ok;
   }
 
-  /** 有新问答时刷新排序：只更新时间，标题以服务端为准 */
-  function touch(pk: string) {
+  /** 局部更新一项并刷新排序：新问答只更新时间，转人工另外关联工单 */
+  function patch(pk: string, changes: Partial<AssistantSession> = {}) {
     const session = sessions.value.find(s => s.pk === pk);
-    if (session) upsert({ ...session, updated_time: new Date().toISOString() });
+    if (!session) return;
+    upsert({ ...session, ...changes, updated_time: new Date().toISOString() });
   }
+  const touch = (pk: string) => patch(pk);
+  const link = (pk: string, ticketId: string) =>
+    patch(pk, { ticket_id: ticketId });
 
   return {
     sessions,
@@ -105,6 +109,7 @@ export function useAssistantSessions() {
     rename,
     remove,
     drop,
+    link,
     touch
   };
 }

@@ -7,7 +7,8 @@ import type {
   AssistantSession,
   FeedbackVote
 } from "@/api/ticketflow/assistant";
-import type { TicketItem } from "@/api/ticketflow/tickets";
+import { ticketApi, type TicketItem } from "@/api/ticketflow/tickets";
+import { openTicketDetail } from "../../tickets/utils/ticketDetailDrawer";
 import { isSuccess } from "@/api/types";
 import { message as toast } from "@/utils/message";
 import { assistantSessionApi } from "@/api/ticketflow/assistant";
@@ -58,6 +59,9 @@ const questions = computed(() =>
   messages.value.filter(m => m.role === "user").map(m => m.content)
 );
 const busy = computed(() => streaming.value || drafting.value || loading.value);
+/** 已转人工的会话只读：对话保留在工单里，继续咨询请新建对话 */
+const handedOff = computed(() => Boolean(props.session.ticket_id));
+const openingTicket = ref(false);
 let alive = true;
 onBeforeUnmount(() => {
   alive = false;
@@ -73,7 +77,8 @@ watch(
 
 async function send() {
   const text = input.value.trim();
-  if (!text || busy.value || text.length > QUESTION_MAX) return;
+  if (!text || busy.value || handedOff.value || text.length > QUESTION_MAX)
+    return;
   const first = messages.value.length === 0;
   const pk = props.session.pk;
   input.value = "";
@@ -128,8 +133,18 @@ async function vote(message: AssistantMessage, value: FeedbackVote) {
   }
 }
 
+/** 打开关联工单：会话里只有工单 ID，先取详情拿到工单号作抽屉标题 */
+async function openLinkedTicket() {
+  const ticketId = props.session.ticket_id;
+  if (!ticketId || openingTicket.value) return;
+  openingTicket.value = true;
+  const res = await ticketApi.retrieve<TicketItem>(ticketId).catch(() => null);
+  openingTicket.value = false;
+  if (res && isSuccess(res) && res.data) openTicketDetail(res.data, {});
+}
+
 async function handoff() {
-  if (busy.value) return;
+  if (busy.value || handedOff.value) return;
   const pk = props.session.pk;
   drafting.value = true;
   const draft = await loadHandoffDraft(pk, questions.value);
@@ -147,7 +162,7 @@ async function handoff() {
     >
       <h3 class="m-0 truncate text-base">{{ session.title }}</h3>
       <el-button
-        v-if="canHandoff"
+        v-if="canHandoff && !handedOff"
         :icon="Service"
         :loading="drafting"
         :disabled="streaming || questions.length === 0"
@@ -194,7 +209,26 @@ async function handoff() {
       </div>
     </el-scrollbar>
 
-    <footer class="flex flex-col gap-2 pt-3">
+    <el-alert
+      v-if="handedOff"
+      type="success"
+      :closable="false"
+      show-icon
+      class="mt-3"
+      :title="t('ticketflow.handoff.linked')"
+      data-testid="assistant-handed-off"
+    >
+      <el-button
+        link
+        type="primary"
+        :loading="openingTicket"
+        data-testid="assistant-open-ticket"
+        @click="openLinkedTicket"
+      >
+        {{ t("ticketflow.handoff.viewTicket") }}
+      </el-button>
+    </el-alert>
+    <footer v-else class="flex flex-col gap-2 pt-3">
       <el-alert
         v-if="error"
         type="error"
