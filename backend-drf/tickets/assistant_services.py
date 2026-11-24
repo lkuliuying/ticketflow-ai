@@ -5,13 +5,18 @@ from uuid import UUID
 from django.apps import apps
 from django.db import transaction
 from django.db.models import Count, Q
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 
 from tickets.models import AssistantFeedback, AssistantMessage, AssistantSession, Category
 from tickets.policy import TicketAccess
 
 HISTORY_TURNS = 10
 HISTORY_CHARACTERS = 8000
+
+
+class SessionHandedOff(APIException):
+    status_code = 409
+    default_detail = "会话已转人工，请新建对话"
 
 
 def require_employee(access: TicketAccess) -> None:
@@ -51,6 +56,8 @@ def conversation_context(session: AssistantSession) -> dict[str, object]:
 @transaction.atomic
 def record_question(user_id: int, session_id: UUID, message: str) -> dict[str, object]:
     session = owned_session(user_id, session_id, lock=True)
+    if session.ticket_id is not None:
+        raise SessionHandedOff()
     context = conversation_context(session)
     references = []
     if apps.is_installed("knowledge"):

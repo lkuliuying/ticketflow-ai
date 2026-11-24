@@ -25,6 +25,8 @@ SSE 建流前的失败沿用 HTTP 错误信封。建流后的失败以 `error` �
 
 回答写入 DRF 后才发送 `done`。生成失败保存已生成正文及 `failed` 状态，并以 `error` 结束。客户端断开时保存已生成正文及 `interrupted` 状态。引用只包含文章 ID 和标题。草稿分类来自会话上下文，标题和描述上限分别为 200 和 20000 字。
 
+会话关联工单后，新提问在建流前返回 HTTP 409 和 `{"code":409,"error":"CONFLICT","detail":"会话已转人工，请新建对话"}`。已经开始的回答仍会写回会话。转人工草稿中的问题、操作和结果以员工明确提供的信息为准，必要时单独注明助手建议的来源。
+
 ## 本地启动
 
 从 [`.env.example`](.env.example) 复制出 `.env`，或直接设置同名环境变量。将 `JWT_SIGNING_KEY` 填为 DRF 的 `SIMPLE_JWT.SIGNING_KEY`，部署时向两边显式注入同一个密钥。使用 `backend-drf/compose.test.yml` 的 Redis 时，将 `AUTH_REDIS_URL` 设为 `redis://127.0.0.1:56379/1`。

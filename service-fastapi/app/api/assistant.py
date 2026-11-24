@@ -32,7 +32,11 @@ async def prepare_chat(body: ChatRequest, user: CurrentUser, resources: AppResou
     "/chat/stream",
     status_code=200,
     response_class=EventStreamResponse,
-    responses={**ERRORS, 200: {"content": SSE_CONTENT}},
+    responses={
+        **ERRORS,
+        200: {"content": SSE_CONTENT},
+        409: {"model": ErrorResponse, "description": "会话已转人工，请新建对话"},
+    },
 )
 async def chat(stream: Annotated[ChatStream, Depends(prepare_chat)], resources: AppResources) -> EventStreamResponse:
     deadline = asyncio.get_running_loop().time() + resources.settings.stream_timeout

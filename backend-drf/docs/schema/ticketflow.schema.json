@@ -194,6 +194,7 @@
       "description": "created_from/created_to 双端含边界，分别按会话创建、问题创建、当前投票更新时间、关联工单创建过滤。包含员工软删除的会话。"
     },
     "assistantQuestionInput": {
+      "description": "POST /api/assistant/internal/sessions/{id}/question。会话已关联工单时返回 HTTP 409，code 为 409，detail 为“会话已转人工，请新建对话”。",
       "type": "object",
       "required": ["message"],
       "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 4000}}
@@ -236,7 +237,7 @@
         "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantReference"}},
         "status": {"$ref": "#/$defs/assistantMessageStatus"}
       },
-      "description": "首次写回保存并返回 assistant_message_id；重放返回原 ID，保留首次写入内容。已完成回答要求非空正文。"
+      "description": "首次写回保存并返回 assistant_message_id；重放返回原 ID，保留首次写入内容。已完成回答要求非空正文。转人工后仍允许写回已有提问的回答。"
     },
     "assistantAnswerResult": {
       "type": "object",
