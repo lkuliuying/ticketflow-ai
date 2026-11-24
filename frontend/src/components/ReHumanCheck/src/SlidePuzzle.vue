@@ -170,8 +170,8 @@ function onKey(event: KeyboardEvent) {
   left: -1px;
   height: 40px;
   color: var(--el-color-white);
-  cursor: grab;
   touch-action: none;
+  cursor: grab;
   background: var(--el-color-primary);
   border-radius: var(--el-border-radius-base);
 }

@@ -58,6 +58,23 @@ describe("useAssistantSessions", () => {
     expect(s.activeId.value).toBe("s3");
   });
 
+  it("列表加载期间新建的会话不会被迟到的列表响应换掉", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    mocks.list.mockReturnValue(
+      new Promise(resolve => {
+        finish = resolve;
+      })
+    );
+    mocks.create.mockResolvedValue(ok(session("s3")));
+    const s = useAssistantSessions();
+    const loading = s.load();
+    await s.create();
+    finish(page([session("s1")]));
+    await loading;
+    expect(s.sessions.value.map(x => x.pk)).toEqual(["s3", "s1"]);
+    expect(s.activeId.value).toBe("s3");
+  });
+
   it("删除当前会话后选中下一条；204 空响应也视为成功", async () => {
     mocks.list.mockResolvedValue(page([session("s1"), session("s2")]));
     mocks.remove.mockResolvedValue("");

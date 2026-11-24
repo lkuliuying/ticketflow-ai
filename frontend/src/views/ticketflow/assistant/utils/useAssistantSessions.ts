@@ -31,7 +31,12 @@ export function useAssistantSessions() {
       .catch(() => null);
     loading.value = false;
     if (!res || !isSuccess(res)) return;
-    sessions.value = res.data?.results ?? [];
+    // 列表请求在途时新建的会话不在响应里：保留在最前，避免当前会话被换掉
+    const fetched = res.data?.results ?? [];
+    const created = sessions.value.filter(
+      s => untitled.value.has(s.pk) && !fetched.some(f => f.pk === s.pk)
+    );
+    sessions.value = [...created, ...fetched];
     if (!sessions.value.some(s => s.pk === activeId.value)) {
       activeId.value = sessions.value[0]?.pk ?? null;
     }
@@ -46,7 +51,7 @@ export function useAssistantSessions() {
     creating.value = false;
     if (!res || !isSuccess(res) || !res.data) return null;
     sessions.value = [res.data, ...sessions.value];
-    untitled.value = new Set(untitled.value).add(res.data.pk);
+    untitled.value.add(res.data.pk);
     activeId.value = res.data.pk;
     return res.data;
   }
@@ -61,11 +66,7 @@ export function useAssistantSessions() {
   }
 
   async function rename(pk: string, title: string): Promise<boolean> {
-    if (untitled.value.has(pk)) {
-      const next = new Set(untitled.value);
-      next.delete(pk);
-      untitled.value = next;
-    }
+    untitled.value.delete(pk); // ref 包裹的 Set 是响应式代理，增删会触发更新
     const res = await assistantSessionApi.rename(pk, title).catch(() => null);
     if (!res || !isSuccess(res) || !res.data) return false;
     upsert(res.data);
