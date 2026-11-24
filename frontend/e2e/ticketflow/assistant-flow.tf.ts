@@ -17,7 +17,18 @@ test("员工向 AI 提问、点赞并转人工提单", async ({ page }) => {
   await page.getByTestId("workbench-assistant").click();
   await expect(page).toHaveURL(/ticketflow\/assistant\/index/);
 
+  // 进入页面会自动选中最近的会话：等新建返回、切到新会话后再输入，避免输进旧会话
+  const created = page.waitForResponse(
+    r =>
+      r.request().method() === "POST" &&
+      /\/api\/assistant\/sessions\/?$/.test(new URL(r.url()).pathname)
+  );
   await page.getByTestId("session-create").click();
+  const session = (await (await created).json()).data as { pk: string };
+  await expect(page.getByTestId(`session-${session.pk}`)).toHaveAttribute(
+    "aria-current",
+    "true"
+  );
   const chat = page.getByTestId("assistant-chat");
   await expect(chat).toBeVisible();
   await chat.getByTestId("assistant-input").fill(question);
