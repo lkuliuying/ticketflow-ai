@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.core.config import Settings
 from app.core.errors import ProviderError, invalid_output, provider_timeout
+from app.schemas.assistant import MAX_HANDOFF_DESCRIPTION_LENGTH, AssistantContext, HandoffDraft, QuestionContext
 from app.schemas.context import TicketContext
 from app.schemas.tickets import AnalysisDraft, Priority, unique_tags
 from app.services import prompts
@@ -19,6 +20,10 @@ class LLMProvider(Protocol):
 
     # Async generators support closing the upstream response when the client disconnects.
     def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]: ...
+
+    def stream_chat(self, context: QuestionContext, question: str) -> AsyncGenerator[str]: ...
+
+    async def handoff_draft(self, context: AssistantContext) -> HandoffDraft: ...
 
 
 class MockProvider:
@@ -55,18 +60,39 @@ class MockProvider:
             tags.append("客服")
         return AnalysisDraft(category=category, suggested_priority=priority, summary=text[:4000], tags=tags)
 
-    async def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]:
+    async def _split(self, text: str) -> AsyncGenerator[str]:
         await self._wait()
-        title = context.ticket.title[:200]
-        text = (
-            f"您好，已收到您反馈的「{title}」。我们会核对问题发生时的环境和相关配置，"
-            "并跟进处理进展。若方便，请补充问题出现的时间、操作步骤及可公开的报错信息。感谢您的配合。"
-        )
         chunks = min(self.settings.mock_chunks, len(text))
         for index in range(chunks):
             if index:
                 await sleep(self.settings.mock_chunk_delay)
             yield text[index * len(text) // chunks : (index + 1) * len(text) // chunks]
+
+    def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]:
+        title = context.ticket.title[:200]
+        text = (
+            f"您好，已收到您反馈的「{title}」。我们会核对问题发生时的环境和相关配置，"
+            "并跟进处理进展。若方便，请补充问题出现的时间、操作步骤及可公开的报错信息。感谢您的配合。"
+        )
+        return self._split(text)
+
+    def stream_chat(self, context: QuestionContext, question: str) -> AsyncGenerator[str]:
+        text = prompts.NO_KNOWLEDGE_ANSWER
+        if context.references:
+            text = "可参考以下知识库内容：\n" + "\n".join(
+                f"{index}. {ref.title}：{ref.excerpt}" for index, ref in enumerate(context.references, 1)
+            )
+        return self._split(text)
+
+    async def handoff_draft(self, context: AssistantContext) -> HandoffDraft:
+        await self._wait()
+        question = next((turn.content for turn in reversed(context.history) if turn.role == "user"), "").strip()
+        category = "OTHER" if "OTHER" in context.categories else context.categories[0]
+        return HandoffDraft(
+            title=question[:200] or "IT 支持请求",
+            description=question[:MAX_HANDOFF_DESCRIPTION_LENGTH] or "请补充遇到的问题和已尝试的操作。",
+            category=category,
+        )
 
 
 class CompletionMessage(BaseModel):
@@ -136,27 +162,39 @@ class OpenAICompatibleProvider:
             raise ValueError("LLM_API_KEY is required")
         self.headers = {"Authorization": f"Bearer {settings.llm_api_key.get_secret_value()}"}
 
-    def _payload(self, prompt: str, context: TicketContext) -> dict[str, object]:
-        payload: dict[str, object] = {"model": self.model, "messages": prompts.messages(prompt, context)}
+    def _payload(self, messages: list[prompts.Message]) -> dict[str, object]:
+        payload: dict[str, object] = {"model": self.model, "messages": messages}
         if self.thinking != "default":
             payload["thinking"] = {"type": self.thinking}
         return payload
 
-    async def analyze(self, context: TicketContext) -> AnalysisDraft:
-        payload = self._payload(prompts.ANALYSIS_PROMPT, context)
+    async def _complete[T: BaseModel](self, messages: list[prompts.Message], schema: type[T]) -> T:
+        payload = self._payload(messages)
         payload["response_format"] = {"type": "json_object"}
         try:
             response = await self.http.post(self.url, headers=self.headers, json=payload, timeout=self.timeout)
             _check_status(response)
             completion = Completion.model_validate_json(response.content)
-            return AnalysisDraft.model_validate_json(completion.choices[0].message.content)
+            return schema.model_validate_json(completion.choices[0].message.content)
         except httpx.RequestError as exc:
             raise _request_error(exc) from exc
         except ValidationError as exc:
             raise invalid_output() from exc
 
-    async def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]:
-        payload = self._payload(prompts.REPLY_PROMPT, context)
+    async def analyze(self, context: TicketContext) -> AnalysisDraft:
+        return await self._complete(prompts.messages(prompts.ANALYSIS_PROMPT, context), AnalysisDraft)
+
+    async def handoff_draft(self, context: AssistantContext) -> HandoffDraft:
+        return await self._complete(prompts.handoff_messages(context), HandoffDraft)
+
+    def stream_reply(self, context: TicketContext) -> AsyncGenerator[str]:
+        return self._stream(prompts.messages(prompts.REPLY_PROMPT, context))
+
+    def stream_chat(self, context: QuestionContext, question: str) -> AsyncGenerator[str]:
+        return self._stream(prompts.chat_messages(context, question))
+
+    async def _stream(self, messages: list[prompts.Message]) -> AsyncGenerator[str]:
+        payload = self._payload(messages)
         payload["stream"] = True
         headers = {**self.headers, "Accept": "text/event-stream"}
         try:

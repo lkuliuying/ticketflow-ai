@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 from redis.asyncio.retry import Retry
 from redis.backoff import NoBackoff
 
-from app.api import health, tickets
+from app.api import assistant, health, tickets
 from app.core.config import Settings
 from app.core.errors import register_error_handlers
 from app.core.resources import Resources
@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health.router, prefix="/ai/v1")
     app.include_router(tickets.router, prefix="/ai/v1")
+    app.include_router(assistant.router, prefix="/ai/v1")
     return app
 
 

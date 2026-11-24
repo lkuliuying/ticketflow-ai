@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
+from app.schemas.context import Reference
+
 Priority = Literal["P0", "P1", "P2", "P3"]
 Summary = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
@@ -32,12 +34,7 @@ class AnalysisResponse(AnalysisDraft):
     ticket_version: Annotated[int, Field(ge=1)]
 
 
-class StreamReference(BaseModel):
-    article_id: UUID
-    title: str
-
-
 class StreamMeta(BaseModel):
     ticket_id: UUID
     ticket_version: Annotated[int, Field(ge=1)]
-    references: list[StreamReference]
+    references: list[Reference]

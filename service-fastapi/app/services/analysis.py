@@ -13,7 +13,7 @@ from app.core.resources import Resources, upstream_slot
 from app.schemas.context import TicketContext
 from app.schemas.tickets import AnalysisDraft, AnalysisResponse
 from app.services import prompts
-from app.services.retry import reacquire_slot
+from app.services.retry import generate_with_retry
 
 CACHE_PREFIX = "ticketflow:ai:analysis"
 
@@ -75,13 +75,7 @@ async def _generate(resources: Resources, context: TicketContext) -> AnalysisDra
         await slot.enter_async_context(upstream_slot(resources))
         try:
             async with timeout(resources.settings.llm_timeout):
-                try:
-                    draft = await resources.provider.analyze(context)
-                except ProviderError as exc:
-                    if not exc.retryable:
-                        raise
-                    await reacquire_slot(resources, slot)
-                    draft = await resources.provider.analyze(context)
+                draft = await generate_with_retry(resources, slot, lambda: resources.provider.analyze(context))
             return _validate_category(AnalysisDraft.model_validate(draft), context)
         except TimeoutError as exc:
             raise provider_timeout() from exc
