@@ -9,6 +9,8 @@ import { closeDrawer, loginAs, openTicket } from "./support";
 const stamp = `${new Date().toISOString().replace(/\D/g, "").slice(0, 17)}-${Math.random().toString(36).slice(2, 6)}`;
 const question = `VPN 连不上怎么办？（冒烟 ${stamp}）`;
 const ticketTitle = `AI 转人工冒烟 ${stamp}`;
+/** 转人工建单后从详情抽屉读出的工单号，供管理员在 AI 反馈页定位本次记录 */
+let ticketNumber = "";
 
 test.describe.configure({ mode: "serial" });
 
@@ -24,7 +26,9 @@ test("员工向 AI 提问、点赞并转人工提单", async ({ page }) => {
       /\/api\/assistant\/sessions\/?$/.test(new URL(r.url()).pathname)
   );
   await page.getByTestId("session-create").click();
-  const session = (await (await created).json()).data as { pk: string };
+  const createdResponse = await created;
+  expect(createdResponse.ok()).toBe(true);
+  const session = (await createdResponse.json()).data as { pk: string };
   await expect(page.getByTestId(`session-${session.pk}`)).toHaveAttribute(
     "aria-current",
     "true"
@@ -57,7 +61,13 @@ test("员工向 AI 提问、点赞并转人工提单", async ({ page }) => {
   await expect(dialog).toBeHidden();
 
   // 建单成功会打开新工单详情；关掉后会话应已转为只读
-  await expect(page.locator(".el-drawer").last()).toContainText(ticketTitle);
+  const ticketDrawer = page.locator(".el-drawer").last();
+  await expect(ticketDrawer).toContainText(ticketTitle);
+  ticketNumber =
+    (await ticketDrawer.getByTestId("ticket-header").innerText()).match(
+      /TF-[0-9A-F]+/
+    )?.[0] ?? "";
+  expect(ticketNumber).not.toBe("");
   await closeDrawer(page);
   await expect(chat.getByTestId("assistant-handed-off")).toBeVisible();
   await expect(chat.getByTestId("assistant-input")).toHaveCount(0);
@@ -82,6 +92,8 @@ test("管理员在工单里查看 AI 对话，并在 AI 反馈页看到转人工
   await expect(page.getByTestId("assistant-summary-sessions")).toBeVisible();
   await page.getByRole("tab", { name: "转人工会话" }).click();
   await expect(
-    page.getByTestId("assistant-handoffs").locator(".el-table__row").first()
+    page
+      .getByTestId("assistant-handoffs")
+      .locator(".el-table__row", { hasText: ticketNumber })
   ).toBeVisible();
 });
