@@ -385,11 +385,17 @@ def _agents(tasks: list[dict], runs: dict, git: dict) -> dict:
     live = next((t for t in codex_tasks if t["log"].get("active") or any(r.get("alive") for r in t["runs"])), None)
     latest = live or max(codex_tasks, key=lambda t: t["log"].get("updated") or "", default=None)
     log = latest["log"] if latest else {}
+    task_id = latest["id"] if latest else None
+    # 看板之外的临时任务（全量测试、修复、排查等）也有调度记录：进程还活着就按运行中显示
+    off_board = next((r for r in reversed(runs.get("codex", [])) if r.get("alive")), None)
+    if not live and off_board:
+        task_id = off_board.get("task")
+        log = parse_codex_log(REPORTS / f"{task_id}.log")
     if log.get("header", {}).get("model"):
         agents["codex"]["model"] = f"{log['header']['model']} · {log['header'].get('reasoning_effort') or ''}".strip(" ·")
     agents["codex"].update(
-        state="running" if live else ("error" if log.get("errors") and not log.get("messages") else "idle"),
-        task=latest["id"] if latest else None,
+        state="running" if live or off_board else ("error" if log.get("errors") and not log.get("messages") else "idle"),
+        task=task_id,
         activity=log.get("last_message", ""),
         log=log,
         runs=runs.get("codex", []),
