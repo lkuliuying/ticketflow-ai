@@ -3,7 +3,13 @@ import { computed, onActivated, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import dayjs from "dayjs";
-import { Plus, Reading, Tickets, User } from "@element-plus/icons-vue";
+import {
+  ChatDotRound,
+  Plus,
+  Reading,
+  Tickets,
+  User
+} from "@element-plus/icons-vue";
 import { useUserStoreHook } from "@/store/modules/user";
 import { usePageAuth } from "@/router/utils";
 import type { TicketItem } from "@/api/ticketflow/tickets";
@@ -26,12 +32,14 @@ defineOptions({
 const LOGO_URL = "/logo.svg";
 const TICKETS_PATH = "/ticketflow/tickets/index";
 const KNOWLEDGE_PATH = "/ticketflow/knowledge/index";
+const ASSISTANT_PATH = "/ticketflow/assistant/index";
 
 const { t, locale } = useI18n();
 const router = useRouter();
 const user = useUserStoreHook();
 const ticketAuth = usePageAuth("TicketFlowTickets");
 const articleAuth = usePageAuth("TicketFlowKnowledge");
+const assistantAuth = usePageAuth("TicketFlowAssistant");
 const { dashboard, tickets, articles, loading, loaded, stats, reload } =
   useWorkbench({
     tickets: () => Boolean(ticketAuth.list),
@@ -104,6 +112,16 @@ onActivated(() => {
             @click="goTickets({ create: '1' })"
           >
             {{ t("workbench.createTicket") }}
+          </el-button>
+          <el-button
+            v-if="assistantAuth.list && role === 'requester'"
+            type="primary"
+            plain
+            :icon="ChatDotRound"
+            data-testid="workbench-assistant"
+            @click="router.push(ASSISTANT_PATH)"
+          >
+            {{ t("workbench.assistant") }}
           </el-button>
           <el-button
             v-if="role === 'admin'"

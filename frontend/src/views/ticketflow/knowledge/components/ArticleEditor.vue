@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import type { FormInstance, FormRules } from "element-plus";
 import { renderMarkdown } from "@/utils/markdown";
 import type { ArticlePayload } from "@/api/ticketflow/knowledge";
+import { TICKET_CATEGORIES as CATEGORIES } from "@/api/ticketflow/tickets";
 
 /**
  * 知识库文章编辑表单：标题、分类、标签与 Markdown 正文，正文可切换预览。
@@ -11,8 +12,6 @@ import type { ArticlePayload } from "@/api/ticketflow/knowledge";
  * 手写原因：正文需要预览、标签是可自由新增的字符串数组，元数据表单表达不了。
  */
 defineOptions({ name: "TicketFlowArticleEditor" });
-
-const CATEGORIES = ["ACCOUNT", "ACCESS", "NETWORK", "SERVICE", "OTHER"];
 
 const props = defineProps<{ initial?: Partial<ArticlePayload> }>();
 const { t } = useI18n();

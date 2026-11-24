@@ -1138,6 +1138,8 @@ menus:
   ticketflowRatingStats: Rating Statistics
   ticketflowAccounts: Accounts
   ticketflowSkillGroups: Skill Groups
+  ticketflowAssistant: AI Assistant
+  ticketflowAssistantFeedback: AI Feedback
   searchData: Data search
   userOnline: Online users
   apiApp: API applications
@@ -4686,6 +4688,76 @@ ticketflow:
     DUE_SOON: Due Soon
     OVERDUE: Overdue
     MET: Met
+  assistant:
+    newSession: New chat
+    noSessions: No chats yet
+    sessionActions: Chat actions
+    rename: Rename
+    remove: Delete
+    renamePrompt: Enter a new chat title
+    titleInvalid: Title must be 1-200 characters
+    renamed: Renamed
+    removeConfirm: Delete chat "{title}"? It will no longer appear in the list.
+    removed: Chat deleted
+    welcomeTitle: Ask the AI assistant first
+    welcomeHint: Answers are based only on published knowledge articles. If it doesn't help, hand off to a human in one click.
+    emptyChat: No messages yet. Ask a question to start.
+    placeholder: "Describe your problem, e.g. VPN won't connect?"
+    inputHint: Enter to send, Shift + Enter for a new line
+    send: Send
+    stop: Stop
+    sendFailed: Failed to send. Please try again later.
+    references: Based on {count} knowledge article(s)
+    up: Helpful
+    down: Not helpful
+    reason: Reason
+    comment: Comment
+    commentPlaceholder: Optional. Tell us what was wrong.
+    commentTooLong: Comment can be at most {max} characters
+    downTitle: What was wrong with this answer?
+    feedbackSaved: Thanks for your feedback
+    reasonValue:
+      INACCURATE: Inaccurate
+      UNRESOLVED: Didn't solve it
+      IRRELEVANT: Irrelevant references
+      OTHER: Other
+    answerStatus:
+      complete: Complete
+      interrupted: Answer incomplete (stopped or disconnected)
+      failed: Failed to generate an answer
+    viewTranscript: View AI chat
+    transcriptTitle: AI chat
+    transcriptTitleWithNumber: AI chat · {number}
+    transcriptHint: The submitter's chat with the AI assistant before handing off. Read only.
+    transcriptFailed: Chat not found or not visible to you
+  handoff:
+    action: Hand off to human
+    title: Hand off to a human
+    hint: The AI drafted this ticket from the chat. Review or edit it before submitting; the handler can view the chat in the ticket.
+    titleRequired: Please enter a title
+    descriptionRequired: Please describe the problem
+    tooLong: At most {max} characters
+    draftFailed: The AI couldn't draft the ticket. Your questions were prefilled; please complete it.
+    created: Ticket {number} submitted
+  assistantFeedback:
+    summary:
+      sessions: Chats
+      questions: Questions
+      upRate: Positive rate
+      handoffRate: Handoff rate
+    votes: Up {up} · Down {down}
+    handoffCount: "{count} handoff(s)"
+    scopeHint: Only downvoted answers and handed-off chats are shown; other chats only count toward the statistics
+    downvotes: Downvoted answers
+    handoffs: Handed-off chats
+    noDownvotes: No downvoted answers
+    noHandoffs: No handed-off chats
+    votedAt: Downvoted at
+    user: Asked by
+    question: Question
+    handedOffAt: Handed off at
+    sessionTitle: Chat title
+    operation: Actions
   categoryValue:
     ACCOUNT: Account
     ACCESS: Access
@@ -4700,6 +4772,7 @@ workbench:
     afternoon: Good afternoon, {name}
     evening: Good evening, {name}
   createTicket: New ticket
+  assistant: AI Assistant
   myTickets: My tickets
   allTickets: All tickets
   myTodo: My to-do
