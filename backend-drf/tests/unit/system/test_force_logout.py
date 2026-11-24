@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """强制下线：用户级令牌失效时间戳 + refresh 拉黑 + action。"""
 
-import time
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.conf import settings
@@ -55,17 +54,19 @@ def test_force_logout_revokes_existing_access_tokens():
         ServerAccessToken(old_token).verify()
 
 
-def test_token_issued_after_logout_still_works():
+def test_token_issued_after_logout_still_works(monkeypatch):
     user = _make_user()
-    force_logout_user(user.pk)
-    # iat 秒级粒度：同秒内重新签发会被误杀，下一秒起自动恢复（登录耗时远大于 1s）
-    time.sleep(1.1)
-    _valid_access(_access_token(user))
+    issued_at = datetime.now(UTC).replace(microsecond=0)
+    with monkeypatch.context() as clock:
+        clock.setattr("identity.utils.session.timezone.now", lambda: issued_at - timedelta(seconds=1))
+        force_logout_user(user.pk)
+    with monkeypatch.context() as clock:
+        clock.setattr("rest_framework_simplejwt.tokens.aware_utcnow", lambda: issued_at)
+        token = _access_token(user)
+    _valid_access(token)
 
 
 def test_force_logout_blacklists_refresh_tokens():
-    from datetime import datetime
-
     from rest_framework_simplejwt.tokens import RefreshToken
 
     user = _make_user()

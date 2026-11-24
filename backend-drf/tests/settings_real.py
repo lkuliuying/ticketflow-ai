@@ -57,6 +57,8 @@ _pg_database = os.environ.get("DB_DATABASE", "xadmin_realtest")
 _real_config = Config()
 _real_config["SECRET_KEY"] = "test-only-secret-key-0123456789abcdef"
 _real_config["XADMIN_APPS"] = ["tickets", "knowledge", "demo"]
+# 容忍虚拟机墙钟回跳，保留签发时间用于令牌撤销判断。
+_real_config["JWT_LEEWAY_SECONDS"] = 30
 # 前置 Config 注入（loadtest/settings_loadtest.py 同款形态）：让 base settings 的
 # DATABASES / CACHES / CHANNEL_LAYERS 按真实 PG + Redis 参数构造——psycopg3 连接池
 # （OPTIONS.pool）与 django_redis（生产同款 backend 与参数）由此被测试首次真实创建。

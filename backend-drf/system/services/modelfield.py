@@ -27,7 +27,7 @@ def _sync_children(parent: ModelLabelField, labels: dict[str, Any]) -> set[Any]:
     """按父节点批量写入字段，保留现有主键和字段白名单引用。"""
     existing = {
         row.name: row
-        for row in ModelLabelField.objects.filter(parent=parent, field_type=parent.field_type).only("name")
+        for row in ModelLabelField.objects.filter(parent=parent, field_type=parent.field_type).only("name", "modifier")
     }
     created, updated = [], []
     updated_time = timezone.now()
@@ -42,9 +42,10 @@ def _sync_children(parent: ModelLabelField, labels: dict[str, Any]) -> set[Any]:
         else:
             row.label = label
             row.updated_time = updated_time
+            on_update_set_modifier(ModelLabelField, row)
             updated.append(row)
     ModelLabelField.objects.bulk_create(created)
-    ModelLabelField.objects.bulk_update(updated, ["label", "updated_time"])
+    ModelLabelField.objects.bulk_update(updated, ["label", "updated_time", "modifier"])
     return {row.pk for row in created + updated}
 
 

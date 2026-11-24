@@ -29,7 +29,7 @@ def branding_rows(seed_creator_user):
     # 使用正式主键和品牌字段构造回灌前的记录，回灌本身仍走完整种子装载。
     site = next(row for row in read_model_rows("system.systemconfig") if row["fields"]["key"] == "WEB_SITE_CONFIG")
     group = next(row for row in read_model_rows("identity.deptinfo") if row["fields"]["code"] == "xadmin")
-    config = SystemConfig.objects.create(pk=site["pk"], key="WEB_SITE_CONFIG", value=site["fields"]["value"])
+    config = SystemConfig.objects.create(pk=site["pk"], key="WEB_SITE_CONFIG", value=dict(site["fields"]["value"]))
     department = DeptInfo.objects.create(pk=group["pk"], code="xadmin", name=group["fields"]["name"])
     return config, department
 

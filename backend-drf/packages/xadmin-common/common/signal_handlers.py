@@ -157,7 +157,8 @@ def on_create_set_creator(sender: Any, instance: Any = None, **kwargs: Any) -> N
 def on_update_set_modifier(sender: Any, instance: Any = None, **kwargs: Any) -> None:
     if getattr(instance, "_ignore_auto_modifier", False):
         return
-    if hasattr(instance, "modifier"):
+    # 先检查模型类，避免读取外键对象时产生额外查询。
+    if hasattr(type(instance), "modifier") or hasattr(instance, "modifier"):
         modifier = _get_request_user()
         if modifier:
             instance.modifier = modifier

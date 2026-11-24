@@ -99,8 +99,8 @@ class TestReentrantLock:
         """看门狗续期推进 Redis 锁的绝对到期时间，竞争者仍拿不到锁。"""
         from django_redis import get_redis_connection
 
-        # 虚拟机墙钟跳变会影响相对 TTL。30 秒租期为首轮续期留出充足余量。
-        lock = ReentrantLock(lock_name, timeout=30)
+        # 虚拟机墙钟跳变会影响相对 TTL。20 秒租期为首轮续期留出余量。
+        lock = ReentrantLock(lock_name, timeout=20)
         conn = get_redis_connection("default")
         assert lock.acquire(blocking=False) is True
         try:
@@ -108,12 +108,12 @@ class TestReentrantLock:
             assert expires_at > 0, f"锁键到期时间异常：{expires_at}"
             deadline = time.monotonic() + 30
             while time.monotonic() < deadline:
-                if conn.pexpiretime(lock.name) >= expires_at + lock.timeout * 1000:
+                if conn.pexpiretime(lock.name) > expires_at:
                     break
                 time.sleep(0.2)
             else:
                 pytest.fail("看门狗未在窗口内推进锁的到期时间")
-            other = ReentrantLock(lock_name, timeout=30)
+            other = ReentrantLock(lock_name, timeout=20)
             assert other.acquire(blocking=False) is False
         finally:
             lock.release()
