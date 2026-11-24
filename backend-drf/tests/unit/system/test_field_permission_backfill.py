@@ -14,10 +14,13 @@ get_allow_fields）：角色在某权限点上没有非空白名单时，该接�
 
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from django.core.management import call_command
+from django.db import transaction
 
+from common.core.modelset import metadata
 from identity.models import UserRole
 from system.models import FieldPermission, Menu, MenuMeta, ModelLabelField
 from system.services.permission_sync import (
@@ -180,6 +183,33 @@ def test_fill_creates_whitelist_for_missing_pair(demo_role: Any, bound_menu: Any
     assert len(filled) == 1
     permission = FieldPermission.objects.get(role=demo_role, menu=bound_menu)
     assert set(permission.field.values_list("name", flat=True)) == {"title", "amount"}
+
+
+def test_fill_invalidates_metadata_cache_after_commit(
+    demo_role: Any, monkeypatch: pytest.MonkeyPatch, django_capture_on_commit_callbacks: Any
+) -> None:
+    invalidate = Mock()
+    monkeypatch.setattr(metadata, "invalidate_metadata_payload_cache", invalidate)
+
+    with django_capture_on_commit_callbacks(execute=True), transaction.atomic():
+        assert len(fill_field_permissions(roles=[demo_role])) == 1
+        invalidate.assert_not_called()
+
+    invalidate.assert_called_once_with()
+
+
+def test_fill_does_not_invalidate_metadata_cache_on_rollback(
+    demo_role: Any, bound_menu: Any, monkeypatch: pytest.MonkeyPatch, django_capture_on_commit_callbacks: Any
+) -> None:
+    invalidate = Mock()
+    monkeypatch.setattr(metadata, "invalidate_metadata_payload_cache", invalidate)
+
+    with django_capture_on_commit_callbacks(execute=True), transaction.atomic():
+        assert len(fill_field_permissions(roles=[demo_role])) == 1
+        transaction.set_rollback(True)
+
+    invalidate.assert_not_called()
+    assert not FieldPermission.objects.filter(role=demo_role, menu=bound_menu).exists()
 
 
 def test_fill_treats_empty_row_as_gap(demo_role: Any, bound_menu: Any) -> None:

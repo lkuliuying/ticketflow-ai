@@ -44,6 +44,8 @@ def audit_field_permissions(roles: Any = None) -> Any:
     if roles is not None:
         grants = grants.filter(userrole_id__in=[role.pk for role in roles])
     granted = list(grants.select_related("userrole", "menu").order_by("-userrole__created_time", "-menu__created_time"))
+    if not granted:
+        return []
     bindings = list(
         Menu.model.through.objects.filter(menu_id__in={grant.menu_id for grant in granted}).values_list(
             "menu_id", "modellabelfield_id"
