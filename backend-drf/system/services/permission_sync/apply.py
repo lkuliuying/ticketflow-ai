@@ -337,9 +337,9 @@ def fill_field_permissions(roles: Any = None) -> Any:
         if replaced:
             through.objects.filter(fieldpermission_id__in=replaced).delete()
         through.objects.bulk_create(relations, ignore_conflicts=True, batch_size=1000)
+        # 批量写入不触发模型信号，等外层事务提交后统一失效一次元数据缓存。
+        transaction.on_commit(invalidate_metadata_payload_cache)
 
-    # 批量写入不触发模型信号，完成白名单后统一失效一次元数据缓存。
-    invalidate_metadata_payload_cache()
     logger.info("filled field permissions: %d (role, menu) pairs", len(filled))
     return filled
 
