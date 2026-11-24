@@ -17,20 +17,29 @@ from rest_framework.test import APIClient
 from common.core.config import UserConfig
 from identity.models import DeptInfo
 from system.models import SystemConfig
+from system.services.seeding import read_model_rows
 
 pytestmark = pytest.mark.django_db
 
 CONFIG_BASE_URL = "/api/system/configs"
 
 
+@pytest.fixture
+def branding_rows(seed_creator_user):
+    # 使用正式主键和品牌字段构造回灌前的记录，回灌本身仍走完整种子装载。
+    site = next(row for row in read_model_rows("system.systemconfig") if row["fields"]["key"] == "WEB_SITE_CONFIG")
+    group = next(row for row in read_model_rows("identity.deptinfo") if row["fields"]["code"] == "xadmin")
+    config = SystemConfig.objects.create(pk=site["pk"], key="WEB_SITE_CONFIG", value=site["fields"]["value"])
+    department = DeptInfo.objects.create(pk=group["pk"], code="xadmin", name=group["fields"]["name"])
+    return config, department
+
+
 @pytest.mark.parametrize(
     ("title", "department_name"),
     [("TicketFlow", "TicketFlow管理团队"), ("客户服务平台", "平台运维团队")],
 )
-def test_seeded_branding_survives_reload(title, department_name, seed_creator_user):
-    call_command("load_init_json", apps="settings,identity", verbosity=0)
-    config = SystemConfig.objects.get(key="WEB_SITE_CONFIG")
-    department = DeptInfo.objects.get(code="xadmin")
+def test_seeded_branding_survives_reload(title, department_name, branding_rows):
+    config, department = branding_rows
     assert config.value["Title"] == "TicketFlow"
     assert department.name == "TicketFlow管理团队"
 

@@ -126,12 +126,17 @@ METADATA_TARGETS = _collect_metadata_targets()
 
 
 @pytest.fixture
-def metadata_actor(target, seeded_module, superuser):
-    if target["cls"] in {AccountViewSet, SkillGroupViewSet}:
-        user = UserInfo.objects.create_user(username="metadata-admin")
-        user.roles.add(UserRole.objects.get(code=ADMIN_ROLE))
-        return user
-    return superuser
+def metadata_actor(target, menu_factory, superuser):
+    resources = {AccountViewSet: "TicketFlowAccounts", SkillGroupViewSet: "TicketFlowSkillGroups"}
+    resource = resources.get(target["cls"])
+    if resource is None:
+        return superuser
+    # 管理元数据复用对应的列表授权，并校验业务管理员身份。
+    role = UserRole.objects.create(code=ADMIN_ROLE, name="工单管理员")
+    role.menu.add(menu_factory(f"list:{resource}", path=f"{target['url'].lstrip('/')}$", method="GET"))
+    user = UserInfo.objects.create_user(username="metadata-admin")
+    user.roles.add(role)
+    return user
 
 
 def _assert_matches_schema(payload, schema_name: str):

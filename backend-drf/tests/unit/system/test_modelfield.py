@@ -125,10 +125,21 @@ def test_parent_filter_accepts_parent_name(superuser):
 @pytest.mark.django_db
 class TestSyncModelField:
     def test_sync_model_field_creates_label_fields(self):
+        from django.db import connection
+
         from system.models import ModelLabelField
         from system.services.modelfield import sync_model_field
 
-        sync_model_field()
+        insert_prefix = f'INSERT INTO "{ModelLabelField._meta.db_table}"'
+        inserted = 0
+
+        def count_inserts(execute, sql, params, many, context):
+            nonlocal inserted
+            inserted += sql.startswith(insert_prefix)
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(count_inserts):
+            sync_model_field()
         # 数据权限维度：所有表/所有字段节点存在
         assert ModelLabelField.objects.filter(field_type=ModelLabelField.FieldChoices.DATA, parent=None).exists()
         # 角色字段权限维度：按序列化器生成
@@ -136,6 +147,7 @@ class TestSyncModelField:
 
         # 幂等：重复执行不报错且数量收敛（旧记录被清理）
         count = ModelLabelField.objects.count()
+        assert inserted < count // 2, f"字段树写入 {count} 个节点发出了 {inserted} 条 INSERT"
         sync_model_field()
         assert ModelLabelField.objects.count() <= count
 

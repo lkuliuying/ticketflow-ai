@@ -34,8 +34,11 @@ TICKETS = "/api/tickets"
 
 
 def authenticated(user: UserInfo) -> APIClient:
+    token = RefreshToken.for_user(user).access_token
+    # 这些请求验证授权范围，给虚拟化环境的墙钟回跳留出余量。
+    token["iat"] -= 60
     client = APIClient()
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client
 
 

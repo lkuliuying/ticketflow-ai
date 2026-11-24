@@ -15,6 +15,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from system.models import Menu
 from system.services.seeding import PLATFORM, build_plan, discover, read_specs
 from system.services.seeding.ownership import analyse
 
@@ -25,42 +26,40 @@ def _rows(path: Path) -> list:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-@pytest.fixture(scope="module")
-def seeded(seeded_module):
-    """模块级装载：本文件全部用例只读种子（导出/统计），无需逐用例重装。"""
-
-    return seeded_module
+@pytest.fixture
+def identity_patch(menu_factory, tmp_path):
+    """给按应用筛选用例同时提供平台层、选中层和未选中层的菜单。"""
+    menu_factory("directory", menu_type=Menu.MenuChoices.DIRECTORY)
+    menu_factory("list:Users", path="api/identity/user$", method="GET")
+    menu_factory("list:Configs", path="api/system/configs$", method="GET")
+    menu_factory("list:Datasets", path="api/dataset/datasets$", method="GET")
+    call_command("dump_init_json", split_apps=True, apps="identity", output=str(tmp_path), verbosity=0)
+    return tmp_path
 
 
 class TestDumpSplitApps:
-    def test_only_selected_app_layers_are_written(self, seeded, tmp_path):
-        out = tmp_path / "patch"
-        call_command("dump_init_json", split_apps=True, apps="identity", output=str(out), verbosity=0)
-
+    def test_only_selected_app_layers_are_written(self, identity_patch):
+        out = identity_patch
         assert (out / PLATFORM / "menu.json").is_file() or (out / "loadjson" / "menu.json").is_file()
         assert (out / "identity" / "seeds" / "menu.json").is_file()
         assert not (out / "system" / "seeds" / "menu.json").exists()
         assert not (out / "dataset" / "seeds" / "menu.json").exists()
 
-    def test_platform_layer_keeps_only_shared_rows(self, seeded, tmp_path):
-        out = tmp_path / "patch"
-        call_command("dump_init_json", split_apps=True, apps="identity", output=str(out), verbosity=0)
-
+    def test_platform_layer_keeps_only_shared_rows(self, identity_patch):
+        out = identity_patch
         platform_menus = _rows(out / "loadjson" / "menu.json")
         identity_menus = _rows(out / "identity" / "seeds" / "menu.json")
         assert identity_menus
         assert len(platform_menus) < len(identity_menus) + len(platform_menus)
         assert all(row["fields"].get("menu_type") in (0, 1) for row in platform_menus)
 
-    def test_shared_platform_models_are_always_exported(self, seeded, tmp_path):
+    def test_shared_platform_models_are_always_exported(self, identity_patch):
         """角色/部门/站点配置等平台级模型不参与归属拆分，补丁里必须带上。"""
 
-        out = tmp_path / "patch"
-        call_command("dump_init_json", split_apps=True, apps="identity", output=str(out), verbosity=0)
         for name in ("userrole.json", "deptinfo.json", "setting.json", "datapermission.json"):
-            assert (out / "loadjson" / name).is_file(), name
+            assert (identity_patch / "loadjson" / name).is_file(), name
 
-    def test_export_is_idempotent(self, seeded, tmp_path):
+    def test_export_is_idempotent(self, seeded_module, tmp_path):
         first = tmp_path / "a"
         second = tmp_path / "b"
         call_command("dump_init_json", split_apps=True, output=str(first), verbosity=0)
@@ -70,7 +69,7 @@ class TestDumpSplitApps:
             assert other.is_file(), path
             assert path.read_bytes() == other.read_bytes(), path
 
-    def test_export_matches_ownership_counts(self, seeded, tmp_path):
+    def test_export_matches_ownership_counts(self, seeded_module, tmp_path):
         """导出不丢行：各层行数之和 == 库内归属统计的合计。"""
 
         out = tmp_path / "patch"
@@ -86,16 +85,18 @@ class TestDumpSplitApps:
             exported += len(_rows(path))
         assert exported == summary.totals["menu"]
 
-    def test_unknown_app_is_command_error(self, seeded, tmp_path):
+    def test_unknown_app_is_command_error(self, tmp_path):
         with pytest.raises(CommandError, match="未知应用"):
             call_command("dump_init_json", split_apps=True, apps="ghost", output=str(tmp_path), verbosity=0)
 
-    def test_plain_dump_still_writes_platform_and_warns(self, seeded, tmp_path, settings):
+    def test_plain_dump_still_writes_platform_and_warns(self, menu_factory, tmp_path, settings):
+        menu = menu_factory("list:Users", path="api/identity/user$", method="GET")
         settings.PROJECT_DIR = str(tmp_path)
         call_command("dump_init_json", verbosity=0)
         assert (tmp_path / "loadjson" / "menu.json").is_file()
+        assert any(row["pk"] == str(menu.pk) for row in _rows(tmp_path / "loadjson" / "menu.json"))
 
-    def test_registered_app_without_manifest_is_initialized(self, seeded, tmp_path, monkeypatch):
+    def test_registered_app_without_manifest_is_initialized(self, tmp_path, monkeypatch):
         """新应用还没有 seeds/manifest.json 时，显式 --apps 直接初始化（免手写）。"""
 
         from django.apps import apps as django_apps
