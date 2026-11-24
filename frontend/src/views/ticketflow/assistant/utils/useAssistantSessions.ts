@@ -4,6 +4,7 @@ import {
   assistantSessionApi,
   type AssistantSession
 } from "@/api/ticketflow/assistant";
+import { mergeFetched } from "./sessionList";
 
 /** 会话列表一次取回的上限：员工的历史会话通常不多，超出部分不在侧栏展示 */
 const PAGE_SIZE = 100;
@@ -19,6 +20,8 @@ export function useAssistantSessions() {
   const creating = ref(false);
   /** 本次进入页面后新建、尚未改过名的会话：首个问题可用来自动命名 */
   const untitled = ref(new Set<string>());
+  /** 列表请求在途期间新建的会话：响应里还没有它们，合并时要保留 */
+  const createdWhileLoading = new Set<string>();
 
   const active = computed(
     () => sessions.value.find(s => s.pk === activeId.value) ?? null
@@ -31,7 +34,9 @@ export function useAssistantSessions() {
       .catch(() => null);
     loading.value = false;
     if (!res || !isSuccess(res)) return;
-    sessions.value = res.data?.results ?? [];
+    const fetched = res.data?.results ?? [];
+    sessions.value = mergeFetched(sessions.value, fetched, createdWhileLoading);
+    createdWhileLoading.clear();
     if (!sessions.value.some(s => s.pk === activeId.value)) {
       activeId.value = sessions.value[0]?.pk ?? null;
     }
@@ -46,7 +51,8 @@ export function useAssistantSessions() {
     creating.value = false;
     if (!res || !isSuccess(res) || !res.data) return null;
     sessions.value = [res.data, ...sessions.value];
-    untitled.value = new Set(untitled.value).add(res.data.pk);
+    untitled.value.add(res.data.pk);
+    if (loading.value) createdWhileLoading.add(res.data.pk);
     activeId.value = res.data.pk;
     return res.data;
   }
@@ -61,11 +67,7 @@ export function useAssistantSessions() {
   }
 
   async function rename(pk: string, title: string): Promise<boolean> {
-    if (untitled.value.has(pk)) {
-      const next = new Set(untitled.value);
-      next.delete(pk);
-      untitled.value = next;
-    }
+    untitled.value.delete(pk); // ref 包裹的 Set 是响应式代理，增删会触发更新
     const res = await assistantSessionApi.rename(pk, title).catch(() => null);
     if (!res || !isSuccess(res) || !res.data) return false;
     upsert(res.data);
