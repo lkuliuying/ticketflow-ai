@@ -12,13 +12,22 @@ MODULES = (
             "TicketFlowRatingStats",
             "TicketFlowAccounts",
             "TicketFlowSkillGroups",
+            "TicketFlowAssistant",
+            "TicketFlowAssistantFeedback",
         ),
-        permissions=("api/tickets", "api/ticket-ratings", "api/ticketflow/accounts", "api/ticketflow/skill-groups"),
+        permissions=(
+            "api/tickets",
+            "api/ticket-ratings",
+            "api/ticketflow/accounts",
+            "api/ticketflow/skill-groups",
+            "api/assistant/",
+        ),
         routes=(
             r"^/api/tickets(?:/|$)",
             r"^/api/ticket-ratings(?:/|$)",
             r"^/api/ticketflow/accounts(?:/|$)",
             r"^/api/ticketflow/skill-groups(?:/|$)",
+            r"^/api/assistant/",
         ),
     ),
 )

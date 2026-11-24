@@ -287,7 +287,14 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "CategoryEnum": "file.serializers.upload.upload_category_choices",
         **(
-            {"TicketFlowCategoryEnum": "tickets.models.Category"}
+            {
+                "TicketFlowCategoryEnum": "tickets.models.Category",
+                "RoleEnum": "tickets.accounts.ROLE_CHOICES",
+                "AssistantMessageRoleEnum": "tickets.models.AssistantMessage.Role",
+                "AssistantMessageStatusEnum": "tickets.models.AssistantMessage.Status",
+                "AssistantFeedbackVoteEnum": "tickets.models.AssistantFeedback.Vote",
+                "AssistantFeedbackReasonEnum": "tickets.models.AssistantFeedback.Reason",
+            }
             if any(app.split(".", 1)[0] == "tickets" for app in CONFIG.XADMIN_APPS)
             else {}
         ),

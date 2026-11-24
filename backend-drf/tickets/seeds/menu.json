@@ -505,5 +505,217 @@
       "meta": "d2431bc0-217a-49eb-a6fa-000000000157",
       "model": []
     }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000180",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "assistantSession:TicketFlowTickets",
+      "rank": 18,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/assistant-session$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000181",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000182",
+    "fields": {
+      "name": "TicketFlowAssistant",
+      "path": "/ticketflow/assistant/index",
+      "component": "ticketflow/assistant/index",
+      "menu_type": 1,
+      "rank": 7,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000183",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000184",
+    "fields": {
+      "name": "TicketFlowAssistantFeedback",
+      "path": "/ticketflow/assistant/feedback/index",
+      "component": "ticketflow/assistant/feedback/index",
+      "menu_type": 1,
+      "rank": 8,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000185",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000186",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "list:TicketFlowAssistant",
+      "rank": 1,
+      "path": "api/assistant/sessions$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000187",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000188",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "create:TicketFlowAssistant",
+      "rank": 2,
+      "path": "api/assistant/sessions$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000189",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000190",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowAssistant",
+      "rank": 3,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000191",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000192",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "destroy:TicketFlowAssistant",
+      "rank": 4,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "DELETE",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000193",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000194",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "messages:TicketFlowAssistant",
+      "rank": 5,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/messages$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000195",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000196",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "feedback:TicketFlowAssistant",
+      "rank": 6,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/messages/(?P<message_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/feedback$",
+      "method": "PUT",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000197",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000198",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "question:TicketFlowAssistant",
+      "rank": 7,
+      "path": "api/assistant/internal/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/question$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000199",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000200",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "answer:TicketFlowAssistant",
+      "rank": 8,
+      "path": "api/assistant/internal/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/answer$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000201",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000202",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "context:TicketFlowAssistant",
+      "rank": 9,
+      "path": "api/assistant/internal/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/context$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000203",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000204",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000184",
+      "menu_type": 2,
+      "name": "downvotes:TicketFlowAssistantFeedback",
+      "rank": 1,
+      "path": "api/assistant/feedback/downvotes$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000205",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000206",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000184",
+      "menu_type": 2,
+      "name": "handoffs:TicketFlowAssistantFeedback",
+      "rank": 2,
+      "path": "api/assistant/feedback/handoffs$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000207",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000208",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000184",
+      "menu_type": 2,
+      "name": "summary:TicketFlowAssistantFeedback",
+      "rank": 3,
+      "path": "api/assistant/feedback/summary$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000209",
+      "model": []
+    }
   }
 ]

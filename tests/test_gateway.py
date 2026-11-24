@@ -71,6 +71,35 @@ def test_gateway_hides_ai_context(gateway, agent, ticket):
     print(f"Private context: HTTP 404, {response.json()}")
 
 
+@pytest.mark.parametrize("method, action", [("POST", "question"), ("POST", "answer"), ("GET", "context")])
+@pytest.mark.parametrize("suffix", ["", "/"])
+def test_gateway_hides_assistant_internal_routes(gateway, method, action, suffix):
+    session_id = "d5f24717-5e7d-4276-b472-888ccadb134d"
+    response = gateway.request(
+        method,
+        f"/api/assistant/internal/sessions/{session_id}/{action}{suffix}",
+        headers={"Authorization": "Bearer gateway-acceptance-probe"},
+    )
+    assert response.status_code == 404, response.text
+    assert response.json() == {"detail": "Not Found"}
+
+
+def test_gateway_proxies_employee_assistant_sessions(gateway, requester, agent):
+    path = "/api/assistant/sessions"
+    assert_failure(gateway.get(path), 401)
+    assert_failure(gateway.get(path, headers=agent.headers), 403)
+    response = gateway.post(path, headers=requester.headers, json={"title": "Gateway assistant acceptance"})
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["code"] == 1000 and payload["data"]["ticket_id"] is None
+    session_path = f"{path}/{payload['data']['pk']}"
+    messages = gateway.get(f"{session_path}/messages", headers=requester.headers)
+    assert messages.status_code == 200, messages.text
+    assert messages.json()["data"] == {"total": 0, "results": []}
+    assert gateway.delete(session_path, headers=requester.headers).status_code == 204
+    assert_failure(gateway.get(f"{session_path}/messages", headers=requester.headers), 404)
+
+
 @pytest.mark.parametrize("path", ["/api-docs", "/api-docs/", "/api-docs/login/", "/api-docs/schema/"])
 def test_gateway_hides_api_docs(gateway, path):
     response = gateway.get(path)

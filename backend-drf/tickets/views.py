@@ -32,6 +32,8 @@ from tickets.api_schema import (
     ticket_result,
     timeline_result,
 )
+from tickets.assistant_schema import assistant_errors, page_parameters, ticket_session_result
+from tickets.assistant_serializers import AssistantSessionSerializer, AssistantTranscriptMessageSerializer
 from tickets.cache import check_rate, dashboard_key
 from tickets.filters import TicketFilter
 from tickets.models import Status, Ticket
@@ -85,7 +87,7 @@ class TicketViewSet(
             return self.queryset.none()
         queryset = self.access.scope(super().get_queryset())
         if self.action == "retrieve":
-            return queryset.select_related("rating__rater", "rating__handler")
+            return queryset.select_related("rating__rater", "rating__handler", "assistant_session")
         return queryset
 
     def data_permission_fallback_q(self, request: Request) -> Q:
@@ -109,7 +111,7 @@ class TicketViewSet(
 
     @extend_schema(
         parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)],
-        responses={200: ticket_result, 201: ticket_result},
+        responses={200: ticket_result, 201: ticket_result, **assistant_errors, 409: ticket_error_result},
     )
     def create(self, request: Request, *args: Any, **kwargs: Any) -> ApiResponse:
         """创建工单"""
@@ -117,8 +119,13 @@ class TicketViewSet(
         if not key or len(key) > 128:
             raise ValidationError({"Idempotency-Key": "请提供 1 至 128 字符的幂等键"})
         check_rate(self.actor.pk, "create", 30)
-        values = cast(services.NewTicket, self._values(request))
-        ticket, created = services.create_ticket(self.actor, key, values)
+        values = dict(self._values(request))
+        session_id = values.pop("assistant_session_id", None)
+        if session_id is None and request.data.get("assistant_session_id") is not None:
+            raise PermissionDenied("无权关联助手会话")
+        ticket, created = services.create_ticket(
+            self.actor, key, cast(services.NewTicket, values), assistant_session_id=session_id
+        )
         return self._ticket_response(ticket, status=201 if created else 200)
 
     @extend_schema(responses=ticket_detail_result)
@@ -162,7 +169,26 @@ class TicketViewSet(
             if rating is not None and (self.access.admin or self.actor.pk in (rating.rater_id, rating.handler_id))
             else None
         )
+        session = getattr(ticket, "assistant_session", None)
+        can_read_session = self.access.can_read_assistant_session(ticket) and (
+            is_superuser or "assistantSession:TicketFlowTickets" in permission_codes
+        )
+        data["assistant_session_id"] = str(session.pk) if session is not None and can_read_session else None
         return ApiResponse(data=data)
+
+    @extend_schema(parameters=page_parameters, responses={200: ticket_session_result, **assistant_errors})
+    @action(detail=True, methods=["get"], url_path="assistant-session", filterset_class=None)
+    def assistant_session(self, request: Request, pk: UUID) -> ApiResponse:
+        """工单关联会话"""
+        ticket = self.get_object()
+        if not self.access.can_read_assistant_session(ticket):
+            raise PermissionDenied("无权查看关联会话")
+        session = getattr(ticket, "assistant_session", None)
+        if session is None:
+            raise NotFound("工单没有关联会话")
+        rows = self.paginate_queryset(session.messages.all())
+        messages = self.get_paginated_response(AssistantTranscriptMessageSerializer(rows, many=True).data).data
+        return ApiResponse(data={"session": AssistantSessionSerializer(session).data, "messages": messages})
 
     @extend_schema(
         parameters=[

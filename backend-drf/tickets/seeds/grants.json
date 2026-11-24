@@ -12,7 +12,8 @@
       "comments:TicketFlowTickets",
       "dashboard:TicketFlowTickets",
       "rating:TicketFlowTickets",
-      "list:TicketFlowMyRatings"
+      "list:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets"
     ],
     "ticketflow_requester": [
       "TicketFlow",
@@ -25,7 +26,18 @@
       "comments:TicketFlowTickets",
       "dashboard:TicketFlowTickets",
       "rating:TicketFlowTickets",
-      "list:TicketFlowMyRatings"
+      "list:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets",
+      "TicketFlowAssistant",
+      "list:TicketFlowAssistant",
+      "create:TicketFlowAssistant",
+      "partialUpdate:TicketFlowAssistant",
+      "destroy:TicketFlowAssistant",
+      "messages:TicketFlowAssistant",
+      "feedback:TicketFlowAssistant",
+      "question:TicketFlowAssistant",
+      "answer:TicketFlowAssistant",
+      "context:TicketFlowAssistant"
     ],
     "ticketflow_agent": [
       "TicketFlow",
@@ -43,7 +55,8 @@
       "rating:TicketFlowTickets",
       "list:TicketFlowMyRatings",
       "TicketFlowMyRatings",
-      "summary:TicketFlowMyRatings"
+      "summary:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets"
     ],
     "ticketflow_admin": [
       "TicketFlow",
@@ -81,7 +94,12 @@
       "retrieve:TicketFlowSkillGroups",
       "partialUpdate:TicketFlowSkillGroups",
       "categoryRoutes:TicketFlowSkillGroups",
-      "categoryRoute:TicketFlowSkillGroups"
+      "categoryRoute:TicketFlowSkillGroups",
+      "assistantSession:TicketFlowTickets",
+      "TicketFlowAssistantFeedback",
+      "downvotes:TicketFlowAssistantFeedback",
+      "handoffs:TicketFlowAssistantFeedback",
+      "summary:TicketFlowAssistantFeedback"
     ]
   }
 }

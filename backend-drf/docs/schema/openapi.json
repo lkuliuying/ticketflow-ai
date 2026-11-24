@@ -806,6 +806,46 @@
         ],
         "type": "object"
       },
+      "AnswerInput": {
+        "properties": {
+          "content": {
+            "maxLength": 20000,
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantReference"
+            },
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssistantMessageStatusEnum"
+          },
+          "user_message_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "references",
+          "status",
+          "user_message_id"
+        ],
+        "type": "object"
+      },
+      "AnswerResult": {
+        "properties": {
+          "assistant_message_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assistant_message_id"
+        ],
+        "type": "object"
+      },
       "ApiApplication": {
         "description": "开放平台应用序列化器。\n\nclient_id / client_secret_prefix 只读（由服务端生成）；client_secret 与 callback_secret\n的明文仅在创建/重置响应中返回一次（视图层注入，不经本序列化器）。",
         "properties": {
@@ -2017,6 +2057,700 @@
         "required": [
           "reason",
           "version"
+        ],
+        "type": "object"
+      },
+      "AssistantAnswerResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AnswerResult"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantContext": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/TicketFlowCategoryEnum"
+            },
+            "type": "array"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories",
+          "history"
+        ],
+        "type": "object"
+      },
+      "AssistantContextResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantContext"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantDownvoteListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantDownvotePage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantDownvotePage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/Downvote"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "AssistantExcerpt": {
+        "properties": {
+          "article_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "excerpt": {
+            "maxLength": 800,
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "article_id",
+          "excerpt",
+          "title"
+        ],
+        "type": "object"
+      },
+      "AssistantFeedback": {
+        "properties": {
+          "comment": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reason": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AssistantFeedbackReasonEnum"
+              },
+              {
+                "$ref": "#/components/schemas/NullEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "updated_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "vote": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantFeedbackVoteEnum"
+              }
+            ],
+            "readOnly": true
+          }
+        },
+        "required": [
+          "comment",
+          "created_time",
+          "reason",
+          "updated_time",
+          "vote"
+        ],
+        "type": "object"
+      },
+      "AssistantFeedbackReasonEnum": {
+        "description": "* `INACCURATE` - 不准确\n* `UNRESOLVED` - 没解决\n* `IRRELEVANT` - 引用不相关\n* `OTHER` - 其他",
+        "enum": [
+          "INACCURATE",
+          "UNRESOLVED",
+          "IRRELEVANT",
+          "OTHER"
+        ],
+        "type": "string"
+      },
+      "AssistantFeedbackResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantFeedback"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantFeedbackVoteEnum": {
+        "description": "* `up` - 点赞\n* `down` - 点踩",
+        "enum": [
+          "up",
+          "down"
+        ],
+        "type": "string"
+      },
+      "AssistantHandoffListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantHandoffPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantHandoffPage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/HandoffSession"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "AssistantMessage": {
+        "properties": {
+          "content": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "feedback": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantFeedback"
+              }
+            ],
+            "nullable": true,
+            "readOnly": true
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantReference"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantMessageRoleEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantMessageStatusEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "user_message_id": {
+            "format": "uuid",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "created_time",
+          "feedback",
+          "pk",
+          "references",
+          "role",
+          "status",
+          "user_message_id"
+        ],
+        "type": "object"
+      },
+      "AssistantMessageListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantMessagePage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantMessagePage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantMessage"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "AssistantMessageRoleEnum": {
+        "description": "* `user` - 提问\n* `assistant` - 回答",
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "type": "string"
+      },
+      "AssistantMessageStatusEnum": {
+        "description": "* `complete` - 完成\n* `interrupted` - 中断\n* `failed` - 失败",
+        "enum": [
+          "complete",
+          "interrupted",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "AssistantQuestionResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/QuestionContext"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantReference": {
+        "properties": {
+          "article_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "article_id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "AssistantSession": {
+        "properties": {
+          "created_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ticket_id": {
+            "format": "uuid",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "title": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "updated_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "created_time",
+          "pk",
+          "ticket_id",
+          "title",
+          "updated_time"
+        ],
+        "type": "object"
+      },
+      "AssistantSessionListResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantSessionPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantSessionPage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantSession"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
+        ],
+        "type": "object"
+      },
+      "AssistantSessionResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantSession"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantStats": {
+        "properties": {
+          "down": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "handoffs": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "questions": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sessions": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "up": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "down",
+          "handoffs",
+          "questions",
+          "sessions",
+          "up"
+        ],
+        "type": "object"
+      },
+      "AssistantStatsResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AssistantStats"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "AssistantTranscriptMessage": {
+        "properties": {
+          "content": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantReference"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantMessageRoleEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssistantMessageStatusEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "user_message_id": {
+            "format": "uuid",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "created_time",
+          "pk",
+          "references",
+          "role",
+          "status",
+          "user_message_id"
+        ],
+        "type": "object"
+      },
+      "AssistantTranscriptPage": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantTranscriptMessage"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total"
         ],
         "type": "object"
       },
@@ -4874,6 +5608,25 @@
         ],
         "type": "object"
       },
+      "Downvote": {
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/AssistantMessage"
+          },
+          "question": {
+            "$ref": "#/components/schemas/AssistantTranscriptMessage"
+          },
+          "session": {
+            "$ref": "#/components/schemas/HandoffSession"
+          }
+        },
+        "required": [
+          "answer",
+          "question",
+          "session"
+        ],
+        "type": "object"
+      },
       "DynamicForm": {
         "properties": {
           "approval_flow": {
@@ -5338,6 +6091,33 @@
         ],
         "type": "string"
       },
+      "FeedbackInput": {
+        "properties": {
+          "comment": {
+            "default": "",
+            "maxLength": 300,
+            "type": "string"
+          },
+          "reason": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AssistantFeedbackReasonEnum"
+              },
+              {
+                "$ref": "#/components/schemas/NullEnum"
+              }
+            ]
+          },
+          "vote": {
+            "$ref": "#/components/schemas/AssistantFeedbackVoteEnum"
+          }
+        },
+        "required": [
+          "vote"
+        ],
+        "type": "object"
+      },
       "FormDataDetail": {
         "description": "表单数据（管理端）详情：列表口径 + schema 快照 / 审批轨迹 / 流程实例号。",
         "properties": {
@@ -5538,6 +6318,74 @@
             "type": "array"
           }
         },
+        "type": "object"
+      },
+      "HandoffSession": {
+        "properties": {
+          "created_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "pk": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ticket_id": {
+            "format": "uuid",
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "ticket_number": {
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "title": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "updated_time": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "user_id": {
+            "readOnly": true,
+            "type": "integer"
+          },
+          "username": {
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "created_time",
+          "pk",
+          "ticket_id",
+          "ticket_number",
+          "title",
+          "updated_time",
+          "user_id",
+          "username"
+        ],
+        "type": "object"
+      },
+      "HistoryEntry": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AssistantMessageRoleEnum"
+          }
+        },
+        "required": [
+          "content",
+          "role"
+        ],
         "type": "object"
       },
       "ImNotifySetting": {
@@ -14593,6 +15441,19 @@
         },
         "type": "object"
       },
+      "PatchedSessionTitle": {
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
       "PatchedSkillGroup": {
         "properties": {
           "description": {
@@ -15904,6 +16765,52 @@
           "embedding"
         ],
         "type": "string"
+      },
+      "QuestionContext": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/TicketFlowCategoryEnum"
+            },
+            "type": "array"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "type": "array"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantExcerpt"
+            },
+            "type": "array"
+          },
+          "user_message_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "categories",
+          "history",
+          "references",
+          "user_message_id"
+        ],
+        "type": "object"
+      },
+      "QuestionInput": {
+        "properties": {
+          "message": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
       },
       "QueueEnum": {
         "description": "* `` - 默认队列\n* `celery` - celery\n* `heavy` - heavy",
@@ -18123,6 +19030,17 @@
         ],
         "type": "string"
       },
+      "SessionCreate": {
+        "properties": {
+          "title": {
+            "default": "新对话",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Setting": {
         "description": "Setting 行级序列化器（设置总表 list/detail/export/import 共用）。\n\n输出侧：敏感行（加密行与声明加密键，判定同源 ``is_sensitive_setting_row``）\n的 ``value`` 一律掩码——落库密文不外发，存量明文不借 list/export 落文件；\n非敏感行原样返回，设置总表仍是完整的配置台账。\n\n写入侧：掩码占位值永不落库。列表行数据被掩码后经「读-改-回写」或导入回放\n提交时，占位串会原样返回——更新丢弃该键（保留库内原值），新建视为未配置\n（模型默认空值）；提交真实新值不受影响。",
         "properties": {
@@ -18846,6 +19764,48 @@
         ],
         "type": "object"
       },
+      "TicketAssistantSession": {
+        "properties": {
+          "messages": {
+            "$ref": "#/components/schemas/AssistantTranscriptPage"
+          },
+          "session": {
+            "$ref": "#/components/schemas/AssistantSession"
+          }
+        },
+        "required": [
+          "messages",
+          "session"
+        ],
+        "type": "object"
+      },
+      "TicketAssistantSessionResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketAssistantSession"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
       "TicketCommentResult": {
         "properties": {
           "code": {
@@ -18907,6 +19867,13 @@
       },
       "TicketCreate": {
         "properties": {
+          "assistant_session_id": {
+            "format": "uuid",
+            "nullable": true,
+            "title": "助手会话",
+            "type": "string",
+            "writeOnly": true
+          },
           "category": {
             "$ref": "#/components/schemas/TicketFlowCategoryEnum"
           },
@@ -19009,6 +19976,12 @@
             "type": "integer"
           },
           "assignee_name": {
+            "nullable": true,
+            "readOnly": true,
+            "type": "string"
+          },
+          "assistant_session_id": {
+            "format": "uuid",
             "nullable": true,
             "readOnly": true,
             "type": "string"
@@ -19149,6 +20122,7 @@
           "ai_tags",
           "assignee_id",
           "assignee_name",
+          "assistant_session_id",
           "available_transitions",
           "category",
           "created_time",
@@ -33066,6 +34040,1237 @@
         ],
         "tags": [
           "LeaveViewSet"
+        ]
+      }
+    },
+    "/api/assistant/feedback/downvotes": {
+      "get": {
+        "description": "被点踩的回答",
+        "operationId": "api_assistant_feedback_downvotes_retrieve",
+        "parameters": [
+          {
+            "description": "开始时间（含）",
+            "in": "query",
+            "name": "created_from",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "结束时间（含）",
+            "in": "query",
+            "name": "created_to",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantDownvoteListResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantFeedbackViewSet"
+        ]
+      }
+    },
+    "/api/assistant/feedback/handoffs": {
+      "get": {
+        "description": "转人工会话列表",
+        "operationId": "api_assistant_feedback_handoffs_retrieve",
+        "parameters": [
+          {
+            "description": "开始时间（含）",
+            "in": "query",
+            "name": "created_from",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "结束时间（含）",
+            "in": "query",
+            "name": "created_to",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantHandoffListResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantFeedbackViewSet"
+        ]
+      }
+    },
+    "/api/assistant/feedback/summary": {
+      "get": {
+        "description": "AI 问答统计",
+        "operationId": "api_assistant_feedback_summary_retrieve",
+        "parameters": [
+          {
+            "description": "开始时间（含）",
+            "in": "query",
+            "name": "created_from",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "结束时间（含）",
+            "in": "query",
+            "name": "created_to",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantStatsResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantFeedbackViewSet"
+        ]
+      }
+    },
+    "/api/assistant/internal/sessions/{id}/answer": {
+      "post": {
+        "description": "仅供 FastAPI 内网调用。重放返回首次保存的回答 ID。",
+        "operationId": "api_assistant_internal_sessions_answer_create",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerInput"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerInput"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantAnswerResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantInternalViewSet"
+        ]
+      }
+    },
+    "/api/assistant/internal/sessions/{id}/context": {
+      "get": {
+        "description": "仅供 FastAPI 内网读取本人会话的转人工草稿上下文。",
+        "operationId": "api_assistant_internal_sessions_context_retrieve",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantContextResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantInternalViewSet"
+        ]
+      }
+    },
+    "/api/assistant/internal/sessions/{id}/question": {
+      "post": {
+        "description": "仅供 FastAPI 从内网转发同一用户 Bearer token。返回历史和发布知识片段，历史排除本次问题。",
+        "operationId": "api_assistant_internal_sessions_question_create",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantQuestionResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantInternalViewSet"
+        ]
+      }
+    },
+    "/api/assistant/sessions": {
+      "get": {
+        "description": "助手会话列表",
+        "operationId": "api_assistant_sessions_list",
+        "parameters": [
+          {
+            "description": "用于排序结果的字段。",
+            "in": "query",
+            "name": "ordering",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSessionListResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantSessionViewSet"
+        ]
+      },
+      "post": {
+        "description": "新建助手会话",
+        "operationId": "api_assistant_sessions_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSessionResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantSessionViewSet"
+        ]
+      }
+    },
+    "/api/assistant/sessions/{id}": {
+      "delete": {
+        "description": "删除助手会话",
+        "operationId": "api_assistant_sessions_destroy",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No response body"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantSessionViewSet"
+        ]
+      },
+      "patch": {
+        "description": "请求必须提供 title。",
+        "operationId": "api_assistant_sessions_partial_update",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSessionTitle"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSessionTitle"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSessionTitle"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSessionTitle"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedSessionTitle"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSessionResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantSessionViewSet"
+        ]
+      }
+    },
+    "/api/assistant/sessions/{id}/messages": {
+      "get": {
+        "description": "助手会话消息",
+        "operationId": "api_assistant_sessions_messages_retrieve",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantMessageListResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantSessionViewSet"
+        ]
+      }
+    },
+    "/api/assistant/sessions/{id}/messages/{message_id}/feedback": {
+      "put": {
+        "description": "提交回答反馈",
+        "operationId": "api_assistant_sessions_messages_feedback_update",
+        "parameters": [
+          {
+            "description": "会话 UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantFeedbackResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "AssistantSessionViewSet"
         ]
       }
     },
@@ -99771,6 +101976,56 @@
               }
             },
             "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -100393,6 +102648,97 @@
             "description": ""
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/assistant-session": {
+      "get": {
+        "description": "工单关联会话",
+        "operationId": "api_tickets_assistant_session_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAssistantSessionResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {

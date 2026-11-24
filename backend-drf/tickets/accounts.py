@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any
 
 from django.conf import settings
@@ -145,7 +146,7 @@ def save_account(user: UserInfo, actor: UserInfo, values: dict[str, Any]) -> Use
         note = "技术员账号已停用" if deactivated else "账号已变更为非技术员"
         release_assigned_tickets(user, actor, note)
     if previous_role is not None and (deactivated or role_changed):
-        revoke_user_credentials(user.pk, operator=actor)
+        transaction.on_commit(partial(revoke_user_credentials, user.pk, operator=actor))
     return user
 
 
@@ -155,4 +156,4 @@ def reset_account_password(user: UserInfo, actor: UserInfo, password: str) -> No
     user.modifier = actor
     user.save(update_fields=["password", "modifier", "updated_time"])
     record_password_hash(user, user.password)
-    revoke_user_credentials(user.pk, operator=actor)
+    transaction.on_commit(partial(revoke_user_credentials, user.pk, operator=actor))

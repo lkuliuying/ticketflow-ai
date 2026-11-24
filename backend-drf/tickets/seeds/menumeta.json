@@ -239,5 +239,114 @@
     "fields": {
       "title": "编辑分类路由"
     }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000181",
+    "fields": {
+      "title": "工单关联会话"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000183",
+    "fields": {
+      "title": "menus.ticketflowAssistant",
+      "icon": "ep:chat-dot-round",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000185",
+    "fields": {
+      "title": "menus.ticketflowAssistantFeedback",
+      "icon": "ep:chat-line-square",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000187",
+    "fields": {
+      "title": "助手会话列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000189",
+    "fields": {
+      "title": "新建助手会话"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000191",
+    "fields": {
+      "title": "修改会话标题"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000193",
+    "fields": {
+      "title": "删除助手会话"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000195",
+    "fields": {
+      "title": "助手会话消息"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000197",
+    "fields": {
+      "title": "提交回答反馈"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000199",
+    "fields": {
+      "title": "记录用户提问"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000201",
+    "fields": {
+      "title": "记录助手回答"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000203",
+    "fields": {
+      "title": "读取转人工上下文"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000205",
+    "fields": {
+      "title": "被点踩的回答"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000207",
+    "fields": {
+      "title": "转人工会话列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000209",
+    "fields": {
+      "title": "AI 问答统计"
+    }
   }
 ]

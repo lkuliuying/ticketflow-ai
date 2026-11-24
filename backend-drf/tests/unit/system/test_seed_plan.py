@@ -290,10 +290,11 @@ class TestValidate:
         # 技术员退回动作新增一个权限点及白名单，删除知识维护角色的三条白名单。
         # 工单评价：两页和三个权限点、14 个字段节点、8 条字段白名单。
         # 账号与技能组管理：两页和 11 个权限点。
-        assert summary.totals["menu"] == 786
-        assert summary.totals["field"] == 2210
+        # 员工助手和管理员反馈：两页、13 个权限点、一个建单的会话 ID 字段。
+        assert summary.totals["menu"] == 801
+        assert summary.totals["field"] == 2211
         assert summary.totals["grant"] == 306
-        assert summary.permission_total == 700
+        assert summary.permission_total == 713
 
 
 class TestRows:
