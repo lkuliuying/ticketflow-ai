@@ -1,10 +1,9 @@
 import json
 from datetime import timedelta
 from hashlib import sha256
-from typing import TypedDict
+from typing import NotRequired, TypedDict, Unpack
 from uuid import UUID, uuid4
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import QuerySet
@@ -12,9 +11,22 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 
 from identity.models import DeptInfo, UserInfo
+from tickets.assignment import dispatch, end_assignment, set_assignee
+from tickets.assistant_services import owned_session, require_employee
 from tickets.cache import IDEMPOTENCY_TTL, invalidate_dashboard, request_key, reserve_create
-from tickets.models import Priority, Status, Ticket, TicketComment, TicketCreateRequest, TicketLog, Visibility
+from tickets.models import (
+    Priority,
+    Status,
+    Ticket,
+    TicketAssignment,
+    TicketComment,
+    TicketCreateRequest,
+    TicketLog,
+    TicketRating,
+    Visibility,
+)
 from tickets.policy import TRANSITIONS, TicketAccess, assignment_candidates
+from tickets.skill_groups import destination
 
 SLA_HOURS = {str(Priority.P0): 2, str(Priority.P1): 8, str(Priority.P2): 24, str(Priority.P3): 72}
 SLA_WARNING = timedelta(minutes=30)
@@ -32,19 +44,17 @@ class NewTicket(TypedDict):
     priority: str
 
 
-def _destination(category: str) -> DeptInfo:
-    routing = getattr(settings, "TICKETFLOW_CATEGORY_DEPARTMENTS", {})
-    dept_id = routing.get(category) or getattr(settings, "TICKETFLOW_DEFAULT_DEPARTMENT", None)
-    departments = DeptInfo.objects.filter(is_active=True)
-    dept = departments.filter(pk=dept_id).first() if dept_id else departments.filter(code="ticketflow_support").first()
-    if dept is None:
-        raise ValidationError({"department": "请配置可用的工单支持部门"})
-    return dept
+class RatingInput(TypedDict):
+    resolved: bool
+    satisfaction: int
+    handler_score: int
+    tags: NotRequired[list[str]]
+    comment: NotRequired[str | None]
 
 
 def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
     ticket_id = uuid4()
-    department = _destination(values["category"])
+    department = destination(values["category"])
     ticket = Ticket.objects.create(
         id=ticket_id,
         number=f"TF-{ticket_id.hex.upper()}",
@@ -57,13 +67,22 @@ def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
         **values,
     )
     TicketLog.objects.create(ticket=ticket, action="CREATE", to_status=ticket.status, operator=user)
+    dispatch(ticket)
+    if ticket.assignee_id is not None:
+        ticket.save(update_fields=["assignee"])
     transaction.on_commit(invalidate_dashboard, robust=True)
     return ticket
 
 
-def create_ticket(user: UserInfo, key: str, values: NewTicket) -> tuple[Ticket, bool]:
+def create_ticket(
+    user: UserInfo, key: str, values: NewTicket, *, assistant_session_id: UUID | None = None
+) -> tuple[Ticket, bool]:
     key_hash = sha256(key.encode()).hexdigest()
-    digest = sha256(json.dumps(values, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    request_values = dict(values)
+    if assistant_session_id is not None:
+        require_employee(TicketAccess.for_user(user))
+        request_values["assistant_session_id"] = str(assistant_session_id)
+    digest = sha256(json.dumps(request_values, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     redis_key = request_key(user.pk, key_hash)
     cached = cache.get(redis_key)
     if cached:
@@ -73,12 +92,17 @@ def create_ticket(user: UserInfo, key: str, values: NewTicket) -> tuple[Ticket, 
         if ticket is not None:
             return ticket, False
     with reserve_create(redis_key):
-        return _persist_ticket(user, key_hash, digest, redis_key, values)
+        return _persist_ticket(user, key_hash, digest, redis_key, values, assistant_session_id)
 
 
 @transaction.atomic
 def _persist_ticket(
-    user: UserInfo, key_hash: str, digest: str, redis_key: str, values: NewTicket
+    user: UserInfo,
+    key_hash: str,
+    digest: str,
+    redis_key: str,
+    values: NewTicket,
+    assistant_session_id: UUID | None = None,
 ) -> tuple[Ticket, bool]:
     now = timezone.now()
     record, inserted = TicketCreateRequest.objects.select_for_update().get_or_create(
@@ -91,7 +115,15 @@ def _persist_ticket(
             raise TicketConflict("相同幂等键已用于其他请求")
         if record.ticket_id is not None:
             return record.ticket, False
+    session = None
+    if assistant_session_id is not None:
+        session = owned_session(user.pk, assistant_session_id, lock=True)
+        if session.ticket_id is not None:
+            raise TicketConflict("此会话已关联工单")
     ticket = _make_ticket(user, values)
+    if session is not None:
+        session.ticket = ticket
+        session.save(update_fields=["ticket", "updated_time"])
     record.ticket = ticket
     record.request_hash = digest
     record.expires_at = now + timedelta(seconds=IDEMPOTENCY_TTL)
@@ -103,15 +135,31 @@ def _persist_ticket(
     return ticket, True
 
 
-def _locked(queryset: QuerySet[Ticket], ticket_id: UUID, version: int | None = None) -> Ticket:
+def _locked(queryset: QuerySet[Ticket], ticket_id: UUID) -> Ticket:
     try:
         visible_ids = queryset.order_by().values("pk")
-        ticket = Ticket.objects.select_for_update().get(pk=ticket_id, pk__in=visible_ids)
+        return Ticket.objects.select_for_update().get(pk=ticket_id, pk__in=visible_ids)
     except Ticket.DoesNotExist as exc:
         raise NotFound("工单不存在") from exc
-    if version is not None and ticket.version != version:
+
+
+def _check_version(ticket: Ticket, version: int) -> None:
+    if ticket.version != version:
         raise TicketConflict()
-    return ticket
+
+
+@transaction.atomic
+def create_rating(
+    queryset: QuerySet[Ticket], ticket_id: UUID, user: UserInfo, **values: Unpack[RatingInput]
+) -> TicketRating:
+    ticket = _locked(queryset, ticket_id)
+    if ticket.submitter_id != user.pk:
+        raise PermissionDenied("仅工单提交人可评价")
+    if ticket.status != Status.CLOSED:
+        raise TicketConflict("仅已关闭的工单可评价")
+    if TicketRating.objects.filter(ticket=ticket).exists():
+        raise TicketConflict("工单已评价")
+    return TicketRating.objects.create(ticket=ticket, rater=user, handler_id=ticket.assignee_id, **values)
 
 
 def _record_change(
@@ -127,7 +175,7 @@ def _record_change(
         to_status=ticket.status,
         operator=user,
         note=note,
-        internal=action in ("ASSIGN", "AI_METADATA"),
+        internal=action in ("ASSIGN", "RETURN", "AI_METADATA", "DEACTIVATED"),
     )
     transaction.on_commit(invalidate_dashboard, robust=True)
     return ticket
@@ -143,11 +191,18 @@ def transition(
     target_status: str,
     note: str = "",
 ) -> Ticket:
-    ticket = _locked(queryset, ticket_id, version)
+    if target_status == Status.REOPENED:
+        group_ids = queryset.filter(pk=ticket_id).order_by().values("department_id")
+        list(DeptInfo.objects.select_for_update(no_key=True).filter(pk__in=group_ids))
+    ticket = _locked(queryset, ticket_id)
+    allowed_targets = access.targets(ticket)
+    if target_status not in allowed_targets and access.read_only(ticket):
+        raise PermissionDenied("无权执行此流转")
+    _check_version(ticket, version)
     previous = ticket.status
     if target_status not in TRANSITIONS.get(previous, ()):
         raise TicketConflict("当前状态不支持该流转")
-    if target_status not in access.targets(ticket):
+    if target_status not in allowed_targets:
         raise PermissionDenied("无权执行此流转")
     ticket.status = target_status
     fields = ["status"]
@@ -157,11 +212,17 @@ def transition(
     if previous == Status.PENDING_VERIFY and target_status == Status.IN_PROGRESS:
         ticket.resolved_at = None
         fields.append("resolved_at")
+    if target_status == Status.CLOSED:
+        end_assignment(ticket, str(TicketAssignment.EndReason.CLOSED_OUT))
     if target_status == Status.REOPENED:
         ticket.resolved_at = None
         ticket.sla_cycle += 1
         ticket.sla_due_at = timezone.now() + timedelta(hours=SLA_HOURS[ticket.priority])
         fields.extend(("resolved_at", "sla_cycle", "sla_due_at"))
+        _record_change(ticket, user, "TRANSITION", previous, fields, note)
+        dispatch(ticket, reopening=True)
+        ticket.save(update_fields=["assignee"])
+        return ticket
     return _record_change(ticket, user, "TRANSITION", previous, fields, note)
 
 
@@ -174,17 +235,48 @@ def assign(
     version: int,
     assignee_id: int | None,
 ) -> Ticket:
-    ticket = _locked(queryset, ticket_id, version)
-    if not access.can_handle(ticket):
+    group_id = None
+    if access.admin and assignee_id is not None:
+        groups = UserInfo.objects.filter(pk=assignee_id).order_by().values("dept_id")
+        group = DeptInfo.objects.select_for_update(no_key=True).filter(pk__in=groups).first()
+        group_id = group.pk if group is not None else None
+    ticket = _locked(queryset, ticket_id)
+    if not access.admin:
         raise PermissionDenied("无权指派此工单")
+    _check_version(ticket, version)
     if ticket.status == Status.CLOSED:
         raise TicketConflict("已关闭的工单不能指派")
+    note = "取消指派"
     if assignee_id is not None:
-        assignee = assignment_candidates(access).filter(pk=assignee_id).first()
+        assignee = assignment_candidates().filter(pk=assignee_id, dept_id=group_id).first()
         if assignee is None:
             raise ValidationError({"assignee_id": "处理人不在可指派范围内"})
-    ticket.assignee_id = assignee_id
-    return _record_change(ticket, user, "ASSIGN", ticket.status, ["assignee"])
+        note = f"处理人：{assignee.username}"
+    set_assignee(ticket, assignee_id, user)
+    return _record_change(ticket, user, "ASSIGN", ticket.status, ["assignee"], note)
+
+
+def release_assigned_tickets(assignee: UserInfo, actor: UserInfo, note: str) -> None:
+    tickets = Ticket.objects.select_for_update().filter(assignee=assignee).exclude(status=Status.CLOSED).order_by("pk")
+    for ticket in tickets:
+        end_assignment(ticket, str(TicketAssignment.EndReason.DEACTIVATED), note)
+        ticket.assignee_id = None
+        _record_change(ticket, actor, "DEACTIVATED", ticket.status, ["assignee"], note)
+
+
+@transaction.atomic
+def return_ticket(
+    queryset: QuerySet[Ticket], ticket_id: UUID, user: UserInfo, access: TicketAccess, version: int, reason: str
+) -> Ticket:
+    ticket = _locked(queryset, ticket_id)
+    if access.admin or not access.can_handle(ticket):
+        raise PermissionDenied("无权退回此工单")
+    _check_version(ticket, version)
+    if ticket.status == Status.CLOSED:
+        raise TicketConflict("已关闭的工单不能退回")
+    end_assignment(ticket, str(TicketAssignment.EndReason.RETURNED), reason)
+    ticket.assignee_id = None
+    return _record_change(ticket, user, "RETURN", ticket.status, ["assignee"], reason)
 
 
 @transaction.atomic
@@ -220,9 +312,10 @@ def save_ai_metadata(
     category: str | None = None,
     priority: str | None = None,
 ) -> Ticket:
-    ticket = _locked(queryset, ticket_id, version)
+    ticket = _locked(queryset, ticket_id)
     if not access.can_handle(ticket):
         raise PermissionDenied("无权更新此工单的 AI 建议")
+    _check_version(ticket, version)
     ticket.ai_summary = summary
     ticket.ai_tags = tags
     fields = ["ai_summary", "ai_tags"]

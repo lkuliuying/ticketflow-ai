@@ -1,9 +1,10 @@
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { isSuccess } from "@/api/types";
 import {
   ticketApi,
+  type TicketAssignmentScope,
   type TicketDashboard,
   type TicketPriority,
   type TicketSlaState,
@@ -19,7 +20,7 @@ import { PRIORITY_TONE, SLA_TONE, STATUS_TONE } from "../utils/ticketColumns";
 defineOptions({ name: "TicketFlowTicketDashboard" });
 
 export type DashboardFilter = {
-  key: "status" | "priority" | "sla";
+  key: "status" | "priority" | "sla" | "assignment";
   value: string;
 };
 
@@ -35,9 +36,28 @@ const STATUSES: TicketStatus[] = [
 ];
 const PRIORITIES: TicketPriority[] = ["P0", "P1", "P2", "P3"];
 const SLA_STATES: TicketSlaState[] = ["OVERDUE", "DUE_SOON", "ON_TRACK", "MET"];
+/** 指派维度按后端返回的键展示：管理员只有 unassigned，技术员有 current / history */
+const ASSIGNMENT_ORDER: TicketAssignmentScope[] = [
+  "unassigned",
+  "current",
+  "history"
+];
+const ASSIGNMENT_TONE: Record<
+  TicketAssignmentScope,
+  "danger" | "primary" | "info"
+> = {
+  unassigned: "danger",
+  current: "primary",
+  history: "info"
+};
 
 const { t } = useI18n();
 const data = ref<TicketDashboard | null>(null);
+const assignmentScopes = computed(() =>
+  ASSIGNMENT_ORDER.filter(
+    scope => data.value?.assignment?.[scope] !== undefined
+  )
+);
 
 let requestSeq = 0;
 
@@ -67,8 +87,29 @@ defineExpose({ refresh });
   <div
     v-if="data"
     class="grid gap-3 mb-3 md:grid-cols-3"
+    :class="{ 'xl:grid-cols-4': assignmentScopes.length }"
     data-testid="ticket-dashboard"
   >
+    <el-card
+      v-if="assignmentScopes.length"
+      shadow="never"
+      body-class="p-3!"
+      data-testid="ticket-dashboard-assignment"
+    >
+      <div class="text-sm mb-2">{{ t("ticketflow.assignment") }}</div>
+      <div class="flex flex-wrap gap-2">
+        <el-check-tag
+          v-for="scope in assignmentScopes"
+          :key="scope"
+          :type="ASSIGNMENT_TONE[scope]"
+          :checked="isActive('assignment', scope)"
+          @change="toggle('assignment', scope)"
+        >
+          {{ t(`ticketflow.assignmentValue.${scope}`) }}
+          <b class="ml-1">{{ data.assignment?.[scope] ?? 0 }}</b>
+        </el-check-tag>
+      </div>
+    </el-card>
     <el-card shadow="never" body-class="p-3!">
       <div class="text-sm mb-2">{{ t("ticketflow.status") }}</div>
       <div class="flex flex-wrap gap-2">

@@ -4,7 +4,8 @@
     "pk": "d2431bc0-217a-49eb-a6fa-000000000059",
     "fields": {
       "code": "ticketflow_support",
-      "name": "工单支持",
+      "name": "工单支持组",
+      "is_ticketflow_skill_group": true,
       "is_active": true
     }
   }

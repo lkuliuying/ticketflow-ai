@@ -38,6 +38,7 @@ from django.utils import timezone
 
 from common.utils import get_logger
 
+from .branding import preserve_branding
 from .demo_guard import deactivate_demo_rows, detach_missing_audit_users
 from .m2m import extract_m2m_relations, strip_m2m_fields
 from .types import (
@@ -402,6 +403,9 @@ def build_fixtures(
     rows_by_model, conflict_notes = filter_conflicting_rows(rows_by_model, using=using)
     if conflict_notes:
         notes.extend(conflict_notes)
+        trimmed = True
+
+    if preserve_branding(rows_by_model, using=using):
         trimmed = True
 
     rows_by_model, m2m_notes = strip_m2m_fields(rows_by_model)

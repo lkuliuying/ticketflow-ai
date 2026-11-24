@@ -6,7 +6,11 @@
     "identity"
   ],
   "url_prefixes": [
-    "api/tickets/"
+    "api/tickets/",
+    "api/ticket-ratings",
+    "api/ticketflow/accounts",
+    "api/ticketflow/skill-groups",
+    "api/assistant/"
   ],
   "config_keys": [],
   "dict_codes": [

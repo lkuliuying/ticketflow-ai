@@ -10,7 +10,7 @@ class AssigneeSerializer(serializers.Serializer):
     pk = serializers.IntegerField(read_only=True)
     username = serializers.CharField(read_only=True)
     nickname = serializers.CharField(read_only=True, allow_blank=True)
-    department_name = serializers.CharField(source="dept.name", read_only=True, allow_null=True)
+    department_name = serializers.CharField(source="dept.name", read_only=True, allow_null=True, help_text="技能组名称")
 
 
 class TicketSerializer(BaseModelSerializer):
@@ -18,10 +18,10 @@ class TicketSerializer(BaseModelSerializer):
     pk = serializers.UUIDField(read_only=True)
     submitter_id = serializers.IntegerField(read_only=True)
     assignee_id = serializers.IntegerField(read_only=True, allow_null=True)
-    department_id = serializers.UUIDField(read_only=True)
+    department_id = serializers.UUIDField(read_only=True, help_text="技能组 ID")
     submitter_name = serializers.CharField(source="submitter.username", read_only=True)
     assignee_name = serializers.CharField(source="assignee.username", read_only=True, allow_null=True)
-    department_name = serializers.CharField(source="department.name", read_only=True)
+    department_name = serializers.CharField(source="department.name", read_only=True, help_text="技能组名称")
     sla_state = serializers.SerializerMethodField()
     sla_due_at = serializers.DateTimeField(format="iso-8601", read_only=True)
     first_response_at = serializers.DateTimeField(format="iso-8601", read_only=True, allow_null=True)
@@ -72,10 +72,11 @@ class TicketCreateSerializer(BaseModelSerializer):
     description = serializers.CharField(max_length=20000)
     category = serializers.ChoiceField(choices=Category.choices)
     priority = serializers.ChoiceField(choices=Priority.choices)
+    assistant_session_id = serializers.UUIDField(required=False, allow_null=True, write_only=True, label="助手会话")
 
     class Meta:
         model = Ticket
-        fields = ("title", "description", "category", "priority")
+        fields = ("title", "description", "category", "priority", "assistant_session_id")
 
 
 class TicketColumnsSerializer(TicketSerializer):
@@ -94,6 +95,11 @@ class TransitionSerializer(serializers.Serializer):
 class AssignmentSerializer(serializers.Serializer):
     version = serializers.IntegerField(min_value=1)
     assignee_id = serializers.IntegerField(min_value=1, allow_null=True)
+
+
+class AssignmentReturnSerializer(serializers.Serializer):
+    version = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(min_length=1, max_length=500)
 
 
 class CommentSerializer(serializers.Serializer):

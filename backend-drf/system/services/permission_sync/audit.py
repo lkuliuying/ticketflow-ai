@@ -3,6 +3,7 @@
 """菜单权限点同步内核：审计报告。"""
 
 import re
+from collections import defaultdict
 from typing import Any
 
 from .constants import FRAMEWORK_PERMISSION_ACTIONS
@@ -30,52 +31,74 @@ def audit_field_permissions(roles: Any = None) -> Any:
 
     返回 ``[(role, menu), ...]``（ORM 实例，供管理命令与只读 API 复用）。
     """
-    from django.db.models import Prefetch
-
     from identity.services import UserRole
-    from system.models import FieldPermission, Menu, ModelLabelField
+    from system.models import Menu, ModelLabelField
 
-    # 绑定模型按「角色字段树根节点」一次性预取：逐菜单读 menu.model.all() 会把每个
-    # 权限点变成一条查询（数百条 N+1），种子收尾的全量审计每轮都跑这份读取，是大批量
-    # 小往返的主要来源。预取成属性后判定口径不变（仍只取 field_type=ROLE）。
-    role_bindings = Prefetch(
-        "model",
-        queryset=ModelLabelField.objects.filter(field_type=ModelLabelField.FieldChoices.ROLE),
-        to_attr="role_bindings",
+    grants = UserRole.menu.through.objects.filter(
+        userrole__is_active=True,
+        userrole__deleted_at__isnull=True,
+        menu__is_active=True,
+        menu__deleted_at__isnull=True,
+        menu__menu_type=Menu.MenuChoices.PERMISSION,
     )
-    model_menus = list(
-        Menu.objects.filter(menu_type=Menu.MenuChoices.PERMISSION, is_active=True)
-        .filter(model__isnull=False)
-        .distinct()
-        .prefetch_related(role_bindings)
-    )
-    if not model_menus:
-        return []
-    # 菜单 → 绑定模型的角色字段树根节点（白名单字段的 parent 应落在其中）
-    menu_roots: dict[Any, set[Any]] = {}
-    for menu in model_menus:
-        roots = {node.pk for node in menu.role_bindings}
-        if roots:
-            menu_roots[menu.pk] = roots
-    if not menu_roots:
-        return []
-    # (role, menu) → 白名单字段的 parent 节点集合；行内字段为空的行等价于"没有行"
-    configured: dict[Any, set[Any]] = {}
-    for role_id, menu_id, parent_id in FieldPermission.objects.values_list("role_id", "menu_id", "field__parent_id"):
-        configured.setdefault((role_id, menu_id), set()).add(parent_id)
-    items = []
-    role_queryset = UserRole.objects.filter(is_active=True).prefetch_related("menu")
     if roles is not None:
-        role_queryset = role_queryset.filter(pk__in=[role.pk for role in roles])
-    for role in role_queryset:
-        for menu in role.menu.all():
-            bound_roots = menu_roots.get(menu.pk)
-            if bound_roots is None:
-                continue
-            parents = configured.get((role.pk, menu.pk))
-            if not parents or not (parents & bound_roots):
-                items.append((role, menu))
-    return items
+        grants = grants.filter(userrole_id__in=[role.pk for role in roles])
+    granted = list(grants.select_related("userrole", "menu").order_by("-userrole__created_time", "-menu__created_time"))
+    if not granted:
+        return []
+    bindings = list(
+        Menu.model.through.objects.filter(menu_id__in={grant.menu_id for grant in granted}).values_list(
+            "menu_id", "modellabelfield_id"
+        )
+    )
+    roots = set(
+        ModelLabelField.objects.filter(
+            pk__in={root_id for _menu_id, root_id in bindings}, field_type=ModelLabelField.FieldChoices.ROLE
+        )
+        .order_by()
+        .values_list("pk", flat=True)
+    )
+    menu_roots: dict[Any, set[Any]] = defaultdict(set)
+    for menu_id, root_id in bindings:
+        if root_id in roots:
+            menu_roots[menu_id].add(root_id)
+
+    eligible = [grant for grant in granted if grant.menu_id in menu_roots]
+    pairs = {(grant.userrole_id, grant.menu_id) for grant in eligible}
+    if not pairs:
+        return []
+    covered = _covered_field_permission_pairs(pairs, menu_roots, roots)
+    return [(grant.userrole, grant.menu) for grant in eligible if (grant.userrole_id, grant.menu_id) not in covered]
+
+
+def _covered_field_permission_pairs(
+    pairs: set[tuple[Any, Any]], menu_roots: dict[Any, set[Any]], roots: set[Any]
+) -> set[tuple[Any, Any]]:
+    from system.models import FieldPermission, ModelLabelField
+
+    # 回灌期间 PostgreSQL 可能为字段权限、关系表与字段树的大连接选出昂贵的计划。
+    # 按本轮授权范围读取三张单表，再用已有索引键匹配；每次审计的 SQL 数与角色和菜单数无关。
+    permissions = {
+        pk: (role_id, menu_id)
+        for pk, role_id, menu_id in FieldPermission.objects.filter(
+            role_id__in={role_id for role_id, _menu_id in pairs}, menu_id__in=menu_roots
+        )
+        .order_by()
+        .values_list("pk", "role_id", "menu_id")
+        if (role_id, menu_id) in pairs
+    }
+    if not permissions:
+        return set()
+    parents = dict(ModelLabelField.objects.filter(parent_id__in=roots).order_by().values_list("pk", "parent_id"))
+    field_links = FieldPermission.field.through.objects.filter(fieldpermission_id__in=permissions).values_list(
+        "fieldpermission_id", "modellabelfield_id"
+    )
+    covered = set()
+    for permission_id, field_id in field_links:
+        pair = permissions[permission_id]
+        if parents.get(field_id) in menu_roots[pair[1]]:
+            covered.add(pair)
+    return covered
 
 
 def audit_wide_manager_grants() -> Any:

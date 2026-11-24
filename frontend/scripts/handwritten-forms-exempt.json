@@ -48,5 +48,10 @@
   "src/views/system/menu/components/MenuFormPermission.vue": "菜单树主编辑界面：权限点挂载表单分片，形态上不适合表格弹窗",
   "src/views/system/menu/components/MenuPermissionDialog.vue": "权限点树选择器：树形勾选交互，非模型 CRUD 表单",
   "src/views/system/user/components/ImBindingPanel.vue": "IM 绑定面板：账号绑定动作（验证码/扫码），非模型字段 CRUD",
-  "src/views/ticketflow/knowledge/components/ArticleEditor.vue": "知识库文章编辑：标签为可自由新增的字符串数组、正文需 Markdown 预览，且同一表单承担从工单转存的预填与 source_ticket_id 提交，元数据表单无法表达"
+  "src/views/ticketflow/accounts/components/AccountForm.vue": "业务账号表单：技能组随角色联动显示且技术员必填，新建时的初始密码需按安全策略生成、校验并以用户名为密钥加密，元数据表单无法表达",
+  "src/views/ticketflow/accounts/components/PasswordForm.vue": "重置业务账号密码：提交目标是重置密码动作而非模型字段，无对应元数据面",
+  "src/views/ticketflow/assistant/components/FeedbackForm.vue": "AI 回答点踩：提交目标是回答的反馈动作（可改投），固定词表单选原因与补充说明无对应模型元数据面",
+  "src/views/ticketflow/assistant/components/HandoffForm.vue": "AI 转人工提单：表单由 AI 草稿预填，提交时需附带会话关联与建单幂等键，元数据表单无法表达",
+  "src/views/ticketflow/knowledge/components/ArticleEditor.vue": "知识库文章编辑：标签为可自由新增的字符串数组、正文需 Markdown 预览，且同一表单承担从工单转存的预填与 source_ticket_id 提交，元数据表单无法表达",
+  "src/views/ticketflow/ratings/components/RatingForm.vue": "工单评价：提交目标是工单的评价动作（一次性、不可修改），星级与固定词表多选标签无对应模型元数据面"
 }

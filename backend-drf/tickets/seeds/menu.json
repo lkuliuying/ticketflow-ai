@@ -223,5 +223,499 @@
       "meta": "d2431bc0-217a-49eb-a6fa-000000000093",
       "model": []
     }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000094",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "returnTicket:TicketFlowTickets",
+      "rank": 14,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/return$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000095",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000012"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000098",
+    "fields": {
+      "name": "TicketFlowMyRatings",
+      "path": "/ticketflow/ratings/mine/index",
+      "component": "ticketflow/ratings/mine/index",
+      "menu_type": 1,
+      "rank": 3,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000099",
+      "method": "",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110"
+      ],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000100",
+    "fields": {
+      "name": "TicketFlowRatingStats",
+      "path": "/ticketflow/ratings/stats/index",
+      "component": "ticketflow/ratings/stats/index",
+      "menu_type": 1,
+      "rank": 4,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000101",
+      "method": "",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110"
+      ],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000096",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "rating:TicketFlowTickets",
+      "rank": 15,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/rating$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000097",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000102",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000098",
+      "menu_type": 2,
+      "name": "list:TicketFlowMyRatings",
+      "rank": 1,
+      "path": "api/ticket-ratings$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000103",
+      "model": [
+        "d2431bc0-217a-49eb-a6fa-000000000110",
+        "d2431bc0-217a-49eb-a6fa-000000000012",
+        "14071ee3-6725-4fcc-962d-ad7898efa284"
+      ]
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000104",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000098",
+      "menu_type": 2,
+      "name": "summary:TicketFlowMyRatings",
+      "rank": 2,
+      "path": "api/ticket-ratings/summary$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000105",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000130",
+    "fields": {
+      "name": "TicketFlowAccounts",
+      "path": "/ticketflow/accounts/index",
+      "component": "ticketflow/accounts/index",
+      "menu_type": 1,
+      "rank": 5,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000131",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000132",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "list:TicketFlowAccounts",
+      "rank": 1,
+      "path": "api/ticketflow/accounts$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000133",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000134",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "create:TicketFlowAccounts",
+      "rank": 2,
+      "path": "api/ticketflow/accounts$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000135",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000136",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "retrieve:TicketFlowAccounts",
+      "rank": 3,
+      "path": "api/ticketflow/accounts/(?P<pk>\\d+)$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000137",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000138",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowAccounts",
+      "rank": 4,
+      "path": "api/ticketflow/accounts/(?P<pk>\\d+)$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000139",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000140",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000130",
+      "menu_type": 2,
+      "name": "resetPassword:TicketFlowAccounts",
+      "rank": 5,
+      "path": "api/ticketflow/accounts/(?P<pk>\\d+)/reset-password$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000141",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000144",
+    "fields": {
+      "name": "TicketFlowSkillGroups",
+      "path": "/ticketflow/skill-groups/index",
+      "component": "ticketflow/skill-groups/index",
+      "menu_type": 1,
+      "rank": 6,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000145",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000146",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "list:TicketFlowSkillGroups",
+      "rank": 1,
+      "path": "api/ticketflow/skill-groups$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000147",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000148",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "create:TicketFlowSkillGroups",
+      "rank": 2,
+      "path": "api/ticketflow/skill-groups$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000149",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000150",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "retrieve:TicketFlowSkillGroups",
+      "rank": 3,
+      "path": "api/ticketflow/skill-groups/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000151",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000152",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowSkillGroups",
+      "rank": 4,
+      "path": "api/ticketflow/skill-groups/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000153",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000154",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "categoryRoutes:TicketFlowSkillGroups",
+      "rank": 5,
+      "path": "api/ticketflow/skill-groups/category-routes$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000155",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000156",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000144",
+      "menu_type": 2,
+      "name": "categoryRoute:TicketFlowSkillGroups",
+      "rank": 6,
+      "path": "api/ticketflow/skill-groups/category-routes/(?P<category>[^/.]+)$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000157",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000180",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "assistantSession:TicketFlowTickets",
+      "rank": 18,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/assistant-session$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000181",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000182",
+    "fields": {
+      "name": "TicketFlowAssistant",
+      "path": "/ticketflow/assistant/index",
+      "component": "ticketflow/assistant/index",
+      "menu_type": 1,
+      "rank": 7,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000183",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000184",
+    "fields": {
+      "name": "TicketFlowAssistantFeedback",
+      "path": "/ticketflow/assistant/feedback/index",
+      "component": "ticketflow/assistant/feedback/index",
+      "menu_type": 1,
+      "rank": 8,
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000185",
+      "method": "",
+      "model": [],
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000186",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "list:TicketFlowAssistant",
+      "rank": 1,
+      "path": "api/assistant/sessions$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000187",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000188",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "create:TicketFlowAssistant",
+      "rank": 2,
+      "path": "api/assistant/sessions$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000189",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000190",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "partialUpdate:TicketFlowAssistant",
+      "rank": 3,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "PATCH",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000191",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000192",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "destroy:TicketFlowAssistant",
+      "rank": 4,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "DELETE",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000193",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000194",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "messages:TicketFlowAssistant",
+      "rank": 5,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/messages$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000195",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000196",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "feedback:TicketFlowAssistant",
+      "rank": 6,
+      "path": "api/assistant/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/messages/(?P<message_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/feedback$",
+      "method": "PUT",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000197",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000198",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "question:TicketFlowAssistant",
+      "rank": 7,
+      "path": "api/assistant/internal/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/question$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000199",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000200",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "answer:TicketFlowAssistant",
+      "rank": 8,
+      "path": "api/assistant/internal/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/answer$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000201",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000202",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000182",
+      "menu_type": 2,
+      "name": "context:TicketFlowAssistant",
+      "rank": 9,
+      "path": "api/assistant/internal/sessions/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/context$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000203",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000204",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000184",
+      "menu_type": 2,
+      "name": "downvotes:TicketFlowAssistantFeedback",
+      "rank": 1,
+      "path": "api/assistant/feedback/downvotes$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000205",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000206",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000184",
+      "menu_type": 2,
+      "name": "handoffs:TicketFlowAssistantFeedback",
+      "rank": 2,
+      "path": "api/assistant/feedback/handoffs$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000207",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000208",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000184",
+      "menu_type": 2,
+      "name": "summary:TicketFlowAssistantFeedback",
+      "rank": 3,
+      "path": "api/assistant/feedback/summary$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000209",
+      "model": []
+    }
   }
 ]

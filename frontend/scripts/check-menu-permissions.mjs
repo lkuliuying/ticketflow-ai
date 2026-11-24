@@ -147,6 +147,9 @@ const WHITELIST_A = new Set([
   "enable:SystemTask", // 前端启停走 batch-enable / partialUpdate，单任务端点无前端交互
   "syncRepoStatus:AiKnowledge", // 前端只调 sync-repo 触发同步，状态经列表刷新获得
   "context:TicketFlowTickets", // 服务间读取上下文，由 FastAPI 消费
+  "question:TicketFlowAssistant", // AI 助手内网提问，由 FastAPI 携带用户令牌调用
+  "answer:TicketFlowAssistant", // AI 助手内网写回回答，由 FastAPI 调用
+  "context:TicketFlowAssistant", // AI 助手转人工草稿读取上下文，由 FastAPI 调用
   // TicketFlow 工作台在 Phase 4 接入，届时移除对应条目。
   "timeline:TicketFlowTickets",
   "transition:TicketFlowTickets",

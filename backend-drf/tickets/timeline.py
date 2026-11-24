@@ -3,8 +3,11 @@ from typing import TypedDict
 from uuid import UUID
 
 from django.db.models import CharField, F, Prefetch, QuerySet, Value, prefetch_related_objects
+from django.db.models.functions import Coalesce
 
 from tickets.models import Ticket, TicketComment, TicketLog, Visibility
+
+SYSTEM_ACTOR = "系统"
 
 
 class TimelineEntry(TypedDict):
@@ -35,7 +38,7 @@ def timeline_rows(ticket: Ticket, internal: bool) -> QuerySet:
         .order_by()
         .annotate(
             kind=Value("log"),
-            actor=F("operator__username"),
+            actor=Coalesce("operator__username", Value(SYSTEM_ACTOR)),
             body=F("note"),
             visibility=Value("", output_field=CharField()),
         )
@@ -68,7 +71,7 @@ def first_page(ticket: Ticket, internal: bool) -> dict[str, int | list[TimelineE
             "id": log.id,
             "created_time": log.created_time,
             "kind": "log",
-            "actor": log.operator.username,
+            "actor": log.operator.username if log.operator is not None else SYSTEM_ACTOR,
             "body": log.note,
             "action": log.action,
             "from_status": log.from_status,

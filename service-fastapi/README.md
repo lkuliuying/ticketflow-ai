@@ -16,6 +16,17 @@ data: {"ticket_id":"2da1c8a8-31ca-40d4-90e3-e3842c849b02","ticket_version":2,"re
 
 SSE 建流前的失败沿用 HTTP 错误信封。建流后的失败以 `error` 事件结束，携带 `{code, error, detail, retryable}`。分析与 SSE 字段见 [工单 AI 契约](../backend-drf/docs/schema/ticketflow-ai.schema.json)。分析缓存使用 `ticketflow:ai:analysis:` 前缀，知识引用的 ID、标题或摘要变化时重新生成，引用顺序变化时仍可命中。缓存读写异常时回源，鉴权 Redis 故障时拒绝请求。
 
+员工 AI 助手使用 DRF 创建的会话，两个接口均转发员工的 Bearer access token。
+
+| 方法和路径 | 请求 | 成功响应 |
+| --- | --- | --- |
+| `POST /ai/v1/assistant/chat/stream` | `{session_id, message}`，问题 1 至 4000 字 | SSE `meta {session_id,user_message_id,references}` → `delta {text}` → `done {finish_reason,assistant_message_id}`，等待正文时可收到 `ping {}` |
+| `POST /ai/v1/assistant/handoff-draft` | `{session_id}` | JSON `{title,description,category}`，供员工编辑确认 |
+
+回答写入 DRF 后才发送 `done`。生成失败保存已生成正文及 `failed` 状态，并以 `error` 结束。客户端断开时保存已生成正文及 `interrupted` 状态。引用只包含文章 ID 和标题。草稿分类来自会话上下文，标题和描述上限分别为 200 和 20000 字。
+
+会话关联工单后，新提问在建流前返回 HTTP 409 和 `{"code":409,"error":"CONFLICT","detail":"会话已转人工，请新建对话"}`。已经开始的回答仍会写回会话。转人工草稿中的问题、操作和结果以员工明确提供的信息为准，必要时单独注明助手建议的来源。
+
 ## 本地启动
 
 从 [`.env.example`](.env.example) 复制出 `.env`，或直接设置同名环境变量。将 `JWT_SIGNING_KEY` 填为 DRF 的 `SIMPLE_JWT.SIGNING_KEY`，部署时向两边显式注入同一个密钥。使用 `backend-drf/compose.test.yml` 的 Redis 时，将 `AUTH_REDIS_URL` 设为 `redis://127.0.0.1:56379/1`。
@@ -35,7 +46,7 @@ uv run uvicorn app.main:app --port 8897
 | `JWT_LEEWAY_SECONDS` | `0` | 与 DRF 使用同一签发和到期时间容差，单位秒。交付栈默认 30 |
 | `AUTH_REDIS_URL` | `redis://127.0.0.1:6379/1` | 包含 DRF `DEFAULT_CACHE_ID` 的认证 Redis URL。默认逻辑库是 1，覆盖时请在 URL 中显式写出库号 |
 | `AUTH_REDIS_TIMEOUT` | `0.5` | 认证 Redis 单次操作的总预算，单位秒 |
-| `DRF_BASE_URL` | `http://127.0.0.1:8896` | DRF 内网地址，须能访问 `/api/tickets/{id}/ai-context` |
+| `DRF_BASE_URL` | `http://127.0.0.1:8896` | DRF 内网地址，须能访问工单和员工助手的内网接口 |
 | `HTTP_CONNECT_TIMEOUT` | `1.0` | HTTP 连接超时，单位秒 |
 | `HTTP_READ_TIMEOUT` | `3.0` | HTTP 读写各阶段超时，单位秒 |
 | `DRF_TOTAL_TIMEOUT` | `5.0` | 工单上下文 HTTP 调用的总预算，包含排队与重试，单位秒 |
@@ -54,7 +65,10 @@ uv run uvicorn app.main:app --port 8897
 | `MOCK_CHUNKS` | `8` | Mock 回复分段数，范围 1–100 |
 | `LLM_BASE_URL` | `https://api.openai.com/v1` | 兼容服务 API 根地址，服务追加 `/chat/completions` |
 | `LLM_MODEL` | `gpt-4o-mini` | 兼容服务模型名 |
+| `LLM_THINKING` | `default` | `default` 沿用上游默认行为并省略请求体的 `thinking` 字段。`enabled` / `disabled` 为支持该字段的提供方显式开启 / 关闭思考模式。Mock 生成忽略该项 |
 | `LLM_API_KEY` | — | 关闭 Mock 时必填 |
+
+分析缓存按模型和思考模式区分。流式和非流式响应均从上游的 `content` 读取正文。
 
 ## 容器
 

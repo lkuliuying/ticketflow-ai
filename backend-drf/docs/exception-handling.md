@@ -39,7 +39,7 @@
 | 1002    | 发送失败/参数处理失败（邮件、发码、上传类型校验等）     | verify_code、email 测试、`packages/xadmin-common/common/core/modelset/upload.py` |
 | 1003    | 文件大小超限（上传）                     | `packages/xadmin-common/common/core/modelset/upload.py` |
 | 1004    | 请求数据异常                         | verify_code                     |
-| 409     | 工单状态、数据版本、建单幂等键或工单转存冲突 | `tickets/services.py`、`knowledge/services.py` |
+| 409     | 工单状态、数据版本、建单幂等键、工单转存冲突或已转人工会话继续提问 | `tickets/services.py`、`knowledge/services.py`、`tickets/assistant_services.py` |
 | 503     | Redis 限流暂时不可用 | `tickets/cache.py` |
 
 > 约定：新增错误码必须先在本表登记；`40001/40002` 为前端约定的协议码，不可挪作他用。

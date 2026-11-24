@@ -10,7 +10,10 @@
       "timeline:TicketFlowTickets",
       "transition:TicketFlowTickets",
       "comments:TicketFlowTickets",
-      "dashboard:TicketFlowTickets"
+      "dashboard:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets"
     ],
     "ticketflow_requester": [
       "TicketFlow",
@@ -21,7 +24,20 @@
       "timeline:TicketFlowTickets",
       "transition:TicketFlowTickets",
       "comments:TicketFlowTickets",
-      "dashboard:TicketFlowTickets"
+      "dashboard:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets",
+      "TicketFlowAssistant",
+      "list:TicketFlowAssistant",
+      "create:TicketFlowAssistant",
+      "partialUpdate:TicketFlowAssistant",
+      "destroy:TicketFlowAssistant",
+      "messages:TicketFlowAssistant",
+      "feedback:TicketFlowAssistant",
+      "question:TicketFlowAssistant",
+      "answer:TicketFlowAssistant",
+      "context:TicketFlowAssistant"
     ],
     "ticketflow_agent": [
       "TicketFlow",
@@ -34,7 +50,13 @@
       "comments:TicketFlowTickets",
       "aiMetadata:TicketFlowTickets",
       "context:TicketFlowTickets",
-      "dashboard:TicketFlowTickets"
+      "dashboard:TicketFlowTickets",
+      "returnTicket:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "TicketFlowMyRatings",
+      "summary:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets"
     ],
     "ticketflow_admin": [
       "TicketFlow",
@@ -55,7 +77,29 @@
       "list:SystemExportRecord",
       "retrieve:SystemExportRecord",
       "download:SystemExportRecord",
-      "assignees:TicketFlowTickets"
+      "assignees:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "TicketFlowRatingStats",
+      "summary:TicketFlowMyRatings",
+      "TicketFlowAccounts",
+      "list:TicketFlowAccounts",
+      "create:TicketFlowAccounts",
+      "retrieve:TicketFlowAccounts",
+      "partialUpdate:TicketFlowAccounts",
+      "resetPassword:TicketFlowAccounts",
+      "TicketFlowSkillGroups",
+      "list:TicketFlowSkillGroups",
+      "create:TicketFlowSkillGroups",
+      "retrieve:TicketFlowSkillGroups",
+      "partialUpdate:TicketFlowSkillGroups",
+      "categoryRoutes:TicketFlowSkillGroups",
+      "categoryRoute:TicketFlowSkillGroups",
+      "assistantSession:TicketFlowTickets",
+      "TicketFlowAssistantFeedback",
+      "downvotes:TicketFlowAssistantFeedback",
+      "handoffs:TicketFlowAssistantFeedback",
+      "summary:TicketFlowAssistantFeedback"
     ]
   }
 }

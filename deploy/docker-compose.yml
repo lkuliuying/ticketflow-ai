@@ -119,6 +119,9 @@ services:
       MOCK_CHUNK_DELAY: ${MOCK_CHUNK_DELAY:-0.12}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_THINKING: ${LLM_THINKING:-default}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-30}
+      STREAM_TIMEOUT: ${STREAM_TIMEOUT:-90}
       LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
       redis:

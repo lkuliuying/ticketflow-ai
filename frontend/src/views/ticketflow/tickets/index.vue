@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import { useTickets } from "./utils/hook";
+import { useRouteIntent } from "./utils/useRouteIntent";
 import TicketDashboard, {
   type DashboardFilter
 } from "./components/TicketDashboard.vue";
@@ -11,6 +12,7 @@ defineOptions({
 
 type PageExpose = {
   handleGetData?: () => void;
+  handleAddOrEdit?: (_isAdd?: boolean) => void;
   searchFields?: { value: Record<string, unknown> } | Record<string, unknown>;
 };
 
@@ -19,9 +21,17 @@ const dashboardRef = ref<InstanceType<typeof TicketDashboard>>();
 const activeFilter = ref<DashboardFilter | null>(null);
 const { api, auth, listColumnsFormat, operationButtonsProps } =
   useTickets(tableRef);
+const listReady = ref(false);
+const { consume: consumeRouteIntent } = useRouteIntent({
+  isReady: () => listReady.value,
+  applyFilter: filter => applyDashboardFilter(filter),
+  openCreate: () => {
+    if (auth.create) tableRef.value?.handleAddOrEdit?.(true);
+  }
+});
 
-const DASHBOARD_KEYS = ["status", "priority", "sla"] as const;
-/** 看板计数随列表筛选变化，但不带看板自身的三个维度与分页参数 */
+const DASHBOARD_KEYS = ["status", "priority", "sla", "assignment"] as const;
+/** 看板计数随列表筛选变化，但不带看板自身的各维度与分页参数 */
 const NON_FILTER_KEYS = new Set<string>([
   ...DASHBOARD_KEYS,
   "page",
@@ -29,7 +39,7 @@ const NON_FILTER_KEYS = new Set<string>([
   "ordering"
 ]);
 
-/** 看板点选：清掉三个看板维度后写入当前条件，回到第 1 页，与搜索表单保持一致再查询 */
+/** 看板点选：清掉看板各维度后写入当前条件，回到第 1 页，与搜索表单保持一致再查询 */
 function applyDashboardFilter(filter: DashboardFilter | null) {
   const fields = tableRef.value?.searchFields as
     Record<string, unknown> | undefined;
@@ -68,6 +78,10 @@ function onSearchComplete({
     )
   );
   dashboardRef.value?.refresh(filters);
+  if (!listReady.value) {
+    listReady.value = true;
+    consumeRouteIntent();
+  }
 }
 </script>
 

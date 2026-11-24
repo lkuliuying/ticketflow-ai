@@ -35,20 +35,23 @@ const { columns } = useColumns();
 
 /** 「相关链接」行：仓库 / 文档 / 演示（外链，与版本行分隔展示） */
 const extLinks = [
-  { label: t("about.webRepo"), href: SITE_LINKS.webRepo },
-  { label: t("about.serverRepo"), href: SITE_LINKS.serverRepo },
+  { label: t("about.repo"), href: SITE_LINKS.repo },
   { label: t("about.docUrl"), href: SITE_LINKS.docs },
-  { label: t("about.demoUrl"), href: SITE_LINKS.demo }
+  { label: t("about.deployDocs"), href: SITE_LINKS.deployDocs },
+  { label: t("about.upstreamClient"), href: SITE_LINKS.upstreamClient },
+  { label: t("about.upstreamServer"), href: SITE_LINKS.upstreamServer }
 ];
 
 /** 页头技术栈徽章（技术名不翻译，直接展示；取自简介文案中的主干技术） */
 const techStack = [
   "Vue 3",
-  "Vite",
-  "TypeScript",
   "Element Plus",
-  "Pinia",
-  "Tailwind CSS"
+  "Django REST Framework",
+  "FastAPI",
+  "PostgreSQL",
+  "Redis",
+  "Celery",
+  "Nginx"
 ];
 
 /** 主依赖高亮 = 生产依赖键集：构建期随 package.json 派生，不再手维护名单 */

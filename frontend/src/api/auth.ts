@@ -138,6 +138,8 @@ export type AuthInfoResult = {
     email?: boolean;
     sms?: boolean;
     basic?: boolean;
+    /** 自助注册是否开放（后端关闭时登录页不显示注册入口） */
+    register?: boolean;
     rate?: number;
   };
 };
@@ -176,6 +178,7 @@ export function toAuthInfo(
     token: Boolean(caps?.basic?.token),
     encrypted: Boolean(caps?.basic?.encrypted),
     reset: Boolean(caps?.reset?.enabled),
+    register: Boolean(caps?.register?.enabled),
     email: Boolean(caps?.code?.enabled && caps.code.email),
     sms: Boolean(caps?.code?.enabled && caps.code.sms)
   };

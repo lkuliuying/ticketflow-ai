@@ -11,9 +11,18 @@ from rest_framework.exceptions import PermissionDenied, Throttled
 
 from identity.models import DeptInfo, UserInfo
 from tickets.cache import check_rate
-from tickets.models import Status, Ticket, TicketCreateRequest, TicketLog, TicketSlaAlert, Visibility
+from tickets.models import (
+    Status,
+    Ticket,
+    TicketAssignment,
+    TicketCreateRequest,
+    TicketLog,
+    TicketRating,
+    TicketSlaAlert,
+    Visibility,
+)
 from tickets.policy import TicketAccess
-from tickets.services import NewTicket, TicketConflict, add_comment, create_ticket, transition
+from tickets.services import NewTicket, TicketConflict, add_comment, create_rating, create_ticket, transition
 from tickets.tasks import scan_ticket_sla
 
 
@@ -31,6 +40,40 @@ def race_twice[T](operation: Callable[[], T]) -> list[T]:
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(execute) for _ in range(2)]
         return [future.result(timeout=20) for future in futures]
+
+
+# Concurrent tests use committed rows, so keep them out of modules using seeded_module.
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_create_balances_work_in_the_same_skill_group(support, requester, agent, details):
+    other = UserInfo.objects.create_user(username="support-other", dept=support)
+    other.roles.set(agent.roles.all())
+    results = race_twice(lambda: create_ticket(requester, str(uuid4()), details))
+    assert all(created for _, created in results)
+    assert {ticket.assignee_id for ticket, _ in results} == {agent.pk, other.pk}
+    assert TicketAssignment.objects.filter(ended_at__isnull=True).count() == 2
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_rating_creates_one_record(support, requester, agent, details):
+    ticket = Ticket.objects.create(
+        **details,
+        number="TF-RATING-RACE",
+        submitter=requester,
+        assignee=agent,
+        department=support,
+        sla_due_at=timezone.now(),
+        status=Status.CLOSED,
+    )
+
+    def rate():
+        try:
+            create_rating(Ticket.objects.all(), ticket.pk, requester, resolved=True, satisfaction=5, handler_score=4)
+        except TicketConflict:
+            return 409
+        return 201
+
+    assert sorted(race_twice(rate)) == [201, 409]
+    assert TicketRating.objects.filter(ticket=ticket).count() == 1
 
 
 @pytest.mark.django_db
@@ -58,9 +101,17 @@ def test_transitions_audit_and_reopen(
     assert ticket.first_response_at == public.created_time
     assert ticket.resolved_at is not None
     ticket = transition(tickets, ticket.pk, requester, owner, 3, Status.CLOSED)
+    assert ticket.assignments.get().end_reason == TicketAssignment.EndReason.CLOSED_OUT
     ticket = transition(tickets, ticket.pk, requester, owner, 4, Status.REOPENED)
+    assert ticket.assignee == agent
+    assert ticket.assignments.get(ended_at__isnull=True).assignee == agent
+    assert ticket.logs.get(action="REOPEN_ASSIGN").operator is None
     assert (ticket.sla_cycle, ticket.version, ticket.resolved_at) == (2, 5, None)
-    assert list(ticket.logs.order_by("created_time").values_list("to_status", flat=True)) == [
+    assert list(
+        ticket.logs.filter(action__in=("CREATE", "TRANSITION"))
+        .order_by("created_time")
+        .values_list("to_status", flat=True)
+    ) == [
         Status.OPEN,
         Status.IN_PROGRESS,
         Status.PENDING_VERIFY,

@@ -203,7 +203,7 @@ class SecurityLoginAuthSerializer(SettingSaveContractMixin, serializers.Serializ
 
 class SecurityRegisterAuthSerializer(SettingSaveContractMixin, serializers.Serializer):
     SECURITY_REGISTER_ACCESS_ENABLED = serializers.BooleanField(
-        required=False, default=True, label=_("Register enable"), help_text=_("Enable register for user")
+        required=False, default=False, label=_("Register enable"), help_text=_("Enable register for user")
     )
     SECURITY_REGISTER_CAPTCHA_ENABLED = serializers.BooleanField(
         required=False,
@@ -237,7 +237,7 @@ class SecurityRegisterAuthSerializer(SettingSaveContractMixin, serializers.Seria
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         # 组合约束：注册流程必须经邮箱/短信验证码完成，通道全关 = 流程走不通
         # （与 settings.services 注册诊断「requires at least one available channel」同口径）
-        if effective_value(self, "SECURITY_REGISTER_ACCESS_ENABLED", attrs, True) and not any(
+        if effective_value(self, "SECURITY_REGISTER_ACCESS_ENABLED", attrs, False) and not any(
             effective_value(self, name, attrs, default)
             for name, default in (
                 ("SECURITY_REGISTER_BY_EMAIL_ENABLED", True),

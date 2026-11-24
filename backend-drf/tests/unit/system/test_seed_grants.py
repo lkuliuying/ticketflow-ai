@@ -46,15 +46,16 @@ pytestmark = pytest.mark.django_db
 #  2026-10 种子授权补全（授权种子补全）：admin 补通讯录/我的管辖/标签/数据字典/模块管理
 #  5 页与对应权限点 + 部门管理员任命/我的管辖视角动作，302 → 338
 #  工单与知识库：默认角色增加 12 项；业务角色使用独立的菜单授权。
+#  工单评价：默认角色与员工获得提交及列表权限；技术员与管理员额外获得各自页面和汇总权限。
+#  工单会话入口按提交人与处理权限开放；员工助手和管理员反馈分别授予相应业务角色。
 EXPECTED_ROLE_MENUS = {
     "admin": 338,
     "test": 87,
-    "default": 45,
+    "default": 48,
     "demo": 67,
-    "ticketflow_requester": 12,
-    "ticketflow_agent": 16,
-    "ticketflow_admin": 24,
-    "ticketflow_kb_editor": 5,
+    "ticketflow_requester": 25,
+    "ticketflow_agent": 22,
+    "ticketflow_admin": 46,
 }
 
 

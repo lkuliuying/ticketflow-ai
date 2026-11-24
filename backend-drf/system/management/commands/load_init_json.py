@@ -134,10 +134,11 @@ class Command(LoadCommand):
         # 2. 冲突预检：自然键被库内数据占用时跳过该行（loaddata 是单事务，一行冲突会回滚全部）；
         # 未做任何裁剪且无冲突时直接用仓库里的原始种子文件
         with tempfile.TemporaryDirectory(prefix="xadmin_seed_") as target_dir:
-            report = prepare(plan, target_dir, module_filter=ModuleSeedFilter.build(), using=DEFAULT_DB_ALIAS)
-            self._report_notes(report, verbosity=int(options.get("verbosity", 1)))
+            # 在装配期间锁住需要保留名称的行，直到 fixture 导入结束。
             # loaddata 与属性型 m2m 必须同一事务：m2m 先删后插，中途失败会留下半覆盖关系集
             with transaction.atomic(using=DEFAULT_DB_ALIAS):
+                report = prepare(plan, target_dir, module_filter=ModuleSeedFilter.build(), using=DEFAULT_DB_ALIAS)
+                self._report_notes(report, verbosity=int(options.get("verbosity", 1)))
                 super().handle(*[str(label) for label in report.fixture_labels], **options)
                 # 属性型 m2m 已从 fixture 抽出，装载后一次落库：与 loaddata 逐行 set() 等价，
                 # 但把近 500 行的「JOIN + DELETE + INSERT」三连收敛成每组两条语句

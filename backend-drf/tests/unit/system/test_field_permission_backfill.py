@@ -14,10 +14,13 @@ get_allow_fields）：角色在某权限点上没有非空白名单时，该接�
 
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from django.core.management import call_command
+from django.db import transaction
 
+from common.core.modelset import metadata
 from identity.models import UserRole
 from system.models import FieldPermission, Menu, MenuMeta, ModelLabelField
 from system.services.permission_sync import (
@@ -107,7 +110,8 @@ def test_audit_and_nodes_queries_do_not_scale_with_menu_count(field_tree: Any) -
         audit_field_permissions(roles=[role_many])
         model_field_nodes(many)
 
-    assert len(ctx_many.captured_queries) <= len(ctx_few.captured_queries) + 3, (
+    assert len(ctx_many.captured_queries) <= 7
+    assert len(ctx_many.captured_queries) == len(ctx_few.captured_queries), (
         "审计/字段节点读取的查询数随菜单数增长（N+1 回归）："
         f"{len(ctx_few.captured_queries)} → {len(ctx_many.captured_queries)}"
     )
@@ -144,11 +148,13 @@ def test_fill_writes_do_not_scale_with_menu_count(field_tree: Any) -> None:
     role_few = _build(5, "few")
     role_many = _build(40, "many")
 
-    # 首次补齐允许随缺口线性（建行是固有成本，FieldPermission 的 id 由 save
-    # 路径拼装、bulk_create 拿不到）；这里锁的是**幂等路径**——种子收尾每轮都走
-    # 第二次，缺口为 0 时查询数必须恒定，否则全量跑批会逐轮线性放大
-    assert fill_field_permissions(roles=[role_few])
-    assert fill_field_permissions(roles=[role_many])
+    with CaptureQueriesContext(connection) as first_few:
+        assert len(fill_field_permissions(roles=[role_few])) == 5
+    with CaptureQueriesContext(connection) as first_many:
+        assert len(fill_field_permissions(roles=[role_many])) == 40
+
+    assert len(first_many.captured_queries) <= 12
+    assert len(first_many.captured_queries) == len(first_few.captured_queries)
 
     with CaptureQueriesContext(connection) as ctx_few:
         assert fill_field_permissions(roles=[role_few]) == []
@@ -159,6 +165,10 @@ def test_fill_writes_do_not_scale_with_menu_count(field_tree: Any) -> None:
         "补齐写入的查询数随组合数增长（写入 N+1 回归）："
         f"{len(ctx_few.captured_queries)} → {len(ctx_many.captured_queries)}"
     )
+    assert len(ctx_many.captured_queries) <= 6
+    for query in ctx_many.captured_queries:
+        if '"system_fieldpermission_field"' in query["sql"]:
+            assert "JOIN" not in query["sql"], "审计只从中间表读取当前授权的字段关联"
     # 语义不变：每个组合都真的拿到了全字段白名单
     filled_menus = set(role_many.menu.values_list("pk", flat=True))
     for permission in FieldPermission.objects.filter(role=role_many, menu_id__in=filled_menus):
@@ -175,14 +185,42 @@ def test_fill_creates_whitelist_for_missing_pair(demo_role: Any, bound_menu: Any
     assert set(permission.field.values_list("name", flat=True)) == {"title", "amount"}
 
 
+def test_fill_invalidates_metadata_cache_after_commit(
+    demo_role: Any, monkeypatch: pytest.MonkeyPatch, django_capture_on_commit_callbacks: Any
+) -> None:
+    invalidate = Mock()
+    monkeypatch.setattr(metadata, "invalidate_metadata_payload_cache", invalidate)
+
+    with django_capture_on_commit_callbacks(execute=True), transaction.atomic():
+        assert len(fill_field_permissions(roles=[demo_role])) == 1
+        invalidate.assert_not_called()
+
+    invalidate.assert_called_once_with()
+
+
+def test_fill_does_not_invalidate_metadata_cache_on_rollback(
+    demo_role: Any, bound_menu: Any, monkeypatch: pytest.MonkeyPatch, django_capture_on_commit_callbacks: Any
+) -> None:
+    invalidate = Mock()
+    monkeypatch.setattr(metadata, "invalidate_metadata_payload_cache", invalidate)
+
+    with django_capture_on_commit_callbacks(execute=True), transaction.atomic():
+        assert len(fill_field_permissions(roles=[demo_role])) == 1
+        transaction.set_rollback(True)
+
+    invalidate.assert_not_called()
+    assert not FieldPermission.objects.filter(role=demo_role, menu=bound_menu).exists()
+
+
 def test_fill_treats_empty_row_as_gap(demo_role: Any, bound_menu: Any) -> None:
     """行存在但字段为空与「没有行」等价（都产出空白名单），一并补齐。"""
-    FieldPermission.objects.create(role=demo_role, menu=bound_menu)
+    (permission,) = FieldPermission.objects.bulk_create(
+        [FieldPermission(pk="legacy-field-permission", role=demo_role, menu=bound_menu)]
+    )
 
     filled = fill_field_permissions(roles=[demo_role])
 
     assert len(filled) == 1
-    permission = FieldPermission.objects.get(role=demo_role, menu=bound_menu)
     assert permission.field.count() == 2
 
 

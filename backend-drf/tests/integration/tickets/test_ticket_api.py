@@ -8,24 +8,36 @@ import pytest
 from django.core.cache import cache
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from common.cache.storage import UserTokenRevokedCache
 from identity.models import DeptInfo, UserInfo
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from system.models import FieldPermission, Menu
 from system.tasks import async_export_data_task
 from task.models.export import ExportRecord
 from tickets.cache import TICKET_CACHE_KEY_PREFIX, WINDOW_SECONDS, request_key
-from tickets.models import Priority, Status, Ticket, TicketComment, TicketCreateRequest, TicketLog, Visibility
+from tickets.models import (
+    Priority,
+    Status,
+    Ticket,
+    TicketAssignment,
+    TicketComment,
+    TicketCreateRequest,
+    TicketLog,
+    Visibility,
+)
 
 pytestmark = pytest.mark.django_db
 TICKETS = "/api/tickets"
 
 
 def authenticated(user: UserInfo) -> APIClient:
+    token = RefreshToken.for_user(user).access_token
     client = APIClient()
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client
 
 
@@ -34,6 +46,22 @@ def assert_error(response, status):
     payload = response.json()
     assert payload["code"] != 1000
     assert isinstance(payload["detail"], str) and payload["detail"]
+
+
+def test_user_revocation_rejects_old_token_and_accepts_new_token(users):
+    user = users["requester"]
+    issued_at = datetime.now(UTC).replace(microsecond=0)
+    revoked_at = issued_at - timedelta(seconds=1)
+    with patch("rest_framework_simplejwt.tokens.aware_utcnow", return_value=revoked_at):
+        old_client = authenticated(user)
+    assert old_client.get(TICKETS).status_code == 200
+
+    UserTokenRevokedCache(user.pk).set_storage_cache(revoked_at.timestamp())
+
+    assert_error(old_client.get(TICKETS), 401)
+    with patch("rest_framework_simplejwt.tokens.aware_utcnow", return_value=issued_at):
+        new_client = authenticated(user)
+    assert new_client.get(TICKETS).status_code == 200
 
 
 @pytest.mark.parametrize("cache_result", [False, True], ids=["database-replay", "redis-replay"])
@@ -66,7 +94,7 @@ def test_create_requires_idempotency_key_and_replays_same_request(
 
 
 def test_transition_distinguishes_hidden_ticket_missing_action_and_stale_version(users, make_ticket, client_for):
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     resource = f"{TICKETS}/{ticket.pk}"
     owner = client_for(users["requester"])
     agent = client_for(users["agent"])
@@ -126,7 +154,7 @@ def test_ticket_submitter_can_reply_at_either_status(users, make_ticket, client_
 
 
 def test_comments_preserve_first_staff_response_and_hide_internal_activity(users, make_ticket, client_for):
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     resource = f"{TICKETS}/{ticket.pk}"
     agent = client_for(users["agent"])
     requester = client_for(users["requester"])
@@ -170,7 +198,7 @@ def test_comments_preserve_first_staff_response_and_hide_internal_activity(users
 
 
 def test_timeline_first_page_matches_full_pagination_across_timestamp_ties(users, make_ticket, client_for):
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     actor = users["agent"]
     logs = TicketLog.objects.bulk_create(
         TicketLog(ticket=ticket, action="TRANSITION", operator=actor) for _ in range(14)
@@ -210,8 +238,8 @@ def test_dashboard_cache_is_scoped_to_viewer_and_invalidated_on_create(
 ):
     requester = client_for(users["requester"])
     agent = client_for(users["agent"])
-    make_ticket()
-    make_ticket(users["admin"], priority=Priority.P0)
+    make_ticket(assignee=users["agent"])
+    make_ticket(users["admin"], priority=Priority.P0, assignee=users["agent"])
     url = f"{TICKETS}/dashboard"
 
     def dashboard(api):
@@ -247,7 +275,7 @@ def test_export_task_replays_submitted_filter_with_current_ticket_scope(
 ):
     settings.CELERY_TASK_ALWAYS_EAGER = False
     admin = users["admin"]
-    visible = make_ticket(status=Status.CLOSED, title="同部门关闭工单")
+    visible = make_ticket(status=Status.CLOSED, title="本人处理的关闭工单", assignee=admin)
     other_department = DeptInfo.objects.create(code="export-other", name="其他支持部门")
     hidden = make_ticket(status=Status.CLOSED, department=other_department)
     make_ticket(status=Status.OPEN)
@@ -293,6 +321,53 @@ def test_export_task_replays_submitted_filter_with_current_ticket_scope(
     assert_error(client_for(users["requester"]).get(url), 403)
 
 
+@pytest.mark.parametrize("assignment", ["current", "history", "unassigned"])
+def test_export_task_replays_assignment_as_submitter(
+    users, make_ticket, client_for, settings, django_capture_on_commit_callbacks, assignment
+):
+    settings.CELERY_TASK_ALWAYS_EAGER = False
+    agent, admin = users["agent"], users["admin"]
+    current = make_ticket(assignee=agent)
+    history = make_ticket()
+    waiting = make_ticket()
+    make_ticket(status=Status.CLOSED)
+    now = timezone.now()
+    TicketAssignment.objects.create(ticket=history, assignee=agent, started_at=now, ended_at=now, end_reason="RETURNED")
+
+    if assignment != "unassigned":
+        agent.roles.get().menu.add(
+            *admin.roles.get().menu.filter(
+                name__in=(
+                    "exportAsync:TicketFlowTickets",
+                    "exportData:TicketFlowTickets",
+                    "download:SystemExportRecord",
+                )
+            )
+        )
+    submitter = admin if assignment == "unassigned" else agent
+    expected = {"current": [current], "history": [history], "unassigned": [history, waiting]}[assignment]
+    api = client_for(submitter)
+    params = {"type": "csv", "assignment": assignment}
+    with (
+        patch.object(async_export_data_task, "apply_async") as dispatch,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        response = api.post(f"{TICKETS}/export-async", params, format="json")
+    assert response.status_code == 200, response.data
+    record = ExportRecord.objects.get(pk=response.data["data"]["record_id"])
+    assert dispatch.call_args.kwargs["args"][2:] == [params, submitter.pk]
+    assert async_export_data_task.apply(**dispatch.call_args.kwargs, throw=True).get() == len(expected)
+    record.refresh_from_db()
+    assert record.status == ExportRecord.Status.SUCCESS
+    assert record.rows == len(expected)
+    download = api.get(f"/api/task/exports/{record.pk}/download")
+    assert download.status_code == 200, download.data
+    _, *rows = csv.reader(io.StringIO(b"".join(download.streaming_content).decode("utf-8-sig")))
+    assert len(rows) == len(expected)
+    numbers = {value for row in rows for value in row if value.startswith("TF-")}
+    assert numbers == {ticket.number for ticket in expected}
+
+
 def test_ai_context_requires_handling_scope_and_exposes_only_published_references(users, make_ticket, client_for):
     agent = users["agent"]
     api = client_for(agent)
@@ -302,7 +377,7 @@ def test_ai_context_requires_handling_scope_and_exposes_only_published_reference
     assert api.get(resource).status_code == 200
     assert_error(api.get(f"{resource}/ai-context"), 403)
 
-    ticket = make_ticket(title="Wireguard failure")
+    ticket = make_ticket(title="Wireguard failure", assignee=agent)
     articles = {
         status: KnowledgeArticle.objects.create(
             title=f"Wireguard {status}",
@@ -329,7 +404,7 @@ def test_ai_context_rejects_missing_required_field(users, make_ticket, client_fo
     menu = Menu.objects.get(name="context:TicketFlowTickets")
     permissions = FieldPermission.objects.get(role=agent.roles.get(), menu=menu)
     permissions.field.remove(permissions.field.get(name="description", parent__name="tickets.ticket"))
-    ticket = make_ticket()
+    ticket = make_ticket(assignee=users["agent"])
     restricted = client_for(agent).get(f"{TICKETS}/{ticket.pk}/ai-context")
     assert_error(restricted, 403)
     assert "字段权限" in restricted.data["detail"]

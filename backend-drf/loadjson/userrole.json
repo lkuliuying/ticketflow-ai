@@ -10,7 +10,7 @@
    "modifier": 1,
    "dept_belong": null,
    "deleted_at": null,
-   "name": "管理员",
+   "name": "平台管理员",
    "code": "admin",
    "is_active": true,
    "menu": []

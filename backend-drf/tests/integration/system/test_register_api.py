@@ -22,6 +22,7 @@ PASSWORD = "Test@123456"
 @pytest.fixture
 def register_free(settings):
     """关闭注册辅助安全项（图片验证码 / 临时 token / 加密），便于传明文密码并直达校验。"""
+    settings.SECURITY_REGISTER_ACCESS_ENABLED = True
     settings.SECURITY_REGISTER_CAPTCHA_ENABLED = False
     settings.SECURITY_REGISTER_TEMP_TOKEN_ENABLED = False
     settings.SECURITY_REGISTER_ENCRYPTED_ENABLED = False
@@ -95,8 +96,11 @@ class TestRegister:
         assert resp2.data["code"] == 1002
         assert UserInfo.objects.filter(username=target).count() == 1
 
-    def test_register_access_disabled(self, api_client, settings):
-        settings.SECURITY_REGISTER_ACCESS_ENABLED = False
+    def test_register_disabled_by_default(self, api_client, settings):
+        settings.EMAIL_ENABLED = True
+        capabilities = api_client.get("/api/identity/auth/capabilities").data["data"]["register"]
+        assert capabilities["email"] is True
+        assert capabilities["enabled"] is False
         resp = api_client.post(
             REGISTER_URL,
             {"verify_token": "x", "verify_code": "y", "password": PASSWORD},

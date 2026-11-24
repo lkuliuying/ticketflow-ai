@@ -23,6 +23,7 @@ COLLAB = ROOT / "collab"
 DESIGN = ROOT / "backend-drf" / "docs" / "plans" / "ticketflow-phase-1.md"
 MODEL = "gemini-4-neon-high"
 DIFF_LIMIT = 400_000
+GENERATED_EXCLUDES = (":(exclude,glob)**/docs/schema/openapi.json",)
 
 
 def read(path: Path) -> str:
@@ -53,7 +54,8 @@ def task_brief(task: str) -> str:
 def build_prompt(task: str, branch: str, repo: Path, round_no: int, previous: str, base: str = "main") -> str:
     commits = git(repo, "log", "--oneline", f"{base}..{branch}")
     stat = git(repo, "diff", "--stat", f"{base}...{branch}")
-    diff = git(repo, "diff", f"{base}...{branch}")
+    # 生成物（OpenAPI 全量导出）动辄数千行，会把核心代码挤出截断线；stat 里仍可见其改动规模
+    diff = git(repo, "diff", f"{base}...{branch}", "--", ".", *GENERATED_EXCLUDES)
     if len(diff) > DIFF_LIMIT:
         diff = diff[:DIFF_LIMIT] + "\n…（diff 过长已截断，请在结论中注明未覆盖部分）"
     head = git(repo, "rev-parse", "--short", branch).strip()

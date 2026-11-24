@@ -451,7 +451,7 @@ layout:
   general: 通用设置
   siteTitle: 站点标题
   siteTitleTip: 侧栏 / 顶栏品牌区与浏览器标签页的站点名（留空用平台配置的 Title）
-  siteTitlePlaceholder: 如：xAdmin 管理平台
+  siteTitlePlaceholder: 如：TicketFlow 智能工单平台
   siteWideAdminOnly: 站点级外观配置全局生效（所有账号与登录页一致），仅管理员可修改
   language: 语言
   languageTip: 界面语言，与顶栏语言切换为同一入口
@@ -1134,6 +1134,12 @@ menus:
   ticketflow: TicketFlow
   ticketflowTickets: 工单
   ticketflowKnowledge: 工单知识库
+  ticketflowMyRatings: 我的评价
+  ticketflowRatingStats: 评价统计
+  ticketflowAccounts: 账号管理
+  ticketflowSkillGroups: 技能组
+  ticketflowAssistant: AI 助手
+  ticketflowAssistantFeedback: AI 反馈
   searchData: 数据查询
   userOnline: 在线用户
   apiApp: API 应用
@@ -2509,6 +2515,7 @@ chat:
   emptyMembers: 暂无成员
 
 login:
+  siteSubtitle: 智能工单与知识库协作平台
   logoutSuccess: 登出成功
   thirdPartyLogin: 第三方登录
   serverForbidden: 当前服务器不允许登录
@@ -4241,7 +4248,7 @@ aiKnowledge:
 
 oauthAuthorize:
   title: 授权请求
-  appRequest: "{app} 请求访问你的 xadmin 账号"
+  appRequest: "{app} 请求访问你的 TicketFlow 账号"
   user: 当前用户
   scopesTitle: 请求的权限范围
   scopesEmpty: 该应用未限制接口范围（以你在应用中的授权面为准）
@@ -4303,7 +4310,7 @@ systemModule:
   discardConfirm: 有未保存的改动，切换预设将丢弃这些改动，是否继续？
 
 about:
-  intro: xAdmin 是一款开源免费且开箱即用的中后台管理系统模版。完全采用 ECMAScript 模块（ESM）规范来编写和组织代码，使用了最新的 Vue3、Vite、Element-Plus、TypeScript、Pinia、Tailwindcss 等主流技术开发。
+  intro: TicketFlow 是面向企业内部支持团队的智能工单与知识库协作平台：员工提交工单，技术人员处理与回复，AI 辅助分析工单、流式起草回复，解决方案可沉淀为知识库文章。前端基于 xadmin-client（Vue 3 / Element Plus），后端基于 xadmin-server（Django / DRF），AI 能力由独立的 FastAPI 异步服务提供。
   platformInfo: 平台信息
   prodDeps: 生产环境依赖
   devDeps: 开发环境依赖
@@ -4311,10 +4318,11 @@ about:
   buildTime: 构建时间
   nodeVersion: Node 版本
   pnpmVersion: pnpm 版本
-  webRepo: 前端代码地址
-  serverRepo: 后端代码地址
-  docUrl: 文档地址
-  demoUrl: 预览地址
+  repo: 项目仓库
+  docUrl: 使用文档
+  deployDocs: 部署说明
+  upstreamClient: 前端底座 xadmin-client
+  upstreamServer: 后端底座 xadmin-server
 
 pickerShortcuts:
   today: 今天
@@ -4423,6 +4431,109 @@ codegen:
   planImported: 方案已导入
   planImportFailed: 导入失败
 ticketflow:
+  account:
+    create: 新建账号
+    createTitle: 新建业务账号
+    editTitle: 编辑账号 {username}
+    edit: 编辑
+    saved: 账号已保存
+    username: 用户名
+    name: 姓名
+    phone: 手机
+    email: 邮箱
+    role: 角色
+    skill_group: 技能组
+    skill_group_name: 技能组
+    skillGroup: 技能组
+    is_active: 状态
+    q: 关键字
+    roleValue:
+      requester: 普通员工
+      agent: 技术员
+      admin: 管理员
+    active: 启用
+    inactive: 停用
+    password: 初始密码
+    newPassword: 新密码
+    generatePassword: 生成
+    usernameRequired: 请输入用户名
+    usernameInvalid: "3~64 位字母、数字或 _ . {'@'} + -"
+    nameRequired: 请输入姓名
+    emailInvalid: 邮箱格式不正确
+    roleRequired: 请选择角色
+    groupRequired: 技术员必须选择技能组
+    passwordRequired: 请输入密码
+    resetPassword: 重置密码
+    resetTitle: 重置 {username} 的密码
+    resetHint: 重置后 {username} 已登录的会话会全部失效，请把新密码告知本人
+    resetDone: 密码已重置
+    toggleActive: 启用 / 停用
+    enable: 启用账号
+    disable: 停用账号
+    enableConfirm: 确定启用 {username}？
+    disableConfirm: 停用后 {username} 无法登录，已登录的会话会立即失效。确定停用？
+    disableAgentConfirm: 停用后 {username} 无法登录，名下未关闭的工单会放回待分配，由管理员重新指派。确定停用？
+    enabled: 账号已启用
+    disabled: 账号已停用
+  skillGroup:
+    name: 名称
+    description: 说明
+    is_active: 状态
+    is_default: 默认组
+    q: 关键字
+    default: 默认组
+    routes: 分类路由
+    routesHint: 新建工单按分类进入对应技能组并自动派单；未配置的分类进入默认组（{name}）
+    useDefault: 使用默认组
+    routeSaved: 路由已保存
+  rating:
+    section: 评价
+    rate: 评价这次处理
+    rateHint: 工单已关闭，欢迎对处理结果和处理人进行评价（每张工单评价一次）
+    title: 评价工单 {number}
+    afterCloseTitle: 工单已关闭，评价一下这次处理吧（可稍后在工单详情里补评）
+    submitted: 感谢你的评价
+    resolved: 问题是否解决
+    resolvedYes: 已解决
+    resolvedNo: 未解决
+    resolvedRequired: 请选择问题是否解决
+    satisfaction: 满意度
+    handlerScore: 处理人评分
+    handlerScoreFor: 对处理人 {name} 的评分
+    scoreRequired: 请打分
+    scoreText:
+      "1": 很差
+      "2": 较差
+      "3": 一般
+      "4": 满意
+      "5": 非常满意
+    tags: 标签
+    tagValue:
+      FAST: 响应快
+      PROFESSIONAL: 专业
+      FRIENDLY: 态度好
+      CLEAR: 沟通清楚
+    comment: 文字评价
+    commentPlaceholder: 说说这次处理的体验（选填）
+    commentTooLong: 文字评价不能超过 {max} 字
+    handler: 处理人
+    byHandler: 按技术员统计
+    drillHint: 点击某位技术员查看其评价明细
+    noRatings: 暂无评价
+    periodStart: 开始日期
+    periodEnd: 结束日期
+    ticket_number: 工单号
+    rater_name: 评价人
+    handler_name: 处理人
+    handler_id: 处理人
+    created_time: 评价时间
+    created_from: 评价时间起
+    created_to: 评价时间止
+    summary:
+      count: 评价数
+      avgSatisfaction: 平均满意度
+      avgHandlerScore: 平均处理人评分
+      resolvedRate: 解决率
   ai:
     analysis: AI 分析
     analyze: 分析工单
@@ -4504,6 +4615,9 @@ ticketflow:
     ASSIGN: 指派
     TRANSITION: 状态流转
     AI_METADATA: 采纳 AI 建议
+    AUTO_ASSIGN: 自动派单
+    REOPEN_ASSIGN: 重开回派
+    RETURN: 退回重派
     OTHER: 操作
   detail:
     open: 工单详情
@@ -4524,6 +4638,14 @@ ticketflow:
     noTimeline: 暂无记录
     loadMore: 加载更多（剩余 {rest} 条）
     archive: 转存为知识库草稿
+    return: 退回重派
+    returnPrompt: 说明退回原因，管理员会据此重新分配
+    returnPlaceholder: 例如：不属于本技能组的问题 / 当前工作量过大
+    returnRequired: 请填写退回原因
+    returnTooLong: 原因不能超过 {max} 字
+    returned: 已退回，等待管理员重新分配
+    readOnly: 只读：这张工单已转交他人处理
+    readOnlyHint: 你曾经处理过这张工单，可以查看完整记录，但不能再操作
   number: 工单号
   title: 标题
   description: 描述
@@ -4532,7 +4654,7 @@ ticketflow:
   status: 状态
   assignee_name: 处理人
   submitter_name: 提交人
-  department_name: 部门
+  department_name: 技能组
   sla_due_at: SLA 截止
   sla_state: SLA 状态
   created_time: 创建时间
@@ -4553,15 +4675,122 @@ ticketflow:
   sla: SLA 状态
   q: 关键字
   assignee_id: 处理人 ID
-  department_id: 部门 ID
+  department_id: 技能组 ID
+  assignment: 指派
+  assignmentValue:
+    unassigned: 待分配
+    current: 处理中（我）
+    history: 历史处理
   slaValue:
     ON_TRACK: 正常
     DUE_SOON: 即将超时
     OVERDUE: 已超时
     MET: 按时完成
+  assistant:
+    newSession: 新对话
+    noSessions: 还没有对话
+    sessionActions: 会话操作
+    rename: 重命名
+    remove: 删除
+    renamePrompt: 输入新的会话标题
+    titleInvalid: 标题为 1~200 个字符
+    renamed: 已重命名
+    removeConfirm: 确定删除对话“{title}”吗？删除后不再显示在列表中。
+    removed: 对话已删除
+    welcomeTitle: 有问题先问问 AI 助手
+    welcomeHint: 回答只依据已发布的知识库文章；没解决可以一键转人工提单。
+    emptyChat: 还没有消息，输入问题开始对话
+    placeholder: 描述你遇到的问题，例如：VPN 连不上怎么办？
+    inputHint: Enter 发送，Shift + Enter 换行
+    send: 发送
+    stop: 停止
+    sendFailed: 发送失败，请稍后重试
+    references: 参考了 {count} 篇知识库文章
+    up: 有帮助
+    down: 没帮助
+    reason: 原因
+    comment: 补充说明
+    commentPlaceholder: 选填，告诉我们哪里不对
+    commentTooLong: 补充说明最多 {max} 个字符
+    downTitle: 这条回答哪里不好？
+    feedbackSaved: 感谢反馈
+    reasonValue:
+      INACCURATE: 不准确
+      UNRESOLVED: 没解决
+      IRRELEVANT: 引用不相关
+      OTHER: 其他
+    answerStatus:
+      complete: 已完成
+      interrupted: 回答未完成（已停止或连接中断）
+      failed: 回答生成失败
+    viewTranscript: 查看 AI 对话
+    transcriptTitle: AI 对话
+    transcriptTitleWithNumber: AI 对话 · {number}
+    transcriptHint: 提交人转人工前与 AI 助手的对话，只读
+    transcriptFailed: 对话不存在或无权查看
+  handoff:
+    linked: 这段对话已转人工提单，处理人可在工单里查看。如需继续咨询，请新建对话。
+    viewTicket: 查看工单
+    tag: 已转人工
+    action: 转人工提单
+    title: 转人工提单
+    hint: AI 已根据对话整理出工单内容，请确认或修改后提交，处理人可以在工单里查看这段对话。
+    titleRequired: 请填写标题
+    descriptionRequired: 请填写问题描述
+    tooLong: 最多 {max} 个字符
+    draftFailed: AI 整理失败，已用你的问题预填，请补充后提交
+    created: 已提交工单 {number}
+  assistantFeedback:
+    summary:
+      sessions: 会话数
+      questions: 问题数
+      upRate: 好评率
+      handoffRate: 转人工率
+    votes: 赞 {up} · 踩 {down}
+    handoffCount: 转人工 {count} 次
+    scopeHint: 只展示被点踩的回答和转人工的会话，其余对话只计入统计
+    downvotes: 被点踩的回答
+    handoffs: 转人工会话
+    noDownvotes: 暂无被点踩的回答
+    noHandoffs: 暂无转人工会话
+    votedAt: 点踩时间
+    user: 提问人
+    question: 问题
+    handedOffAt: 转人工时间
+    sessionTitle: 会话标题
+    operation: 操作
   categoryValue:
     ACCOUNT: 账户
     ACCESS: 权限
     NETWORK: 网络
     SERVICE: 服务
     OTHER: 其他
+
+workbench:
+  subtitle: 智能工单与知识库协作平台
+  greeting:
+    morning: 上午好，{name}
+    afternoon: 下午好，{name}
+    evening: 晚上好，{name}
+  createTicket: 新建工单
+  assistant: AI 助手
+  myTickets: 我的工单
+  allTickets: 全部工单
+  myTodo: 我的待办
+  unassignedTickets: 待分配工单
+  knowledge: 知识库
+  stats:
+    unassigned: 待分配
+    current: 处理中（我）
+    history: 历史处理
+    open: 待处理
+    reopened: 已重开
+    inProgress: 处理中
+    verifying: 待验收
+    dueSoon: 即将超时
+    overdue: 已超时
+  recentTickets: 最近工单
+  latestArticles: 最新知识
+  viewAll: 查看全部
+  noTickets: 暂无工单
+  noArticles: 暂无已发布的知识文章

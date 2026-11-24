@@ -1,13 +1,16 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { TicketDetail } from "@/api/ticketflow/tickets";
+import type { TicketDetail, TicketStatus } from "@/api/ticketflow/tickets";
 import { useTicketDetail } from "../utils/useTicketDetail";
 import { PRIORITY_TONE, SLA_TONE, STATUS_TONE } from "../utils/ticketColumns";
 import TicketActions from "./TicketActions.vue";
 import TicketAiPanel from "./TicketAiPanel.vue";
 import TicketReply from "./TicketReply.vue";
 import TicketTimeline from "./TicketTimeline.vue";
+import RatingCard from "../../ratings/components/RatingCard.vue";
+import { openRatingDialog } from "../../ratings/utils/ratingDialog";
+import { openAssistantTranscript } from "../../assistant/utils/transcriptDrawer";
 
 /**
  * 工单详情抽屉：摘要与 SLA、可执行操作、回复框、时间线；处理人在右侧另有 AI 面板。
@@ -28,6 +31,45 @@ const { detail, loading, busy, notFound, load, run } = useTicketDetail(
 );
 
 onMounted(load);
+
+/**
+ * 只读（已转交）时处理人类操作全部关闭，但同时是提交人时仍可验收、重开，
+ * 经手过的已关闭工单仍可转存：操作区按能力位决定是否出现，不只看 read_only。
+ */
+const showActions = computed(() => {
+  const ticket = detail.value;
+  if (!ticket) return false;
+  return showTicketActions.value || canArchive.value;
+});
+
+/** 只读且没有可用流转时不挂操作组件，避免出现“没有可执行的流转”空态 */
+const showTicketActions = computed(() => {
+  const ticket = detail.value;
+  return Boolean(
+    ticket &&
+    (!ticket.viewer.read_only || ticket.available_transitions.length > 0)
+  );
+});
+
+const canArchive = computed(() =>
+  Boolean(detail.value?.viewer.can_archive && props.onArchive)
+);
+
+function rate(afterClose = false) {
+  if (!detail.value) return;
+  openRatingDialog(detail.value, {
+    afterClose,
+    onRated: () => {
+      void load();
+      props.onChanged?.();
+    }
+  });
+}
+
+/** 提交人确认解决后（流转到已关闭且后端允许评价）自动弹出评价，可跳过稍后补评 */
+function onTransitioned(to: TicketStatus) {
+  if (to === "CLOSED" && detail.value?.viewer.can_rate) rate(true);
+}
 
 /** 能否回复完全由后端 viewer 给出（处理人或提交人，且有评论权限） */
 const canReply = computed(() => Boolean(detail.value?.viewer.can_reply));
@@ -87,7 +129,28 @@ function time(value: string | null | undefined) {
             </span>
           </div>
           <h3 class="m-0">{{ detail.title }}</h3>
+          <div v-if="detail.assistant_session_id">
+            <el-button
+              size="small"
+              plain
+              type="primary"
+              data-testid="ticket-assistant-transcript"
+              @click="openAssistantTranscript(detail)"
+            >
+              {{ t("ticketflow.assistant.viewTranscript") }}
+            </el-button>
+          </div>
         </header>
+
+        <el-alert
+          v-if="detail.viewer.read_only"
+          type="info"
+          show-icon
+          :closable="false"
+          :title="t('ticketflow.detail.readOnly')"
+          :description="t('ticketflow.detail.readOnlyHint')"
+          data-testid="ticket-read-only"
+        />
 
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item :label="t('ticketflow.category')">
@@ -136,18 +199,45 @@ function time(value: string | null | undefined) {
           </el-descriptions-item>
         </el-descriptions>
 
-        <section class="flex flex-col gap-2">
+        <section v-if="showActions" class="flex flex-col gap-2">
           <h4 class="m-0">{{ t("ticketflow.detail.actions") }}</h4>
-          <TicketActions :ticket="detail" :run="run" :busy="busy" />
-          <div v-if="detail.viewer.can_archive && onArchive">
+          <TicketActions
+            v-if="showTicketActions"
+            :ticket="detail"
+            :run="run"
+            :busy="busy"
+            @transitioned="onTransitioned"
+          />
+          <div v-if="canArchive">
             <el-button
               type="success"
               plain
               data-testid="ticket-archive"
-              @click="onArchive(detail, load)"
+              @click="onArchive?.(detail, load)"
             >
               {{ t("ticketflow.detail.archive") }}
             </el-button>
+          </div>
+        </section>
+
+        <section
+          v-if="detail.rating || detail.viewer.can_rate"
+          class="flex flex-col gap-2"
+        >
+          <h4 class="m-0">{{ t("ticketflow.rating.section") }}</h4>
+          <RatingCard v-if="detail.rating" :rating="detail.rating" />
+          <div v-else>
+            <el-button
+              type="primary"
+              plain
+              data-testid="ticket-rate"
+              @click="rate()"
+            >
+              {{ t("ticketflow.rating.rate") }}
+            </el-button>
+            <span class="ml-3 text-sm text-fg-muted">
+              {{ t("ticketflow.rating.rateHint") }}
+            </span>
           </div>
         </section>
 

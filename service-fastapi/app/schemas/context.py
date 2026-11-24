@@ -13,9 +13,12 @@ class ContextTicket(BaseModel):
     version: Annotated[int, Field(strict=True, ge=1)]
 
 
-class KnowledgeReference(BaseModel):
+class Reference(BaseModel):
     article_id: UUID
     title: str
+
+
+class KnowledgeReference(Reference):
     excerpt: str
 
 
@@ -25,6 +28,6 @@ class TicketContext(BaseModel):
     references: list[KnowledgeReference]
 
 
-class DrfContextResponse(BaseModel):
+class DrfResponse[T](BaseModel):
     code: Literal[1000]
-    data: TicketContext
+    data: T

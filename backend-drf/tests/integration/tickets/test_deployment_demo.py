@@ -6,7 +6,7 @@ from django.core.management.base import CommandError
 from identity.models import UserInfo
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from ops.seed_ticketflow_demo import ADMIN, AGENT, NETWORK_AGENT, REQUESTER, USERNAMES, main, seed
-from tickets.models import Priority, Status, Ticket, Visibility
+from tickets.models import Priority, RatingTag, Status, Ticket, TicketRating, Visibility
 from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE, TicketAccess, has_permission
 
 
@@ -27,7 +27,7 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert ADMIN_ROLE in TicketAccess.for_user(users[ADMIN]).roles
     assert AGENT_ROLE in TicketAccess.for_user(agent).roles
     assert AGENT_ROLE in TicketAccess.for_user(network_agent).roles
-    assert has_permission(agent, "assign:TicketFlowTickets", "assignees:TicketFlowTickets")
+    assert not has_permission(agent, "assign:TicketFlowTickets", "assignees:TicketFlowTickets")
     assert not has_permission(network_agent, "assign:TicketFlowTickets", "assignees:TicketFlowTickets")
 
     tickets = Ticket.objects.all()
@@ -36,7 +36,10 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert set(tickets.values_list("priority", flat=True)) == set(Priority.values)
     assert set(tickets.values_list("department_id", flat=True)) == {agent.dept_id, network_agent.dept_id}
     for ticket in tickets:
-        assert ticket.version == ticket.logs.count()
+        assert ticket.version == ticket.logs.exclude(action__in=("AUTO_ASSIGN", "REOPEN_ASSIGN")).count()
+        assert ticket.assignments.exists()
+        assert ticket.assignee.dept_id == ticket.department_id
+        assert ticket.assignments.filter(ended_at__isnull=True).count() == (ticket.status != Status.CLOSED)
         if ticket.first_response_at:
             assert ticket.first_response_at == ticket.comments.get(visibility=Visibility.PUBLIC).created_time
             assert ticket.comments.filter(visibility=Visibility.INTERNAL).exists()
@@ -46,8 +49,25 @@ def test_deployment_demo_seeds_consistent_data_and_preserves_existing_accounts(s
     assert articles.filter(status=ArticleStatus.DRAFT, creator=agent, source_ticket__status=Status.CLOSED).count() == 1
     assert tickets.filter(status=Status.CLOSED, knowledge_article__isnull=True).exists()
 
+    ratings = TicketRating.objects.select_related("ticket")
+    assert ratings.count() == 2
+    assert set(ratings.values_list("satisfaction", flat=True)) == {2, 5}
+    assert {tag for row in ratings for tag in row.tags} == set(RatingTag.values)
+    assert all(
+        row.ticket.status == Status.CLOSED
+        and row.rater_id == row.ticket.submitter_id
+        and row.handler_id == row.ticket.assignee_id
+        for row in ratings
+    )
+    assert tickets.filter(status=Status.CLOSED, rating__isnull=True).count() == 1
+    ratings.filter(satisfaction=2).delete()
+    ratings.filter(satisfaction=5).update(comment="保留既有评价")
+    assert not seed(passwords)
+    assert ratings.count() == 2
+    assert ratings.get(satisfaction=5).comment == "保留既有评价"
+
     ticket = tickets.get(department_id=agent.dept_id, title="门户密码重置邮件未收到")
-    response = client_for(agent).post(
+    response = client_for(users[ADMIN]).post(
         f"/api/tickets/{ticket.pk}/assign", {"assignee_id": agent.pk, "version": ticket.version}, format="json"
     )
     assert response.status_code == 200, response.data

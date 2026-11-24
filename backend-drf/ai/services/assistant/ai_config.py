@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 # 聊天室助手内置人设（档案/Setting 未配置人设时的兜底）
 BUILTIN_PERSONA = (
-    "You are the xadmin in-app assistant. Answer concisely and accurately in the user's language. "
+    "You are the TicketFlow in-app assistant. Answer concisely and accurately in the user's language. "
     "If you are unsure, say so instead of making things up."
 )
 # 结构化输出（NL 查数 DSL / 动作草稿 JSON）在档案未配置 max_tokens 时的安全上限：

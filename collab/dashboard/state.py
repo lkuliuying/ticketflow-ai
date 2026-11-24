@@ -353,6 +353,7 @@ def collect() -> dict:
             task["stage"] = _stage(task, branches.get(task["branch"] or ""), task["runs"], task["log"], done)
             if task["stage"] in ("已通过", "已合并"):
                 done.add(task["id"])
+    tasks.extend(_off_board_tasks({t["id"] for t in tasks}, runs))
     for task in tasks:
         task["branch_info"] = branches.get(task["branch"] or "")
         task.pop("log_raw", None)
@@ -364,6 +365,37 @@ def collect() -> dict:
         "git": git,
         "events": _events(tasks, git),
     }
+
+
+def _off_board_tasks(board_ids: set[str], runs: dict[str, list[dict]]) -> list[dict]:
+    """看板之外仍在运行的调度（全量测试、修复、排查等临时任务）：补成任务卡，
+    让总览、仓库内部和侧栏都能看到；运行结束后不再出现，结论看对应报告。"""
+    extra: dict[str, dict] = {}
+    for agent, items in runs.items():
+        for run in items:
+            task_id = run.get("task")
+            if not run.get("alive") or not task_id or task_id in board_ids:
+                continue
+            reviewing = run.get("kind") == "review"
+            entry = extra.setdefault(task_id, {
+                "id": task_id,
+                "title": (run.get("detail") or task_id).splitlines()[0][:40],
+                "executor": "Codex",
+                "depends": [],
+                "board_status": "临时任务",
+                "agent": "codex",
+                "branch": None,
+                "report": _report(task_id),
+                "review": _review(task_id),
+                "log": parse_codex_log(REPORTS / f"{task_id}.log"),
+                "runs": [],
+            })
+            entry["runs"].append(run)
+            # 评审进行中优先显示在评审仓，否则在执行方流水线上
+            entry["stage"] = "评审中" if reviewing or entry.get("stage") == "评审中" else "执行中"
+            if agent == "claude":
+                entry["executor"], entry["agent"] = "Claude", "claude"
+    return list(extra.values())
 
 
 def _agents(tasks: list[dict], runs: dict, git: dict) -> dict:
@@ -385,11 +417,17 @@ def _agents(tasks: list[dict], runs: dict, git: dict) -> dict:
     live = next((t for t in codex_tasks if t["log"].get("active") or any(r.get("alive") for r in t["runs"])), None)
     latest = live or max(codex_tasks, key=lambda t: t["log"].get("updated") or "", default=None)
     log = latest["log"] if latest else {}
+    task_id = latest["id"] if latest else None
+    # 看板之外的临时任务（全量测试、修复、排查等）也有调度记录：进程还活着就按运行中显示
+    off_board = next((r for r in reversed(runs.get("codex", [])) if r.get("alive")), None)
+    if not live and off_board:
+        task_id = off_board.get("task")
+        log = parse_codex_log(REPORTS / f"{task_id}.log")
     if log.get("header", {}).get("model"):
         agents["codex"]["model"] = f"{log['header']['model']} · {log['header'].get('reasoning_effort') or ''}".strip(" ·")
     agents["codex"].update(
-        state="running" if live else ("error" if log.get("errors") and not log.get("messages") else "idle"),
-        task=latest["id"] if latest else None,
+        state="running" if live or off_board else ("error" if log.get("errors") and not log.get("messages") else "idle"),
+        task=task_id,
         activity=log.get("last_message", ""),
         log=log,
         runs=runs.get("codex", []),

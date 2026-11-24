@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     llm_base_url: AnyHttpUrl = AnyHttpUrl("https://api.openai.com/v1")
     llm_api_key: SecretStr | None = None
     llm_model: str = "gpt-4o-mini"
+    llm_thinking: Literal["default", "enabled", "disabled"] = "default"
 
     @model_validator(mode="after")
     def require_provider_key(self) -> Self:

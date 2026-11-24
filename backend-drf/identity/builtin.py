@@ -181,5 +181,7 @@ def _ensure_role_fields(role: Any, model_names: Any) -> None:
         permission = FieldPermission.objects.filter(role=role, menu=menu).first()
         if permission is None:
             permission = FieldPermission.objects.create(role=role, menu=menu)
-        if not permission.field.exists():
-            permission.field.set(all_fields)
+            permission.field.add(*all_fields)
+        elif not permission.field.exists():
+            # 白名单已确认为空，直接走覆盖式写入，避免 set() 再联表读取旧字段。
+            permission.field.set(all_fields, clear=True)

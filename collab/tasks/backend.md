@@ -480,3 +480,190 @@ tests/integration/tickets/test_viewer_contract.py:29  users 夹具 → call_comm
    直接挂进 Linux 容器跑运维脚本相关测试通过（迭代 4 时约 30 条失败）。
 
 完成标准：DRF 全量门禁通过；`test_tag_center` 连续跑 20 次（`pytest --count` 或循环）无失败，报告贴结果。
+
+## SV-04 模型思考模式开关与超时透传
+
+分支：`be/llm-thinking`，工作目录 `service-fastapi/` 与 `deploy/`（本任务只改这两处，外加下面点名的文档）。
+
+背景：交付栈要接 DeepSeek（`LLM_BASE_URL=https://api.deepseek.com`，`LLM_MODEL=deepseek-flash`）。
+DeepSeek 的 Chat Completions **默认开启思考模式**，关闭方式是请求体顶层带 `{"thinking": {"type": "disabled"}}`
+（开启为 `"enabled"`；官方文档 https://api-docs.deepseek.com/zh-cn/guides/thinking_mode ）。思考模式下思维链走
+`delta.reasoning_content` / `message.reasoning_content`，最终回答才在 `content`。现在 `OpenAICompatibleProvider`
+不传这个参数，于是：流式回复在模型思考期间只有心跳、迟迟不出字；分析受 `LLM_TIMEOUT`（30 秒）约束，思考过长会 504。
+另外交付栈 Compose 没有把 `LLM_TIMEOUT`、`STREAM_TIMEOUT` 传给 ai 容器，无法在 `deploy/.env` 调整。
+
+1. **配置项 `LLM_THINKING`**：`Settings` 新增 `llm_thinking: Literal["default", "enabled", "disabled"] = "default"`。
+   - `default`：请求体完全不带 `thinking` 字段，行为与现在一致（兼容 OpenAI 等不认识该字段的提供方）。
+   - `enabled` / `disabled`：分析请求和流式回复请求的 payload 顶层都加 `"thinking": {"type": <值>}`。
+   - 非法取值启动时报错（沿用 pydantic 校验，错误里不能回显密钥）。Mock 提供方忽略此项。
+2. **分析缓存键**：思考开关会改变输出，把 `llm_thinking` 纳入 `analysis_cache_key`（与模型名同级）；补单测：其他条件相同、
+   开关不同时缓存键不同。
+3. **`reasoning_content` 容错**：确认流式分片里只有 `reasoning_content`、`content` 为空或缺失时不报错、不输出正文、
+   不计为首段正文（自动重试只发生在第一段正文前的语义保持不变）；非流式分析的 `message` 带 `reasoning_content`
+   时仍只解析 `content`。现有行为如果已满足，补单测锁定即可，不要改协议。
+4. **Compose 透传**：`deploy/docker-compose.yml` 的 ai 服务新增 `LLM_THINKING: ${LLM_THINKING:-default}`、
+   `LLM_TIMEOUT: ${LLM_TIMEOUT:-30}`、`STREAM_TIMEOUT: ${STREAM_TIMEOUT:-90}`。默认值必须与服务端默认一致，
+   不改变现有交付栈行为。
+5. **文档与示例**：
+   - `service-fastapi/README.md` 配置表加 `LLM_THINKING`，说明三个取值；`service-fastapi/.env.example` 同步。
+   - `deploy/.env.example` 在 LLM 段加 `LLM_THINKING=`、`LLM_TIMEOUT=`、`STREAM_TIMEOUT=`（留空走默认，或写默认值，
+     与 `deploy/local.py env` 的生成逻辑保持一致——先看 `local.py` 怎么处理空值和已有键）。
+   - `deploy/README.md` 的模型段补一段“接入 DeepSeek”的示例：`MOCK_LLM=false`、`LLM_BASE_URL=https://api.deepseek.com`、
+     `LLM_MODEL=deepseek-flash`、`LLM_THINKING=disabled`、`LLM_API_KEY=<自行填写>`，以及改完后
+     `up -d ai` 只重建 ai 容器。
+6. **单测**（`service-fastapi/tests/`）：payload 在三种取值下的形态（`default` 不含 `thinking` 键）；分析与流式两条路径
+   都覆盖；非法取值被 `Settings` 拒绝；第 2、3 点的用例。用 `httpx.MockTransport` 或现有夹具，**不要访问真实
+   DeepSeek**，本任务没有可用的 API Key。
+
+不做：不接入思维链展示、不改 SSE 帧协议、不改前端、不改 `LLM_BASE_URL` 等现有默认值、不碰 `deploy/.env`（本机真实配置）。
+
+完成标准：`service-fastapi` 门禁（`uv run ruff format --check .`、`uv run ruff check .`、`uv run mypy`、`uv run pytest`）
+通过；`docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example config` 能解析且 ai 服务环境里出现
+三个新变量；报告贴命令和输出。交付栈 ai 镜像由 Claude 在评审通过后重建，本任务不需要重启 `:8080`。
+
+## BE-07 后端品牌：站点标题与用户可见的 xAdmin 字样
+
+分支：`be/branding`，工作目录 `backend-drf/`。前端同时在做 FE-11（把界面上的 xAdmin 换成 TicketFlow）。
+前端的站点标题以后端下发的站点配置为准（`settings/seeds/systemconfig.json` 的 `WEB_SITE_CONFIG.Title`，
+前端仅在缺失时回落 `platform-config.json`），所以后端不改，界面标题就还是 xAdmin。
+
+1. **站点配置种子**：`WEB_SITE_CONFIG.Title` 改为 `TicketFlow`。
+2. **已部署库**：现有交付栈和联调库里这条配置已经落库，改种子不会覆盖。新增一个数据迁移（放在站点配置所属
+   app 的常规线性迁移里）：只有当库里 `Title` 恰好是旧默认值 `xAdmin` 时才改成 `TicketFlow`，用户自定义过的
+   标题保持不动；反向迁移为空操作。补单测覆盖“旧默认值被替换”和“自定义值不变”。
+   先确认 `load_init_json` 对已存在配置的合并语义，如果它本身就会按种子补齐或覆盖，在报告里写明并说明为什么
+   仍需要（或不需要）迁移。
+3. **其他用户可见字样**：盘点运行时会展示给最终用户的 `xAdmin` / `xadmin` 文案并替换为 `TicketFlow`，至少检查：
+   根部门名称（`loadjson/deptinfo.json` 的“xAdmin管理团队”，只改名称，`code` 不动；已部署库同样用条件迁移改名）、
+   MFA / TOTP 的 issuer（会显示在用户的身份验证器 App 里）、邮件与通知模板标题、验证码或登录相关的提示文案、
+   OpenAPI 文档标题、`locale/zh` 里的对应译文。报告里列一张表：位置、原文、新文、是否需要迁移。
+4. **不改**：Python 包名与导入名（`xadmin-common`、`common`）、模块路径、配置键、环境变量、缓存键、
+   权限码、`code` 字段、上游许可证和版权声明、`demo_seed` 里的上游演示命令（交付栈不使用它们）、开发者向的
+   日志与注释。拿不准的列进报告“未改”一栏说明理由，不要扩大范围。
+
+完成标准：`backend-drf/AGENTS.md` 第六节门禁通过（含 `makemigrations --check`、`load_init_json --check`、
+`dump_openapi --check`），新增迁移与单测在真实 PG + Redis 下通过；报告贴命令输出。交付栈的 DRF 镜像由 Claude
+在评审通过后重建，本任务不需要重启 `:8080`。
+
+## BE-08 三角色、技术员范围与自动派单
+
+分支：`be/roles`，**从 `integration/iter6` 切出**（依赖 BE-07 的种子改动），工作目录 `backend-drf/`。
+口径以 [迭代 6 角色改造方案](../../docs/development/迭代6角色改造方案.md) 第 1~4 节为准，本节列实现要求。
+改接口响应先改 `docs/schema/`，再改代码，`dump_openapi --check` 必须通过。
+
+1. **角色**：三个角色编码不变，显示名改为“普通员工 / 技术员 / 管理员”（种子 + 已部署库条件迁移）。
+   `ticketflow_kb_editor` 下线：数据迁移把持有该角色的用户和部门授权迁到 `ticketflow_admin`，再删除角色；
+   代码里的 `KB_EDITOR_ROLE` 判断改为只认管理员。“部门”在接口文案和 OpenAPI 描述里称“技能组”，字段名不改。
+2. **指派历史**：新增模型（建议 `TicketAssignment`：工单、处理人、指派人（系统派单为空）、开始时间、结束时间、
+   结束原因 `REASSIGNED / RETURNED / DEACTIVATED / CLOSED_OUT` 之类、备注），每张工单同一时刻最多一段未结束记录
+   （部分唯一约束）。迁移时为现有已指派工单回填一段当前记录；能从 `TicketLog` 还原的历史指派尽量回填，
+   还原不了的在报告里说明口径。
+3. **可见范围**（`TicketAccess.scope` 及所有复用它的列表、详情、看板、导出、时间线、知识转存、AI 上下文）：
+   - 管理员：全部；
+   - 技术员：当前处理人是自己 ∪ 指派历史里出现过自己 ∪ 本人提交；**不再按部门可见**；
+   - 普通员工：本人提交。
+   `can_handle` 改为“管理员或当前处理人”。技术员看自己的历史工单时：完整时间线可见（含内部备注），
+   `viewer` 所有动作位为 `false`，新增 `viewer.read_only: true`；任何写接口返回 403（不是 404）。
+   技术员以提交人身份看到的工单沿用现有“只暴露对外内容”规则。
+4. **自动派单**：建单事务内执行。候选为工单所属技能组里在职、启用、持有技术员角色的用户，**排除提交人本人**；
+   选未完成（非 `CLOSED`）工单最少者，并列按最近一次被指派时间最早（从未被指派的最先），再按用户名。
+   同一技能组的并发建单要串行化选人（例如事务级 advisory lock），补并发单测。没有候选时保持未指派。
+   自动派单写日志（操作人为系统，需要一个不可登录的系统用户或允许日志操作人为空，二选一并说明）和指派历史。
+5. **指派 / 改派**：`can_assign` 只给管理员；`/assignees` 返回在职技术员（管理员可按技能组筛选，返回技能组名），
+   改派结束上一段历史（`REASSIGNED`）。已关闭工单仍禁止指派（BE-05 行为不变）。
+6. **退回重派**：新增 `POST /api/tickets/{id}/return`，请求 `{version, reason}`（原因必填、≤500 字），只有当前处理人
+   可用，`viewer.can_return` 标识；清空处理人、状态不变、结束历史（`RETURNED`，备注存原因）、写日志；版本冲突 409。
+7. **待分配与列表筛选**：列表与看板新增筛选 `assignment`：`unassigned`（仅管理员有效）、`current`（当前指派给我）、
+   `history`（指派过我但当前不是我）。看板响应新增 `assignment: {unassigned, current, history}` 计数
+   （按身份只返回有意义的键，契约里写清楚）。
+8. **重新打开**：`CLOSED → REOPENED` 时，上一位处理人仍是该技能组在职技术员则继续由他处理（写日志），否则重新自动派单；
+   没有候选则进入待分配。
+9. **知识转存**：技术员可从自己**经手过**（当前或历史）的已关闭工单创建草稿；管理员不限；其他规则不变。
+10. **AI 上下文**：`ai-context` 只对管理员和当前处理人开放（历史只读和提交人身份都返回 403），FastAPI 侧无需改动，
+    报告里写明网关验收 `tests/test_ai.py` 是否需要同步并同步。
+11. **关闭自助注册**：交付默认关闭注册（找到底座对应设置的正确落点：种子或部署默认值），已部署库也要关闭；
+    登录能力接口（`auth/capabilities` 或同类）反映关闭状态，补测试。
+12. **演示数据**：`tf_agent` 在工单支持组、`tf_agent_other` 在网络支持组；演示工单补齐指派历史，未指派的开放工单
+    按自动派单规则分配；角色显示名同步。`deploy` 的 seed 流程重复执行仍幂等。
+13. **文档**：Phase 1 设计文档的“角色与可见范围”一节改为引用迭代 6 方案并更新表格；`docs/schema/` 与
+    `openapi.json` 同步；报告里给出前端需要的接口示例（详情 `viewer`、列表 `assignment` 筛选、看板新字段、
+    `/return`、`/assignees`）。
+
+完成标准：`backend-drf/AGENTS.md` 第六节门禁全部通过；工单与知识库相关测试全绿，新增用例覆盖三种身份的范围、
+历史只读（403）、自动派单的选人与并列规则、无候选、提交人排除、并发建单、退回、重开回派、kb_editor 迁移、
+注册关闭、AI 上下文拒绝历史只读；在交付栈之外的隔离库验证迁移在有数据的库上可执行。交付栈由 Claude 在评审后重建。
+
+## BE-09 工单评价
+
+分支：`be/ratings`，从合入 BE-08 后的 `integration/iter6` 切出。口径见改造方案第 5 节。
+
+1. 模型（建议 `TicketRating`）：工单一对一、评价人（提交人）、被评处理人（关闭时的处理人，可空）、`resolved`（是否解决）、
+   `satisfaction` 1~5、`handler_score` 1~5、`tags`（固定词表编码数组，如 `FAST / PROFESSIONAL / FRIENDLY / CLEAR`，
+   中英文标签进契约或业务字典）、`comment`（≤500，可空）、创建时间。
+2. `POST /api/tickets/{id}/rating`：只有提交人、工单 `CLOSED`、尚未评价时 201；重复评价或非关闭状态 409；
+   无权 403 / 不可见 404。工单重开再关闭不产生第二次评价，也不能修改。详情 `viewer.can_rate`，详情响应带 `rating`
+   （评价人、被评处理人、管理员可见，其他人为 `null`）。
+3. `GET /api/ticket-ratings`：列表（RePlusPage 元数据齐全），范围：员工看自己给出的、技术员看被评处理人是自己的、
+   管理员看全部；筛选处理人、分数、是否解决、时间段。
+4. `GET /api/ticket-ratings/summary`：技术员返回本人 `{count, avg_satisfaction, avg_handler_score, resolved_rate, tags}`；
+   管理员返回整体汇总加按处理人的明细数组（可按时间段筛选）。
+5. 菜单与权限点：技术员“我的评价”（组件名 `TicketFlowMyRatings`，路由 `ticketflow/ratings/mine/index`），
+   管理员“评价统计”（`TicketFlowRatingStats`，`ticketflow/ratings/stats/index`），按应用种子规范登记并授权给对应角色。
+6. 演示数据：给几张已关闭演示工单补评价，覆盖不同分数与标签。
+
+完成标准：第六节门禁通过；新增用例覆盖权限矩阵、状态约束、重复评价、重开后不可再评、汇总口径；报告给出接口示例。
+
+## BE-10 账号与技能组管理
+
+分支：`be/accounts`。口径见改造方案第 7 节。
+
+1. `api/ticketflow/accounts`（列表、详情、新建、编辑、停用 / 启用、`reset-password`）：字段用户名、姓名、手机、邮箱、
+   `role`（`requester / agent / admin` 三选一）、`skill_group`（技术员必填，其他角色为空）、`is_active`。
+   只能管理三种业务角色的账号：不能创建或修改超级管理员、不能授予其他角色、不能改自己的角色或停用自己。
+   新建时由管理员设初始密码（走底座密码策略校验）。重置密码、停用、改角色后撤销该用户已有会话（复用底座撤销机制）。
+2. 技术员停用或改为非技术员：名下未完成工单结束指派历史（`DEACTIVATED`）、进入待分配、写日志。
+3. `api/ticketflow/skill-groups`：新建、改名、描述、启用 / 停用；分类路由配置（每个分类对应一个技能组，未配置走默认组），
+   改为可编辑并替换现有硬编码或配置来源。停用仍有在职技术员或被路由指向的技能组时返回 409 并说明原因。
+4. 菜单与权限点：管理员“账号管理”（`TicketFlowAccounts`，`ticketflow/accounts/index`）、“技能组”
+   （`TicketFlowSkillGroups`，`ticketflow/skill-groups/index`）；列表元数据齐全，可直接用 RePlusPage。
+5. 审计：账号与技能组变更写底座操作日志。
+
+完成标准：第六节门禁通过；用例覆盖越权（改超管、授予其他角色、改自己）、停用释放工单、会话撤销、技能组停用约束、路由生效。
+
+## BE-11 AI 知识问答（DRF 部分）
+
+分支：`be/assistant`。口径见改造方案第 6 节；FastAPI 部分是 SV-05。
+
+1. 模型：会话（用户、标题、创建 / 更新时间、软删除、转人工后关联的工单）、消息（会话、角色 `user / assistant`、内容、
+   引用 `[{article_id, title}]`、状态 `complete / interrupted / failed`、时间）、反馈（回答消息一对一、`up / down`、
+   原因 `INACCURATE / UNRESOLVED / IRRELEVANT / OTHER`、补充 ≤300、时间，可改投）。
+2. 员工接口（`api/assistant/...`）：本人会话列表、新建、改标题、删除；会话消息分页（时间正序）；对本人会话里的回答提交反馈。
+   只有普通员工可用（管理员只读反馈页，见第 4 点）。
+3. 转人工：建单接口接受可选 `assistant_session_id`（必须是本人会话），建单后会话关联工单；工单详情对提交人、当前处理人、
+   管理员给出会话入口，新增只读接口 `GET /api/tickets/{id}/assistant-session` 返回该会话消息。
+4. 管理员接口：被点踩回答列表（带对应问题和会话信息）、转人工会话列表、统计 `{sessions, questions, up, down, handoffs}`
+   （时间段筛选）。菜单：员工“AI 助手”（`TicketFlowAssistant`，`ticketflow/assistant/index`）、管理员“AI 反馈”
+   （`TicketFlowAssistantFeedback`，`ticketflow/assistant/feedback/index`）。
+5. 内网接口（FastAPI 用用户 token 调用，网关返回 404，`deploy/nginx` 同步拦截并补网关验收）：
+   - 提问：校验会话归属与角色后写入用户消息，返回 `{user_message_id, history（最近若干轮，按字数截断）, references
+     （已发布知识 Top-K 片段，复用 ai-context 的检索）, categories}`；
+   - 写回：`{user_message_id, content, references, status}` 写入回答消息并返回 `assistant_message_id`；同一问题只能写回一次。
+   限流复用 AI 入口的滑动窗口。
+6. 契约：`docs/schema/` 与 OpenAPI 同步，报告给出 SV-05 和前端需要的全部示例。
+
+完成标准：第六节门禁通过；用例覆盖会话归属、角色限制、软删除、反馈改投、转人工关联与可见性、内网接口授权与网关拦截、写回幂等。
+
+## SV-05 AI 知识问答（FastAPI 部分）
+
+分支：`be/assistant-ai`，依赖 BE-11 的内网接口。工作目录 `service-fastapi/`（网关验收在 `tests/`）。
+
+1. `POST /ai/v1/assistant/chat/stream` `{session_id, message}`：鉴权与现有 AI 接口一致；调用 DRF 提问接口取上下文后流式生成，
+   帧序 `meta {session_id, user_message_id, references:[{article_id,title}]}` → `delta+` → `done {finish_reason, assistant_message_id}`，
+   失败以 `error` 结束。结束、失败或客户端断开都写回（断开写 `interrupted` 和已生成部分）。
+   提示词：只依据给出的知识片段回答；没有相关片段时明确说明知识库中没有找到，并建议使用“转人工提单”；中文、简洁、分步骤。
+2. `POST /ai/v1/assistant/handoff-draft` `{session_id}`：读取会话，JSON 模式生成 `{title, description, category}`，
+   分类必须在 DRF 给出的词表内，长度校验同建单。
+3. Mock 提供方对两个接口给出确定性输出，`LLM_THINKING` 等现有配置同样生效；并发槽位、排队超时、重试沿用现有实现。
+4. 测试：单测覆盖帧序、断开写回、无引用时的提示、草稿校验；网关验收补对话流与草稿各一条。
+
+完成标准：`service-fastapi` 门禁通过；在 Mock 模式的交付栈上跑网关验收并贴输出。

@@ -43,7 +43,7 @@ def create_article(
         ticket = access.scope(Ticket.objects.all()).select_for_update().filter(pk=source_ticket_id).first()
         if ticket is None:
             raise NotFound("来源工单不存在")
-        if not access.can_handle(ticket):
+        if not access.can_archive(ticket):
             raise PermissionDenied("无权转存此工单")
         if ticket.status != Status.CLOSED:
             raise TicketConflict("只有已关闭的工单可以转存")
@@ -57,7 +57,11 @@ def create_article(
 
 
 def references_for(ticket: Ticket, limit: int = 5) -> list[dict[str, object]]:
-    words = re.findall(r"[\u3400-\u9fff]{2,12}|[A-Za-z0-9]{3,32}", f"{ticket.title} {ticket.description[:800]}")
+    return references_for_text(f"{ticket.title} {ticket.description[:800]}", category=ticket.category, limit=limit)
+
+
+def references_for_text(text: str, *, category: str | None = None, limit: int = 5) -> list[dict[str, object]]:
+    words = re.findall(r"[\u3400-\u9fff]{2,12}|[A-Za-z0-9]{3,32}", text)
     terms = list(dict.fromkeys(word.lower() for word in words))[:12]
     if not terms:
         return []
@@ -73,9 +77,7 @@ def references_for(ticket: Ticket, limit: int = 5) -> list[dict[str, object]]:
         KnowledgeArticle.objects.filter(matches, status=ArticleStatus.PUBLISHED)
         .annotate(
             rank=SearchRank(vector, query),
-            same_category=Case(
-                When(category=ticket.category, then=Value(1)), default=Value(0), output_field=IntegerField()
-            ),
+            same_category=Case(When(category=category, then=Value(1)), default=Value(0), output_field=IntegerField()),
         )
         .order_by("-same_category", "-rank", "-updated_time", "id")
         .values_list("id", "title", "body_markdown")[:limit]

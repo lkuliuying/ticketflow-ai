@@ -50,6 +50,7 @@ class TestBuildLoginCapabilities:
 
     def test_all_enabled_with_channels(self, settings, all_channels, no_oauth):
         """通道全开:全部入口可见。"""
+        settings.SECURITY_REGISTER_ACCESS_ENABLED = True
         cap = build_login_capabilities()
         assert cap["code"] == {"enabled": True, "email": True, "sms": True}
         assert cap["register"]["enabled"] is True

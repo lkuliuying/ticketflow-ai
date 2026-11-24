@@ -98,5 +98,255 @@
     "fields": {
       "title": "工单指派候选人"
     }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000095",
+    "fields": {
+      "title": "退回工单"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000099",
+    "fields": {
+      "title": "menus.ticketflowMyRatings",
+      "icon": "ep:star",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000101",
+    "fields": {
+      "title": "menus.ticketflowRatingStats",
+      "icon": "ep:data-analysis",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000097",
+    "fields": {
+      "title": "提交工单评价"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000103",
+    "fields": {
+      "title": "工单评价列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000105",
+    "fields": {
+      "title": "工单评价汇总"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000131",
+    "fields": {
+      "title": "menus.ticketflowAccounts",
+      "icon": "ep:user",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000133",
+    "fields": {
+      "title": "账号列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000135",
+    "fields": {
+      "title": "创建业务账号"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000137",
+    "fields": {
+      "title": "账号详情"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000139",
+    "fields": {
+      "title": "编辑业务账号"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000141",
+    "fields": {
+      "title": "重置业务账号密码"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000145",
+    "fields": {
+      "title": "menus.ticketflowSkillGroups",
+      "icon": "ep:collection",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000147",
+    "fields": {
+      "title": "技能组列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000149",
+    "fields": {
+      "title": "创建技能组"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000151",
+    "fields": {
+      "title": "技能组详情"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000153",
+    "fields": {
+      "title": "编辑技能组"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000155",
+    "fields": {
+      "title": "分类路由列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000157",
+    "fields": {
+      "title": "编辑分类路由"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000181",
+    "fields": {
+      "title": "工单关联会话"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000183",
+    "fields": {
+      "title": "menus.ticketflowAssistant",
+      "icon": "ep:chat-dot-round",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000185",
+    "fields": {
+      "title": "menus.ticketflowAssistantFeedback",
+      "icon": "ep:chat-line-square",
+      "is_show_menu": true
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000187",
+    "fields": {
+      "title": "助手会话列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000189",
+    "fields": {
+      "title": "新建助手会话"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000191",
+    "fields": {
+      "title": "修改会话标题"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000193",
+    "fields": {
+      "title": "删除助手会话"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000195",
+    "fields": {
+      "title": "助手会话消息"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000197",
+    "fields": {
+      "title": "提交回答反馈"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000199",
+    "fields": {
+      "title": "记录用户提问"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000201",
+    "fields": {
+      "title": "记录助手回答"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000203",
+    "fields": {
+      "title": "读取转人工上下文"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000205",
+    "fields": {
+      "title": "被点踩的回答"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000207",
+    "fields": {
+      "title": "转人工会话列表"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000209",
+    "fields": {
+      "title": "AI 问答统计"
+    }
   }
 ]

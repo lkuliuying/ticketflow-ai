@@ -39,6 +39,7 @@ SKIP_DIRS = ("migrations/", ".venv", "__pycache__", "tests/", "demo/", "examples
 EXEMPT = {
     "SecurityBlockIpViewSet": ("数据源是 Redis key 列表（非 ORM queryset），分页器不参与 ordered 判定，无需 ordering"),
     "BaseAnalysisViewSet": ("抽象基类，具体 ViewSet（Screen/Report）均已声明 ordering"),
+    "AssistantViewSet": ("抽象基类，会话、消息及反馈分页分别使用模型排序或显式排序"),
 }
 
 

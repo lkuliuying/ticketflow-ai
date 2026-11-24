@@ -1,10 +1,20 @@
 import { BaseApi } from "@/api/base";
 import { isSuccess } from "@/api/types";
 import type { DetailResult, ListResult } from "@/api/types";
+import type { RatingPayload, TicketRating } from "./ratings";
 
 export type TicketStatus =
   "OPEN" | "IN_PROGRESS" | "PENDING_VERIFY" | "CLOSED" | "REOPENED";
 export type TicketPriority = "P0" | "P1" | "P2" | "P3";
+export const TICKET_PRIORITIES: TicketPriority[] = ["P0", "P1", "P2", "P3"];
+/** 工单分类词表（显示名走词条 ticketflow.categoryValue.*） */
+export const TICKET_CATEGORIES = [
+  "ACCOUNT",
+  "ACCESS",
+  "NETWORK",
+  "SERVICE",
+  "OTHER"
+];
 export type TicketSlaState = "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "MET";
 export type CommentVisibility = "PUBLIC" | "INTERNAL";
 
@@ -54,10 +64,23 @@ export type TicketViewer = {
   can_reply: boolean;
   can_comment_internal: boolean;
   can_archive: boolean;
+  /** 当前处理人可退回给管理员重新分配 */
+  can_return: boolean;
+  /** 技术员查看曾经处理、已转交他人的工单：只读，不显示任何操作 */
+  read_only: boolean;
+  /** 提交人可评价：工单已关闭且尚未评价 */
+  can_rate?: boolean;
 };
+
+/** 指派维度：管理员看待分配，技术员看当前处理与历史处理 */
+export type TicketAssignmentScope = "unassigned" | "current" | "history";
 
 export type TicketDetail = TicketItem & {
   viewer: TicketViewer;
+  /** 评价人、被评处理人与管理员可见，其他人或未评价时为 null */
+  rating?: TicketRating | null;
+  /** 由 AI 助手转人工创建且当前用户可查看时为会话 ID，否则为 null */
+  assistant_session_id?: string | null;
   available_transitions: TicketStatus[];
   timeline: { total: number; results: TimelineEntry[] };
 };
@@ -67,12 +90,16 @@ export type TicketCreatePayload = {
   description: string;
   category: string;
   priority: TicketPriority;
+  /** AI 助手转人工：本人会话，建单后关联到工单 */
+  assistant_session_id?: string;
 };
 
 export type TicketDashboard = {
   status: Partial<Record<TicketStatus, number>>;
   priority: Partial<Record<TicketPriority, number>>;
   sla: Record<TicketSlaState, number>;
+  /** 按身份只返回有意义的键：管理员 unassigned，技术员 current / history，员工为空对象 */
+  assignment?: Partial<Record<TicketAssignmentScope, number>>;
 };
 
 export type TicketAssignee = {
@@ -186,14 +213,37 @@ class TicketApi extends BaseApi {
     );
   };
 
-  /** 指派候选人：可见且可处理该工单、并持有指派权限时可用；最多 20 条，按用户名与主键排序 */
-  assignees = (pk: string, q?: string) => {
+  /** 指派候选人（仅管理员）：在职技术员，可按技能组筛选；最多 20 条，按用户名与主键排序 */
+  assignees = (pk: string, q?: string, departmentId?: string) => {
     const keyword = q?.trim();
     return this.request<DetailResult<TicketAssignee[]>>(
       "get",
-      keyword ? { q: keyword } : {},
+      {
+        ...(keyword ? { q: keyword } : {}),
+        ...(departmentId ? { department_id: departmentId } : {})
+      },
       undefined,
       `${this.baseApi}/${pk}/assignees`
+    );
+  };
+
+  /** 提交人评价已关闭的工单：每张工单一次，重复或未关闭返回 409 */
+  rate = (pk: string, data: RatingPayload) => {
+    return this.request<DetailResult<TicketRating>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/rating`
+    );
+  };
+
+  /** 当前处理人退回工单：清空处理人、状态不变，进入管理员的待分配；原因必填（1~500 字） */
+  returnTicket = (pk: string, data: { version: number; reason: string }) => {
+    return this.request<DetailResult<TicketItem>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/return`
     );
   };
 

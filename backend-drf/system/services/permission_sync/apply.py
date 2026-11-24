@@ -296,6 +296,7 @@ def fill_field_permissions(roles: Any = None) -> Any:
 
     ``roles`` 限定角色范围（默认全部启用角色）。返回补齐的 ``[(role, menu), ...]``。
     """
+    from common.core.modelset.metadata import invalidate_metadata_payload_cache
     from system.models import FieldPermission
 
     from .audit import audit_field_permissions
@@ -303,57 +304,43 @@ def fill_field_permissions(roles: Any = None) -> Any:
     items = audit_field_permissions(roles=roles)
     if not items:
         return []
-    fields_by_menu = model_field_nodes([menu for _role, menu in items])
-    # 按「字段集」分组：同一模型的权限点共享同一份白名单。
-    # 曾经的形态是逐组合 ``get_or_create`` + ``.set()``——前者每个组合一次 SELECT、
-    # 后者每次 DELETE+INSERT+SELECT 三条往返，角色×菜单数百时即数千条小查询，
-    # 与读取侧 N+1 叠加后把种子收尾拖到分钟级（全量 pytest 尾部假死的直接燃料）。
-    # 现在：一次查出全部已存在的组合（1 条 SQL），只对缺口逐个 create
-    # （FieldPermission 的 id 由 save 路径拼装，bulk_create 拿不到，不能走批量插入）；
-    # m2m 按组「一条 DELETE + 一条多值 INSERT」替代逐组合三连。
-    groups: dict[tuple[int, ...], list[tuple[Any, Any, list[Any]]]] = {}
-    for role, menu in items:
-        fields = fields_by_menu.get(menu.pk) or []
-        if not fields:
-            continue
-        key = tuple(sorted(field.pk for field in fields))
-        groups.setdefault(key, []).append((role, menu, fields))
-    if not groups:
+    menus = {menu.pk: menu for _role, menu in items}
+    fields_by_menu = model_field_nodes(menus.values())
+    filled = [(role, menu) for role, menu in items if fields_by_menu.get(menu.pk)]
+    if not filled:
         return []
-    pairs = [(role, menu) for group in groups.values() for role, menu, _fields in group]
-    existing = {
-        (fp.role_id, fp.menu_id): fp
-        for fp in FieldPermission.objects.filter(
-            role__in={role for role, _menu in pairs}, menu__in={menu for _role, menu in pairs}
-        )
-    }
-    filled = []
+
     through = FieldPermission.field.through
     with transaction.atomic():
-        # 全部缺口一次性重写白名单（与逐组 .set() 同语义：先清后插）。分组只用于
-        # 复用字段清单，DELETE 与 INSERT 都按「全部目标组合」合并成各一条多值语句——
-        # 逐组发语句时，角色×菜单上百个缺口就是几百条 DELETE/INSERT 小往返。
-        pks: list[Any] = []
-        relations: list[tuple[Any, Any]] = []
-        for group in groups.values():
-            fields = group[0][2]
-            for role, menu, _fields in group:
-                fp = existing.get((role.pk, menu.pk))
-                if fp is None:
-                    fp = FieldPermission.objects.create(role=role, menu=menu)
-                    existing[(role.pk, menu.pk)] = fp
-                pks.append(fp.pk)
-                relations.extend((fp.pk, field.pk) for field in fields)
-                filled.append((role, menu))
-        if pks:
-            through.objects.filter(fieldpermission_id__in=pks).delete()
-            through.objects.bulk_create(
-                [through(fieldpermission_id=pk, modellabelfield_id=field_pk) for pk, field_pk in relations],
-                ignore_conflicts=True,
-                batch_size=1000,
+        # 保留存量行的实际主键，种子中的主键也可能来自旧版本。
+        existing = {
+            (role_id, menu_id): pk
+            for role_id, menu_id, pk in FieldPermission.objects.filter(
+                role_id__in={role.pk for role, _menu in filled},
+                menu_id__in={menu.pk for _role, menu in filled},
+            ).values_list("role_id", "menu_id", "pk")
+        }
+        new_permissions = []
+        replaced = []
+        relations: list[Any] = []
+        for role, menu in filled:
+            pk = existing.get((role.pk, menu.pk))
+            if pk is None:
+                pk = FieldPermission.make_id(role.pk, menu.pk)
+                new_permissions.append(FieldPermission(pk=pk, role_id=role.pk, menu_id=menu.pk))
+            else:
+                replaced.append(pk)
+            relations.extend(
+                through(fieldpermission_id=pk, modellabelfield_id=field.pk) for field in fields_by_menu[menu.pk]
             )
-    if filled:
-        logger.info(f"filled field permissions: {len(filled)} (role, menu) pairs")
+        FieldPermission.objects.bulk_create(new_permissions, batch_size=1000)
+        if replaced:
+            through.objects.filter(fieldpermission_id__in=replaced).delete()
+        through.objects.bulk_create(relations, ignore_conflicts=True, batch_size=1000)
+        # 批量写入不触发模型信号，等外层事务提交后统一失效一次元数据缓存。
+        transaction.on_commit(invalidate_metadata_payload_cache)
+
+    logger.info("filled field permissions: %d (role, menu) pairs", len(filled))
     return filled
 
 

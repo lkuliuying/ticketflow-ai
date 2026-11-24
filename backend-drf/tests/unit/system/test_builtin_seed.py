@@ -24,6 +24,8 @@ from io import StringIO
 import pytest
 from django.apps import apps
 from django.core.management import call_command
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from approval.serializers.approval_flow import FORM_FIELD_TYPES
 from approval.services.approval_flow import CONDITION_OPS
@@ -231,8 +233,17 @@ class TestSeedOrderingFillsBuiltinRoles:
         assert FieldPermission.objects.count() == 0
 
         out = StringIO()
-        call_command("load_init_json", verbosity=0, stdout=out)
+        with CaptureQueriesContext(connection) as queries:
+            call_command("load_init_json", verbosity=0, stdout=out)
         assert "[内置角色]" in out.getvalue(), "load_init_json 收尾必须补跑内置角色同步"
+        field_joins = [
+            query["sql"]
+            for query in queries.captured_queries
+            if query["sql"].startswith("SELECT")
+            and '"system_fieldpermission_field"' in query["sql"]
+            and '"system_modellabelfield"' in query["sql"]
+        ]
+        assert not field_joins, "收尾只需检查和写入字段关联，无需联表回读已有白名单"
 
         # SystemAdmin：全部活跃菜单（grant_all_menus）
         active_menus = Menu.objects.filter(is_active=True).count()

@@ -8,24 +8,27 @@
     "visibility": {"enum": ["PUBLIC", "INTERNAL"]},
     "ticketSla": {
       "enum": ["ON_TRACK", "DUE_SOON", "OVERDUE", "MET"],
-      "description": "工单 sla 筛选值。search-fields 中 sla 显示为 SLA 状态，选项依次显示为正常、即将超时、已超时、按时完成。q、assignee_id 和 department_id 分别显示为关键字、处理人和所属部门。"
+      "description": "工单 sla 筛选值。search-fields 中 sla 显示为 SLA 状态，选项依次显示为正常、即将超时、已超时、按时完成。q、assignee_id 和 department_id 分别显示为关键字、处理人和所属技能组。"
     },
     "ticketViewer": {
       "type": "object",
       "description": "GET /api/tickets/{id} 的 viewer；能力由服务端按当前用户、权限点及工单状态计算。",
-      "required": ["can_handle", "can_assign", "can_reply", "can_comment_internal", "can_archive"],
+      "required": ["can_handle", "can_assign", "can_reply", "can_comment_internal", "can_archive", "can_return", "can_rate", "read_only"],
       "additionalProperties": false,
       "properties": {
         "can_handle": {"type": "boolean"},
-        "can_assign": {"type": "boolean", "description": "工单未关闭、可处理工单，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
-        "can_reply": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态不影响此能力。"},
+        "can_assign": {"type": "boolean", "description": "管理员在工单未关闭时，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
+        "can_reply": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。"},
         "can_comment_internal": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"},
-        "can_archive": {"type": "boolean", "description": "已关闭、可处理、有知识库创建权限且尚未转存。"}
+        "can_archive": {"type": "boolean", "description": "已关闭且尚未转存时，管理员或当前及历史技术员持有知识库创建权限即可转存。"},
+        "can_return": {"type": "boolean", "description": "仅当前处理工单且有退回权限的技术员，工单须未关闭。"},
+        "can_rate": {"type": "boolean", "description": "持有评价权限的工单提交人可对已关闭且尚未评价的工单提交评价。"},
+        "read_only": {"type": "boolean", "description": "技术员曾经处理但当前未指派给自己时为 true，时间线包含内部内容。提交人的 can_reply 和 available_transitions，以及转存能力 can_archive，按各自规则给出。"}
       }
     },
     "ticketAssignees": {
       "type": "array",
-      "description": "GET /api/tickets/{id}/assignees?q= 的 data，按 username、pk 排序；q 匹配用户名或昵称，不分页。仅活跃客服、管理员或超级用户，非管理员仅本部门，未分配部门时返回空数组。",
+      "description": "管理员可查询在职且启用的技术员。q 匹配用户名或昵称，可按 department_id（技能组 UUID）筛选。省略或留空时查询所有技能组，非法 UUID 返回 400。按 username、pk 排序，不分页。",
       "maxItems": 20,
       "items": {
         "type": "object",
@@ -35,13 +38,13 @@
           "pk": {"type": "integer"},
           "username": {"type": "string"},
           "nickname": {"type": "string"},
-          "department_name": {"type": ["string", "null"]}
+          "department_name": {"type": ["string", "null"], "description": "技能组名称"}
         }
       }
     },
     "articleViewer": {
       "type": "object",
-      "description": "知识库文章详情、创建及更新响应的 viewer；can_edit 要求更新权限，且为工单管理员、知识维护人员或本人草稿；can_publish 要求工单管理员或知识维护身份及更新权限。",
+      "description": "知识库文章详情、创建及更新响应的 viewer；can_edit 要求更新权限，且为管理员或本人草稿；can_publish 要求管理员及更新权限。",
       "required": ["can_edit", "can_publish"],
       "additionalProperties": false,
       "properties": {
@@ -62,8 +65,184 @@
         "title": {"type": "string", "minLength": 1, "maxLength": 200},
         "description": {"type": "string", "minLength": 1, "maxLength": 20000},
         "category": {"$ref": "#/$defs/category"},
-        "priority": {"$ref": "#/$defs/priority"}
+        "priority": {"$ref": "#/$defs/priority"},
+        "assistant_session_id": {"type": ["string", "null"], "format": "uuid", "description": "可选，null 等同省略。仅普通员工可提交本人未删除且尚未关联工单的会话。关联与建单同事务，参与幂等请求摘要。"}
       }
+    },
+    "ticketDetailAssistant": {
+      "type": "object",
+      "required": ["assistant_session_id"],
+      "properties": {
+        "assistant_session_id": {"type": ["string", "null"], "format": "uuid", "description": "仅有会话查看权限的提交人、当前处理技术员和管理员可见，其他情况为 null。GET /api/tickets/{id}/assistant-session 返回会话和分页消息。"}
+      }
+    },
+    "assistantSessionCreate": {
+      "type": "object",
+      "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 200, "default": "新对话"}}
+    },
+    "assistantSessionRename": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 200}}
+    },
+    "assistantSession": {
+      "type": "object",
+      "required": ["pk", "title", "ticket_id", "created_time", "updated_time"],
+      "properties": {
+        "pk": {"type": "string", "format": "uuid"},
+        "title": {"type": "string", "maxLength": 200},
+        "ticket_id": {"type": ["string", "null"], "format": "uuid"},
+        "created_time": {"type": "string", "format": "date-time"},
+        "updated_time": {"type": "string", "format": "date-time"}
+      }
+    },
+    "assistantReference": {
+      "type": "object",
+      "required": ["article_id", "title"],
+      "properties": {
+        "article_id": {"type": "string", "format": "uuid"},
+        "title": {"type": "string", "maxLength": 200}
+      }
+    },
+    "assistantExcerpt": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantReference"},
+        {"type": "object", "required": ["excerpt"], "properties": {"excerpt": {"type": "string", "maxLength": 800}}}
+      ]
+    },
+    "assistantMessageRole": {"enum": ["user", "assistant"]},
+    "assistantMessageStatus": {"enum": ["complete", "interrupted", "failed"]},
+    "assistantVote": {"enum": ["up", "down"]},
+    "assistantFeedbackReason": {
+      "enum": ["INACCURATE", "UNRESOLVED", "IRRELEVANT", "OTHER", null],
+      "x-labels": {
+        "INACCURATE": {"zh": "不准确"},
+        "UNRESOLVED": {"zh": "没解决"},
+        "IRRELEVANT": {"zh": "引用不相关"},
+        "OTHER": {"zh": "其他"}
+      }
+    },
+    "assistantFeedbackInput": {
+      "type": "object",
+      "required": ["vote"],
+      "properties": {
+        "vote": {"$ref": "#/$defs/assistantVote"},
+        "reason": {"$ref": "#/$defs/assistantFeedbackReason"},
+        "comment": {"type": "string", "maxLength": 300, "default": ""}
+      },
+      "description": "点赞清空原因和补充。改投以本次提交为准。"
+    },
+    "assistantFeedback": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantFeedbackInput"},
+        {"type": "object", "required": ["reason", "comment", "created_time", "updated_time"], "properties": {
+          "created_time": {"type": "string", "format": "date-time"},
+          "updated_time": {"type": "string", "format": "date-time"}
+        }}
+      ]
+    },
+    "assistantTranscriptMessage": {
+      "type": "object",
+      "required": ["pk", "role", "content", "references", "status", "user_message_id", "created_time"],
+      "properties": {
+        "pk": {"type": "string", "format": "uuid"},
+        "role": {"$ref": "#/$defs/assistantMessageRole"},
+        "content": {"type": "string"},
+        "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantReference"}},
+        "status": {"$ref": "#/$defs/assistantMessageStatus"},
+        "user_message_id": {"type": ["string", "null"], "format": "uuid"},
+        "created_time": {"type": "string", "format": "date-time"}
+      }
+    },
+    "assistantMessage": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantTranscriptMessage"},
+        {"type": "object", "required": ["feedback"], "properties": {
+          "feedback": {"oneOf": [{"$ref": "#/$defs/assistantFeedback"}, {"type": "null"}]}
+        }}
+      ]
+    },
+    "assistantHandoffSession": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantSession"},
+        {"type": "object", "required": ["user_id", "username", "ticket_number"], "properties": {
+          "user_id": {"type": "integer"},
+          "username": {"type": "string"},
+          "ticket_number": {"type": ["string", "null"]}
+        }}
+      ]
+    },
+    "assistantDownvote": {
+      "type": "object",
+      "required": ["session", "question", "answer"],
+      "properties": {
+        "session": {"$ref": "#/$defs/assistantHandoffSession"},
+        "question": {"$ref": "#/$defs/assistantTranscriptMessage"},
+        "answer": {"$ref": "#/$defs/assistantMessage", "description": "对应回答，含当前点踩及原因。"}
+      }
+    },
+    "assistantStats": {
+      "type": "object",
+      "required": ["sessions", "questions", "up", "down", "handoffs"],
+      "properties": {
+        "sessions": {"type": "integer", "minimum": 0},
+        "questions": {"type": "integer", "minimum": 0},
+        "up": {"type": "integer", "minimum": 0},
+        "down": {"type": "integer", "minimum": 0},
+        "handoffs": {"type": "integer", "minimum": 0}
+      },
+      "description": "created_from/created_to 双端含边界，分别按会话创建、问题创建、当前投票更新时间、关联工单创建过滤。包含员工软删除的会话。"
+    },
+    "assistantQuestionInput": {
+      "description": "POST /api/assistant/internal/sessions/{id}/question。会话已关联工单时返回 HTTP 409，code 为 409，detail 为“会话已转人工，请新建对话”。",
+      "type": "object",
+      "required": ["message"],
+      "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 4000}}
+    },
+    "assistantContext": {
+      "type": "object",
+      "required": ["history", "categories"],
+      "properties": {
+        "history": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["role", "content"],
+            "properties": {
+              "role": {"$ref": "#/$defs/assistantMessageRole"},
+              "content": {"type": "string"}
+            }
+          },
+          "description": "最近 10 个问题及其已完成回答，按提问顺序排列，最多 8000 字符。提问响应排除本次问题，转人工上下文包含最新问题。"
+        },
+        "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}}
+      }
+    },
+    "assistantQuestionContext": {
+      "allOf": [
+        {"$ref": "#/$defs/assistantContext"},
+        {"type": "object", "required": ["user_message_id", "references"], "properties": {
+          "user_message_id": {"type": "string", "format": "uuid"},
+          "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantExcerpt"}}
+        }}
+      ]
+    },
+    "assistantAnswerInput": {
+      "type": "object",
+      "required": ["user_message_id", "content", "references", "status"],
+      "properties": {
+        "user_message_id": {"type": "string", "format": "uuid"},
+        "content": {"type": "string", "maxLength": 20000},
+        "references": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/assistantReference"}},
+        "status": {"$ref": "#/$defs/assistantMessageStatus"}
+      },
+      "description": "首次写回保存并返回 assistant_message_id；重放返回原 ID，保留首次写入内容。已完成回答要求非空正文。转人工后仍允许写回已有提问的回答。"
+    },
+    "assistantAnswerResult": {
+      "type": "object",
+      "required": ["assistant_message_id"],
+      "properties": {"assistant_message_id": {"type": "string", "format": "uuid"}}
     },
     "ticketTransition": {
       "type": "object",
@@ -72,6 +251,183 @@
         "target_status": {"$ref": "#/$defs/status"},
         "version": {"type": "integer", "minimum": 1},
         "note": {"type": "string", "maxLength": 4000}
+      }
+    },
+    "ticketReturn": {
+      "type": "object",
+      "description": "POST /api/tickets/{id}/return。返回更新后的工单，处理人为空，状态不变，版本递增；可见但无权退回为 403，状态或版本冲突为 409。",
+      "required": ["version", "reason"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 500}
+      }
+    },
+    "ticketAssignmentFilter": {
+      "enum": ["unassigned", "current", "history"],
+      "description": "列表、看板和导出的 assignment 参数。unassigned 为仅管理员可筛选的未关闭、未指派工单；current 为当前指派给我；history 为曾指派给我且当前未指派给我。异步导出以任务执行时的提交者身份和权限回放筛选。"
+    },
+    "ticketDashboardAssignment": {
+      "type": "object",
+      "description": "GET /api/tickets/dashboard 的 data.assignment。计数应用当前筛选。管理员返回 unassigned，技术员返回 current 和 history，普通员工返回空对象。",
+      "additionalProperties": false,
+      "properties": {
+        "unassigned": {"type": "integer", "minimum": 0},
+        "current": {"type": "integer", "minimum": 0},
+        "history": {"type": "integer", "minimum": 0}
+      }
+    },
+    "ticketDetailRating": {
+      "type": "object",
+      "required": ["rating"],
+      "properties": {
+        "rating": {
+          "description": "仅工单评价人、评价记录中的处理人和管理员可见，其他情况为 null。",
+          "oneOf": [{"$ref": "#/$defs/ticketRating"}, {"type": "null"}]
+        }
+      }
+    },
+    "ticketRatingTag": {
+      "enum": ["FAST", "PROFESSIONAL", "FRIENDLY", "CLEAR"],
+      "x-labels": {
+        "FAST": {"zh": "响应快", "en": "Fast response"},
+        "PROFESSIONAL": {"zh": "专业", "en": "Professional"},
+        "FRIENDLY": {"zh": "态度好", "en": "Friendly"},
+        "CLEAR": {"zh": "沟通清楚", "en": "Clear communication"}
+      }
+    },
+    "ticketRatingScore": {"type": "integer", "minimum": 1, "maximum": 5},
+    "ticketRatingInput": {
+      "type": "object",
+      "description": "POST /api/tickets/{id}/rating。提交后不可修改，重开不重置评价。",
+      "required": ["resolved", "satisfaction", "handler_score"],
+      "properties": {
+        "resolved": {"type": "boolean"},
+        "satisfaction": {"$ref": "#/$defs/ticketRatingScore"},
+        "handler_score": {"$ref": "#/$defs/ticketRatingScore"},
+        "tags": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ticketRatingTag"}},
+        "comment": {"type": ["string", "null"], "maxLength": 500, "description": "空字符串和纯空白输入按 null 保存。"}
+      }
+    },
+    "ticketRating": {
+      "allOf": [
+        {"$ref": "#/$defs/ticketRatingInput"},
+        {
+          "type": "object",
+          "required": ["pk", "ticket_id", "ticket_number", "rater_id", "rater_name", "handler_id", "handler_name", "tags", "comment", "created_time"],
+          "properties": {
+            "pk": {"type": "string", "format": "uuid"},
+            "ticket_id": {"type": "string", "format": "uuid"},
+            "ticket_number": {"type": "string"},
+            "rater_id": {"type": "integer"},
+            "rater_name": {"type": "string"},
+            "handler_id": {"type": ["integer", "null"], "description": "评价所对应的关闭时处理人。"},
+            "handler_name": {"type": ["string", "null"]},
+            "created_time": {"type": "string", "format": "date-time"}
+          }
+        }
+      ]
+    },
+    "ticketRatingList": {
+      "type": "object",
+      "description": "GET /api/ticket-ratings。员工看本人给出的评价，技术员看本人收到的评价，管理员看全部。按创建时间、主键倒序，支持 handler_id、satisfaction、handler_score、resolved、created_from、created_to 筛选。handler_id 为整数，小数或非数字返回 400。时间用 ISO 8601，两端均含边界。",
+      "required": ["total", "results"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "results": {"type": "array", "items": {"$ref": "#/$defs/ticketRating"}}
+      }
+    },
+    "ticketRatingMetrics": {
+      "type": "object",
+      "required": ["count", "avg_satisfaction", "avg_handler_score", "resolved_rate", "tags"],
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "avg_satisfaction": {"type": ["number", "null"], "minimum": 1, "maximum": 5},
+        "avg_handler_score": {"type": ["number", "null"], "minimum": 1, "maximum": 5},
+        "resolved_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "已解决评价数除以评价总数。无评价时均分及解决率为 null。"},
+        "tags": {
+          "type": "object",
+          "description": "各已出现标签的计数，无标签时为空对象。",
+          "propertyNames": {"$ref": "#/$defs/ticketRatingTag"},
+          "additionalProperties": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "ticketRatingSummary": {
+      "description": "GET /api/ticket-ratings/summary。技术员返回本人指标，管理员另有 by_handler（按处理人排序，未关联处理人的评价归入 null 组并排在最后）。可用 created_from、created_to 筛选。",
+      "allOf": [
+        {"$ref": "#/$defs/ticketRatingMetrics"},
+        {
+          "type": "object",
+          "properties": {
+            "by_handler": {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  {"$ref": "#/$defs/ticketRatingMetrics"},
+                  {
+                    "type": "object",
+                    "required": ["handler_id", "handler_name"],
+                    "properties": {
+                      "handler_id": {"type": ["integer", "null"]},
+                      "handler_name": {"type": ["string", "null"]}
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "accountRole": {
+      "enum": ["requester", "agent", "admin"],
+      "x-labels": {"requester": "普通员工", "agent": "技术员", "admin": "管理员"}
+    },
+    "account": {
+      "type": "object",
+      "description": "GET /api/ticketflow/accounts 和 GET /api/ticketflow/accounts/{pk}。仅业务管理员可用。列表支持 q、role、skill_group、is_active 及分页。停用与启用通过 PATCH is_active 完成。",
+      "required": ["pk", "username", "name", "phone", "email", "role", "skill_group", "skill_group_name", "is_active"],
+      "properties": {
+        "pk": {"type": "integer", "readOnly": true},
+        "username": {"type": "string", "minLength": 1, "maxLength": 150},
+        "name": {"type": "string", "minLength": 1, "maxLength": 150},
+        "phone": {"type": "string", "maxLength": 16},
+        "email": {"type": "string", "maxLength": 254},
+        "role": {"$ref": "#/$defs/accountRole"},
+        "skill_group": {"type": ["string", "null"], "format": "uuid", "description": "技术员需指定技能组，其他角色为空。改为其他角色时自动清空。"},
+        "skill_group_name": {"type": ["string", "null"], "readOnly": true},
+        "is_active": {"type": "boolean"}
+      }
+    },
+    "accountPassword": {
+      "type": "object",
+      "description": "创建账号及 POST /api/ticketflow/accounts/{pk}/reset-password 使用 password。启用底座密码加密时，以目标用户名作为加密密钥，沿用系统用户的 AESCipherV2 协议。",
+      "required": ["password"],
+      "properties": {
+        "password": {"type": "string", "minLength": 1, "maxLength": 512, "writeOnly": true}
+      }
+    },
+    "skillGroup": {
+      "type": "object",
+      "description": "GET/POST /api/ticketflow/skill-groups，GET/PATCH /api/ticketflow/skill-groups/{pk}。列表支持 q、is_active 及分页。默认组、仍有在职技术员的组和仍被分类指向的组停用时返回 409。",
+      "required": ["pk", "name", "description", "is_active", "is_default"],
+      "properties": {
+        "pk": {"type": "string", "format": "uuid", "readOnly": true},
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "description": {"type": ["string", "null"], "maxLength": 256},
+        "is_active": {"type": "boolean"},
+        "is_default": {"type": "boolean", "readOnly": true}
+      }
+    },
+    "categoryRoute": {
+      "type": "object",
+      "description": "GET /api/ticketflow/skill-groups/category-routes 返回所有分类的数组。PATCH /api/ticketflow/skill-groups/category-routes/{category} 接收 {skill_group}。null 清除配置并恢复默认组。只影响后续建单。",
+      "required": ["category", "label", "skill_group", "skill_group_name"],
+      "properties": {
+        "category": {"$ref": "#/$defs/category"},
+        "label": {"type": "string"},
+        "skill_group": {"type": ["string", "null"], "format": "uuid"},
+        "skill_group_name": {"type": ["string", "null"]}
       }
     },
     "knowledgeReference": {

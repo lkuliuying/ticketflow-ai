@@ -19,3 +19,19 @@ export const operates = [
   { page: LOGIN_PAGE.verifyCode, title: $t("login.verifyCodeLogin") },
   { page: LOGIN_PAGE.register, title: $t("login.register") }
 ];
+
+/**
+ * 按后端能力过滤「其他登录方式」：验证码登录需开启邮箱或短信通道，
+ * 注册需后端开放自助注册（企业内部部署默认关闭，由管理员开号）。
+ */
+export function visibleOperates(caps: {
+  email?: boolean;
+  sms?: boolean;
+  register?: boolean;
+}) {
+  return operates.filter(item => {
+    if (item.page === LOGIN_PAGE.verifyCode) return caps.email || caps.sms;
+    if (item.page === LOGIN_PAGE.register) return Boolean(caps.register);
+    return true;
+  });
+}
