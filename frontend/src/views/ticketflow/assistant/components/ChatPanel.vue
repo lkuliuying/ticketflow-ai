@@ -140,6 +140,8 @@ async function openLinkedTicket() {
   openingTicket.value = true;
   const res = await ticketApi.retrieve<TicketItem>(ticketId).catch(() => null);
   openingTicket.value = false;
+  // 请求期间切换了会话或离开页面：不再弹出旧会话的工单
+  if (!alive) return;
   if (res && isSuccess(res) && res.data) openTicketDetail(res.data, {});
 }
 
