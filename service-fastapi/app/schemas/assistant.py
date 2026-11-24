@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from app.schemas.context import KnowledgeReference, Reference
 
 MAX_ANSWER_LENGTH = 20000
+MAX_HANDOFF_DESCRIPTION_LENGTH = 20000
 AnswerStatus = Literal["complete", "interrupted", "failed"]
 
 
@@ -53,5 +54,7 @@ class HandoffDraft(BaseModel):
     model_config = ConfigDict(strict=True, revalidate_instances="always", hide_input_in_errors=True)
 
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20000)]
+    description: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_HANDOFF_DESCRIPTION_LENGTH)
+    ]
     category: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]

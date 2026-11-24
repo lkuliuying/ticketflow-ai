@@ -12,6 +12,7 @@ from test_ticket_routes import InMemoryRedis, frames
 from app.core.config import Settings
 from app.core.errors import ProviderError
 from app.core.resources import Resources
+from app.schemas.assistant import AssistantContext
 from app.services.providers import MockProvider, OpenAICompatibleProvider
 
 CHAT = "/ai/v1/assistant/chat/stream"
@@ -28,7 +29,7 @@ pytestmark = pytest.mark.anyio
 @pytest.fixture
 async def assistant(application, signing_key, claims):
     headers = {"Authorization": "Bearer " + jwt.encode(claims, signing_key, algorithm="HS256")}
-    context = {"history": HISTORY, "categories": ["NETWORK", "OTHER"]}
+    context = {"history": list(HISTORY), "categories": ["NETWORK", "OTHER"]}
     question = {
         **context,
         "user_message_id": QUESTION,
@@ -92,6 +93,50 @@ async def test_chat_stream_persists_complete_answer_and_publishes_metadata(assis
     if not has_references:
         assert "知识库中没有找到" in calls[-1][1]["content"]
         assert "转人工提单" in calls[-1][1]["content"]
+
+
+async def test_assistant_routes_accept_full_drf_context(assistant):
+    ai, headers, question, _, _ = assistant
+    question["history"][:] = HISTORY * 10
+    question["references"] = [
+        {"article_id": str(uuid4()), "title": f"VPN 排查指南 {index}", "excerpt": "先确认客户端已连接。"}
+        for index in range(5)
+    ]
+
+    draft = await ai.post(DRAFT, headers=headers, json={"session_id": SESSION})
+    assert draft.status_code == 200
+    assert draft.json()["description"] == HISTORY[0]["content"]
+
+    chat = await ai.post(CHAT, headers=headers, json={"session_id": SESSION, "message": MESSAGE})
+    assert chat.status_code == 200
+    result = frames(chat.text)
+    assert result[0][0] == "meta"
+    assert len(result[0][1]["references"]) == 5
+    assert result[-1][0] == "done"
+
+
+async def test_chat_queue_timeout_returns_json_before_recording_question(assistant, application):
+    ai, headers, _, calls, _ = assistant
+    resources = application.state.resources
+    settings = resources.settings.model_copy(update={"upstream_slot_timeout": 0.01})
+    application.state.resources = replace(resources, settings=settings)
+
+    async with resources.upstream_slots:
+        response = await ai.post(CHAT, headers=headers, json={"session_id": SESSION, "message": MESSAGE})
+
+    assert response.status_code == 503
+    assert response.headers["content-type"] == "application/json"
+    assert response.json()["error"] == "UPSTREAM_BUSY"
+    assert calls == []
+
+
+async def test_chat_rejects_whitespace_only_message(assistant):
+    ai, headers, _, calls, _ = assistant
+    response = await ai.post(CHAT, headers=headers, json={"session_id": SESSION, "message": " \t\n　"})
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "VALIDATION_ERROR"
+    assert calls == []
 
 
 @pytest.mark.parametrize("disconnect_after_delta", [False, True])
@@ -160,6 +205,36 @@ async def test_chat_provider_failure_after_a_delta_persists_partial_without_retr
     assert result[-1][1] == {"code": 503, "error": "LLM_UNAVAILABLE", "detail": "模型暂时不可用", "retryable": True}
     assert calls[-1][1]["status"] == "failed"
     assert calls[-1][1]["content"] == "正文第一段"
+
+
+@pytest.mark.parametrize("partial", ["", "正文第一段"])
+async def test_chat_stream_timeout_persists_failed_and_ends_with_error(assistant, application, monkeypatch, partial):
+    ai, headers, _, calls, _ = assistant
+    resources = application.state.resources
+    settings = resources.settings.model_copy(update={"stream_timeout": 0.2})
+    application.state.resources = replace(resources, settings=settings)
+    upstream_closed = asyncio.Event()
+
+    async def stream(context, message):
+        try:
+            if partial:
+                yield partial
+            await asyncio.Future()
+        finally:
+            upstream_closed.set()
+
+    monkeypatch.setattr(resources.provider, "stream_chat", stream)
+    response = await ai.post(CHAT, headers=headers, json={"session_id": SESSION, "message": MESSAGE})
+
+    assert response.status_code == 200
+    result = frames(response.text)
+    assert [event for event, _ in result] == (["meta", "delta", "error"] if partial else ["meta", "error"])
+    assert result[-1][1] == {"code": 504, "error": "LLM_TIMEOUT", "detail": "模型生成超时", "retryable": False}
+    assert calls == [
+        ("/question", {"message": MESSAGE}),
+        ("/answer", {"user_message_id": QUESTION, "content": partial, "references": [REFERENCE], "status": "failed"}),
+    ]
+    assert upstream_closed.is_set()
 
 
 async def test_chat_only_retries_the_idempotent_write_and_never_sends_done_for_failed_write(assistant):
@@ -233,22 +308,53 @@ async def test_handoff_draft_uses_json_mode_and_validates_output(assistant, appl
         assert response.json() == {"title": "需要协助", "description": "连接报错", "category": "NETWORK"}
 
 
-async def test_real_provider_chat_prompt_uses_knowledge_history_and_original_question(assistant, application):
+@pytest.mark.parametrize(
+    ("history", "expected_history"),
+    [
+        ([], []),
+        (HISTORY, HISTORY),
+        (
+            [
+                {"role": "assistant", "content": "缺少提问的回答"},
+                {"role": "user", "content": "先前未答的问题"},
+                HISTORY[0],
+                HISTORY[1],
+                {"role": "assistant", "content": "也请提供系统版本"},
+                {"role": "user", "content": "结尾未答的问题"},
+            ],
+            [
+                {"role": "user", "content": "先前未答的问题\n\n连接报错"},
+                {"role": "assistant", "content": "请提供报错信息\n\n也请提供系统版本"},
+            ],
+        ),
+        ([{"role": "user", "content": "仅有一个未答的问题"}], []),
+    ],
+)
+async def test_real_provider_chat_prompt_alternates_roles_and_grounds_latest_question(
+    assistant, application, history, expected_history
+):
     ai, headers, question, _, _ = assistant
+    question["history"] = history
     resources = application.state.resources
-    settings = Settings(mock_llm=False, llm_api_key="test-upstream-key", llm_thinking="disabled")
+    settings = Settings(mock_llm=False, llm_api_key="test-upstream-key", llm_thinking="enabled")
 
     def llm(request):
         payload = json.loads(request.content)
-        assert payload["thinking"] == {"type": "disabled"}
+        assert payload["thinking"] == {"type": "enabled"}
         assert payload["stream"] is True
-        instruction, knowledge, *conversation = payload["messages"]
+        instruction, *conversation, latest = payload["messages"]
+        assert [message["role"] for message in payload["messages"]] == [
+            "system",
+            *(["user", "assistant"] * (len(expected_history) // 2)),
+            "user",
+        ]
         assert "只依据本次提供的知识片段" in instruction["content"]
         assert "知识库中没有找到" in instruction["content"] and "转人工提单" in instruction["content"]
-        assert json.loads(knowledge["content"])["references"] == [
-            {"title": REFERENCE["title"], "excerpt": "先确认客户端已连接。"}
-        ]
-        assert conversation == [*question["history"], {"role": "user", "content": MESSAGE}]
+        assert conversation == expected_history
+        assert json.loads(latest["content"]) == {
+            "question": MESSAGE,
+            "references": [{"title": REFERENCE["title"], "excerpt": "先确认客户端已连接。"}],
+        }
         return httpx.Response(
             200,
             text='data: {"choices":[{"delta":{"content":"已找到指南"}}]}\n\ndata: [DONE]\n\n',
@@ -258,3 +364,14 @@ async def test_real_provider_chat_prompt_uses_knowledge_history_and_original_que
         application.state.resources = replace(resources, provider=OpenAICompatibleProvider(settings, upstream))
         response = await ai.post(CHAT, headers=headers, json={"session_id": SESSION, "message": MESSAGE})
     assert frames(response.text)[-1][0] == "done"
+
+
+async def test_mock_handoff_draft_truncates_long_description():
+    provider = MockProvider(Settings(mock_first_delay=0))
+    context = AssistantContext(history=[{"role": "user", "content": " 描" + "述" * 20000 + " "}], categories=["OTHER"])
+
+    draft = await provider.handoff_draft(context)
+
+    assert draft.title == "描" + "述" * 199
+    assert draft.description == "描" + "述" * 19999
+    assert draft.category == "OTHER"

@@ -148,6 +148,36 @@ def test_internal_context_uses_bearer_scope_published_articles_and_bounded_histo
     assert sum(len(row["content"]) for row in reopened["history"]) == 8000
 
 
+def test_internal_context_and_question_cap_history_and_references(employee):
+    session_id = new_session(employee)["pk"]
+    path = f"{INTERNAL}/{session_id}"
+    for turn in range(11):
+        question = ask(employee, session_id, f"问题 {turn}")
+        answer(employee, session_id, question["user_message_id"], content=f"回答 {turn}")
+
+    KnowledgeArticle.objects.bulk_create(
+        KnowledgeArticle(
+            title=f"VPN 设置 {index}",
+            body_markdown="VPN 连接步骤",
+            category=Category.NETWORK,
+            status=ArticleStatus.PUBLISHED,
+        )
+        for index in range(7)
+    )
+    expected_history = [
+        {"role": role, "content": f"{label} {turn}"}
+        for turn in range(1, 11)
+        for role, label in (("user", "问题"), ("assistant", "回答"))
+    ]
+
+    context = data(employee.get(f"{path}/context"))
+    validate(context, "assistantContext")
+    assert context["history"] == expected_history
+    question = ask(employee, session_id, "VPN 连不上")
+    assert question["history"] == expected_history
+    assert len({ref["article_id"] for ref in question["references"]}) == 5
+
+
 def test_internal_writeback_replay_status_and_message_pagination(employee, teammate, client_for):
     session_id = new_session(employee)["pk"]
     second_id = new_session(employee)["pk"]

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.core.config import Settings
 from app.core.errors import ProviderError, invalid_output, provider_timeout
-from app.schemas.assistant import AssistantContext, HandoffDraft, QuestionContext
+from app.schemas.assistant import MAX_HANDOFF_DESCRIPTION_LENGTH, AssistantContext, HandoffDraft, QuestionContext
 from app.schemas.context import TicketContext
 from app.schemas.tickets import AnalysisDraft, Priority, unique_tags
 from app.services import prompts
@@ -86,11 +86,11 @@ class MockProvider:
 
     async def handoff_draft(self, context: AssistantContext) -> HandoffDraft:
         await self._wait()
-        question = next((turn.content for turn in reversed(context.history) if turn.role == "user"), "")
+        question = next((turn.content for turn in reversed(context.history) if turn.role == "user"), "").strip()
         category = "OTHER" if "OTHER" in context.categories else context.categories[0]
         return HandoffDraft(
-            title=question.strip()[:200] or "IT 支持请求",
-            description=question.strip() or "请补充遇到的问题和已尝试的操作。",
+            title=question[:200] or "IT 支持请求",
+            description=question[:MAX_HANDOFF_DESCRIPTION_LENGTH] or "请补充遇到的问题和已尝试的操作。",
             category=category,
         )
 
