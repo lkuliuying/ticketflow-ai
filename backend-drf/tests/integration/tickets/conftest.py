@@ -11,6 +11,13 @@ from tickets.policy import ADMIN_ROLE, AGENT_ROLE, REQUESTER_ROLE
 from tickets.services import NewTicket
 
 
+@pytest.fixture(scope="module")
+def seed_apps() -> str:
+    # 工单和知识库沿用正式菜单与字段白名单，任务中心提供导出记录的下载授权。
+    # 其余应用提供平台数据权限引用的菜单，以及身份、设置和任务中心引用的菜单和字段。
+    return "tickets,knowledge,task,settings,captcha,file,notifications,audit"
+
+
 @pytest.fixture
 def support() -> DeptInfo:
     return DeptInfo.objects.create(code="ticketflow_support", name="工单支持")

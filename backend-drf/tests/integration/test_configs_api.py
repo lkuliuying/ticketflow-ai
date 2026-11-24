@@ -28,7 +28,7 @@ CONFIG_BASE_URL = "/api/system/configs"
     [("TicketFlow", "TicketFlow管理团队"), ("客户服务平台", "平台运维团队")],
 )
 def test_seeded_branding_survives_reload(title, department_name, seed_creator_user):
-    call_command("load_init_json", verbosity=0)
+    call_command("load_init_json", apps="settings,identity", verbosity=0)
     config = SystemConfig.objects.get(key="WEB_SITE_CONFIG")
     department = DeptInfo.objects.get(code="xadmin")
     assert config.value["Title"] == "TicketFlow"
