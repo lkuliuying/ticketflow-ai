@@ -2,7 +2,7 @@ import json
 import os
 import re
 from time import monotonic
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -140,8 +140,9 @@ def assistant_session(gateway, requester):
 def test_assistant_stream_persists_answer_through_gateway(gateway, requester, assistant_session):
     body = {"session_id": assistant_session, "message": "VPN"}
     events = read_stream(gateway, CHAT, requester.headers, body)
-    sequence = " ".join(event for event, _, _ in events)
-    assert re.fullmatch(r"meta (?:ping |delta )*delta (?:ping |delta )*done", sequence), sequence
+    names = [event for event, _, _ in events]
+    assert names and names[0] == "meta" and names[-1] == "done", names
+    assert "delta" in names[1:-1] and set(names[1:-1]) <= {"delta", "ping"}, names
     meta, done = events[0][1], events[-1][1]
     assert set(meta) == {"session_id", "user_message_id", "references"}
     assert meta["session_id"] == assistant_session
@@ -167,7 +168,9 @@ def test_assistant_stream_persists_answer_through_gateway(gateway, requester, as
     assert answer["user_message_id"] == meta["user_message_id"]
     assert answer["status"] == "complete" and answer["references"] == meta["references"]
     first_delta = next(elapsed for event, _, elapsed in events if event == "delta")
-    print(f"Assistant SSE {sequence}: first delta={first_delta:.3f}s, done={events[-1][2]:.3f}s, stored=complete")
+    print(
+        f"Assistant SSE {' '.join(names)}: first delta={first_delta:.3f}s, done={events[-1][2]:.3f}s, stored=complete"
+    )
     if GATEWAY_MOCK:
         assert first_delta < events[-1][2] / 2
     for event, data in [("meta", meta), ("delta", {"text": deltas[0]}), ("done", done)]:
@@ -188,3 +191,41 @@ def test_assistant_handoff_draft_through_gateway(gateway, requester, assistant_s
     print(f"Assistant handoff draft HTTP 200: {json.dumps(draft, ensure_ascii=False)}")
     if GATEWAY_MOCK:
         assert draft == {"title": message, "description": message, "category": "OTHER"}
+
+
+def test_assistant_rejects_new_question_after_handoff_through_gateway(gateway, requester, assistant_session):
+    message = "VPN 客户端连接时超时"
+    events = read_stream(gateway, CHAT, requester.headers, {"session_id": assistant_session, "message": message})
+    assert events[-1][0] == "done"
+
+    handoff = gateway.post(
+        "/api/tickets",
+        headers={**requester.headers, "Idempotency-Key": str(uuid4())},
+        json={
+            "title": message,
+            "description": message,
+            "category": "NETWORK",
+            "priority": "P2",
+            "assistant_session_id": assistant_session,
+        },
+    )
+    assert handoff.status_code == 201, handoff.text
+    ticket_id = handoff.json()["data"]["pk"]
+    ticket = gateway.get(f"/api/tickets/{ticket_id}", headers=requester.headers)
+    assert ticket.status_code == 200, ticket.text
+    assert ticket.json()["data"]["assistant_session_id"] == assistant_session
+
+    response = gateway.post(
+        CHAT, headers=requester.headers, json={"session_id": assistant_session, "message": "还有其他排查方法吗？"}
+    )
+    assert_ai_failure(response, 409, "CONFLICT")
+    assert response.headers["content-type"].split(";", 1)[0] == "application/json"
+
+    transcript = gateway.get(f"/api/assistant/sessions/{assistant_session}/messages", headers=requester.headers)
+    assert transcript.status_code == 200, transcript.text
+    data = transcript.json()["data"]
+    assert data["total"] == 2
+    assert {item["pk"] for item in data["results"]} == {
+        events[0][1]["user_message_id"],
+        events[-1][1]["assistant_message_id"],
+    }
