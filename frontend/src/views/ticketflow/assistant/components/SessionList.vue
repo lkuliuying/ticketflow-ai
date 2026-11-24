@@ -64,7 +64,18 @@ function onCommand(command: string, session: AssistantSession) {
           @keydown.enter="emit('select', session.pk)"
         >
           <div class="flex-1 min-w-0">
-            <div class="truncate text-sm">{{ session.title }}</div>
+            <div class="flex items-center gap-1 min-w-0">
+              <span class="truncate text-sm">{{ session.title }}</span>
+              <el-tag
+                v-if="session.ticket_id"
+                size="small"
+                type="success"
+                effect="plain"
+                class="shrink-0"
+              >
+                {{ t("ticketflow.handoff.tag") }}
+              </el-tag>
+            </div>
             <div class="text-xs text-fg-muted">
               {{ dayjs(session.updated_time).format("MM-DD HH:mm") }}
             </div>

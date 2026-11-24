@@ -33,7 +33,7 @@ const {
   create,
   rename,
   remove,
-  drop,
+  link,
   touch
 } = useAssistantSessions();
 
@@ -78,9 +78,9 @@ function onAsked(pk: string, titleFrom: string | null) {
   }
 }
 
-/** 转人工成功：会话已由服务端转入工单，从侧栏移除并提供跳转 */
+/** 转人工成功：会话转为只读并关联工单，打开新工单详情 */
 function onHandedOff(pk: string, ticket: TicketItem) {
-  drop(pk);
+  link(pk, ticket.pk);
   message(t("ticketflow.handoff.created", { number: ticket.number }), {
     type: "success"
   });

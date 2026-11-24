@@ -95,6 +95,15 @@ describe("useAssistantSessions", () => {
     expect(s.sessions.value).toHaveLength(0);
   });
 
+  it("转人工后会话保留在列表最前并关联工单", async () => {
+    mocks.list.mockResolvedValue(page([session("s1"), session("s2")]));
+    const s = useAssistantSessions();
+    await s.load();
+    s.link("s2", "t9");
+    expect(s.sessions.value[0]).toMatchObject({ pk: "s2", ticket_id: "t9" });
+    expect(s.sessions.value).toHaveLength(2);
+  });
+
   it("改名用服务端返回值替换并移到最前", async () => {
     mocks.list.mockResolvedValue(page([session("s1"), session("s2")]));
     mocks.rename.mockResolvedValue(ok(session("s2", "VPN 排查")));
