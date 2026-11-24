@@ -292,8 +292,14 @@ def superuser(db):
 
 
 @pytest.fixture(scope="module")
-def seeded_module(django_db_setup, django_db_blocker):
-    """模块级种子：整模块共享一次装载，模块结束时随外层事务整体回滚。
+def seed_apps() -> str:
+    """默认装载全部应用，业务测试可以覆盖为所需的应用清单。"""
+    return ""
+
+
+@pytest.fixture(scope="module")
+def seeded_module(django_db_setup, django_db_blocker, seed_apps):
+    """模块级种子：每个模块装载一次，模块结束时随外层事务整体回滚。
 
     完整种子装载是重查询（近四千行 + 字段白名单同步），逐用例重装会把耗时放大成
     用例数的倍数——全量 pytest 尾部集中了这类种子测试，慢 runner 上直接堆成分钟级
@@ -318,7 +324,7 @@ def seeded_module(django_db_setup, django_db_blocker):
                 if creator.pk != 1:
                     creator.hard_delete()
                     UserInfo.objects.create(pk=1, username="init-admin", password="!")
-            call_command("load_init_json", verbosity=0)
+            call_command("load_init_json", apps=seed_apps, verbosity=0)
             yield
             transaction.set_rollback(True)
 

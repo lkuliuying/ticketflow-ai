@@ -5,6 +5,7 @@
 # author : ly_13
 # date : 8/10/2024
 from typing import Any
+from uuid import UUID
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -46,8 +47,12 @@ class FieldPermission(DbAuditModel, DbCharModel):
         ordering = ("-created_time",)
         unique_together = ("role", "menu")
 
+    @staticmethod
+    def make_id(role_id: UUID | str, menu_id: UUID | str) -> str:
+        return f"{role_id}-{menu_id}"
+
     def save(self, *args: Any, **kwargs: Any) -> Any:
-        self.id = f"{self.role.pk}-{self.menu.pk}"
+        self.id = self.make_id(self.role.pk, self.menu.pk)
         return super().save(*args, **kwargs)
 
     def __str__(self) -> str:

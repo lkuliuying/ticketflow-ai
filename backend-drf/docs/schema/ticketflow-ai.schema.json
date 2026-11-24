@@ -33,8 +33,7 @@
         {"$ref": "#/$defs/httpError"},
         {"properties": {
           "code": {"const": 409},
-          "error": {"const": "CONFLICT"},
-          "detail": {"const": "会话已转人工，请新建对话"}
+          "error": {"const": "CONFLICT"}
         }}
       ]
     },
