@@ -37,7 +37,11 @@ export function openArticleEditor(options: {
     // 确认按钮提交中显示 loading 并阻止重复点击，避免重复新建或重复转存
     sureBtnLoading: true,
     contentRenderer: () =>
-      h(ArticleEditor, { ref: editorRef, initial: options.initial }),
+      h(ArticleEditor, {
+        ref: editorRef,
+        initial: options.initial,
+        sourceTicketId: options.sourceTicketId
+      }),
     beforeSure: async (done, { closeLoading }) => {
       const payload = await editorRef.value?.getPayload();
       if (!payload) {

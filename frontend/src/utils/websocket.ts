@@ -96,7 +96,7 @@ export interface WSOptions {
   /**
    * 关闭连接回调
    */
-  closeCallback?: (socket: WebSocket) => void;
+  closeCallback?: (socket: WebSocket, event?: CloseEvent) => void;
   /**
    * 连接异常回调
    */
@@ -230,9 +230,10 @@ class WS {
           this.errorCallback(socket);
         }
       };
-      socket.onclose = () => {
+      socket.onclose = event => {
         if (this.closeCallback) {
-          this.closeCallback(socket);
+          // 回调内调用 close() 会置 socketOpen=false，下方的延时重连随之空转
+          this.closeCallback(socket, event);
         }
         // 指数退避：3s、6s、12s… 封顶 30s，避免服务端抖动时被固定 3s 高频重连冲击
         const backoff = Math.min(

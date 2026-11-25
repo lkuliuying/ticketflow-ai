@@ -101,12 +101,14 @@ def test_ticket_viewer_comment_capabilities_require_menu_permission(users, ticke
     assert detail.status_code == 200, detail.data
     viewer = detail.data["data"]["viewer"]
     assert viewer["can_handle"] is (role == "agent")
-    assert (viewer["can_reply"], viewer["can_comment_internal"]) == (False, False)
+    assert (viewer["can_reply"], viewer["can_comment_internal"]) == (True, False)
 
     for visibility in (Visibility.PUBLIC, Visibility.INTERNAL):
         response = api.post(f"{resource}/comments", {"body": "工单跟进", "visibility": visibility}, format="json")
         assert response.status_code == 403, response.data
     assert not ticket.comments.exists()
+    user.roles.get().menu.remove(Menu.objects.get(name="chatSend:TicketFlowTickets"))
+    assert api.get(resource).data["data"]["viewer"]["can_reply"] is False
 
 
 def test_ticket_viewer_respects_action_grants_and_submitter_only_scope(users, ticket):
@@ -418,30 +420,33 @@ def test_ticket_search_fields_use_localized_labels_and_sla_choices(users, api_cl
     }
 
 
-def test_ticketflow_directory_contains_visible_pages_in_order(users):
-    directory = Menu.objects.get(name="TicketFlow")
-    assert directory.menu_type == Menu.MenuChoices.DIRECTORY
-    children = list(Menu.objects.filter(parent=directory).select_related("meta").order_by("rank"))
-    assert [page.component for page in children] == [
+def test_ticketflow_root_pages_are_ordered_and_granted_by_role(users):
+    assert not Menu.objects.filter(name="TicketFlow").exists()
+    pages = list(
+        Menu.objects.filter(component__startswith="ticketflow/", menu_type=Menu.MenuChoices.MENU)
+        .select_related("meta")
+        .order_by("rank")
+    )
+    assert [page.component for page in pages] == [
         "ticketflow/tickets/index",
         "ticketflow/knowledge/index",
+        "ticketflow/assistant/index",
         "ticketflow/ratings/mine/index",
         "ticketflow/ratings/stats/index",
         "ticketflow/accounts/index",
         "ticketflow/skill-groups/index",
-        "ticketflow/assistant/index",
         "ticketflow/assistant/feedback/index",
     ]
-    assert all(page.meta.is_show_menu for page in children)
-    for user in users.values():
-        assert user.roles.filter(menu=directory).exists()
+    assert all(page.parent_id is None and page.meta.is_show_menu for page in pages)
     role_pages = {
-        "TicketFlowAccounts": "admin",
-        "TicketFlowSkillGroups": "admin",
-        "TicketFlowAssistant": "requester",
-        "TicketFlowAssistantFeedback": "admin",
+        "TicketFlowTickets": {"requester", "agent", "admin"},
+        "TicketFlowKnowledge": {"requester", "agent", "admin"},
+        "TicketFlowMyRatings": {"agent"},
+        "TicketFlowRatingStats": {"admin"},
+        "TicketFlowAccounts": {"admin"},
+        "TicketFlowSkillGroups": {"admin"},
+        "TicketFlowAssistant": {"requester"},
+        "TicketFlowAssistantFeedback": {"admin"},
     }
-    for page in children:
-        if page.name in role_pages:
-            for role, user in users.items():
-                assert user.roles.filter(menu=page).exists() is (role == role_pages[page.name])
+    for page in pages:
+        assert {role for role, user in users.items() if user.roles.filter(menu=page).exists()} == role_pages[page.name]

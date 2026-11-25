@@ -6,8 +6,7 @@
 name: workspace-health
 
 on:
-  schedule:
-    - cron: "0 1 * * 1" # UTC 周一 01:00 = 北京时间 09:00
+  # 上游多仓巡检仅按需手动触发，避免在独立 TicketFlow 仓库内周期性拉取外部仓库报错。
   workflow_dispatch: {}
 
 permissions:

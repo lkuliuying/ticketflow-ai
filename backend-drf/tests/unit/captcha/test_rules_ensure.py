@@ -16,6 +16,7 @@ def test_ensure_default_rules_fills_missing_rows():
 
 
 def test_ensure_default_rules_keeps_existing_values():
+    ensure_default_rules()
     row = CaptchaRule.objects.get(code="honeypot")
     row.score = 42
     row.save(update_fields=["score"])

@@ -51,11 +51,11 @@ pytestmark = pytest.mark.django_db
 EXPECTED_ROLE_MENUS = {
     "admin": 338,
     "test": 87,
-    "default": 48,
+    "default": 54,
     "demo": 67,
-    "ticketflow_requester": 25,
-    "ticketflow_agent": 22,
-    "ticketflow_admin": 46,
+    "ticketflow_requester": 31,
+    "ticketflow_agent": 28,
+    "ticketflow_admin": 52,
 }
 
 

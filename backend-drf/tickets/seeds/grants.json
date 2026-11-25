@@ -2,21 +2,6 @@
   "version": 1,
   "roles": {
     "default": [
-      "TicketFlow",
-      "TicketFlowTickets",
-      "list:TicketFlowTickets",
-      "create:TicketFlowTickets",
-      "retrieve:TicketFlowTickets",
-      "timeline:TicketFlowTickets",
-      "transition:TicketFlowTickets",
-      "comments:TicketFlowTickets",
-      "dashboard:TicketFlowTickets",
-      "rating:TicketFlowTickets",
-      "list:TicketFlowMyRatings",
-      "assistantSession:TicketFlowTickets"
-    ],
-    "ticketflow_requester": [
-      "TicketFlow",
       "TicketFlowTickets",
       "list:TicketFlowTickets",
       "create:TicketFlowTickets",
@@ -28,6 +13,33 @@
       "rating:TicketFlowTickets",
       "list:TicketFlowMyRatings",
       "assistantSession:TicketFlowTickets",
+      "uploadAttachment:TicketFlowTickets",
+      "attachmentFile:TicketFlowTickets",
+      "chatMessages:TicketFlowTickets",
+      "chatSend:TicketFlowTickets",
+      "chatUpload:TicketFlowTickets",
+      "chatRead:TicketFlowTickets",
+      "chatFile:TicketFlowTickets"
+    ],
+    "ticketflow_requester": [
+      "TicketFlowTickets",
+      "list:TicketFlowTickets",
+      "create:TicketFlowTickets",
+      "retrieve:TicketFlowTickets",
+      "timeline:TicketFlowTickets",
+      "transition:TicketFlowTickets",
+      "comments:TicketFlowTickets",
+      "dashboard:TicketFlowTickets",
+      "rating:TicketFlowTickets",
+      "list:TicketFlowMyRatings",
+      "assistantSession:TicketFlowTickets",
+      "uploadAttachment:TicketFlowTickets",
+      "attachmentFile:TicketFlowTickets",
+      "chatMessages:TicketFlowTickets",
+      "chatSend:TicketFlowTickets",
+      "chatUpload:TicketFlowTickets",
+      "chatRead:TicketFlowTickets",
+      "chatFile:TicketFlowTickets",
       "TicketFlowAssistant",
       "list:TicketFlowAssistant",
       "create:TicketFlowAssistant",
@@ -40,7 +52,6 @@
       "context:TicketFlowAssistant"
     ],
     "ticketflow_agent": [
-      "TicketFlow",
       "TicketFlowTickets",
       "list:TicketFlowTickets",
       "create:TicketFlowTickets",
@@ -56,10 +67,16 @@
       "list:TicketFlowMyRatings",
       "TicketFlowMyRatings",
       "summary:TicketFlowMyRatings",
-      "assistantSession:TicketFlowTickets"
+      "assistantSession:TicketFlowTickets",
+      "uploadAttachment:TicketFlowTickets",
+      "attachmentFile:TicketFlowTickets",
+      "chatMessages:TicketFlowTickets",
+      "chatSend:TicketFlowTickets",
+      "chatUpload:TicketFlowTickets",
+      "chatRead:TicketFlowTickets",
+      "chatFile:TicketFlowTickets"
     ],
     "ticketflow_admin": [
-      "TicketFlow",
       "TicketFlowTickets",
       "list:TicketFlowTickets",
       "create:TicketFlowTickets",
@@ -99,7 +116,14 @@
       "TicketFlowAssistantFeedback",
       "downvotes:TicketFlowAssistantFeedback",
       "handoffs:TicketFlowAssistantFeedback",
-      "summary:TicketFlowAssistantFeedback"
+      "summary:TicketFlowAssistantFeedback",
+      "uploadAttachment:TicketFlowTickets",
+      "attachmentFile:TicketFlowTickets",
+      "chatMessages:TicketFlowTickets",
+      "chatSend:TicketFlowTickets",
+      "chatUpload:TicketFlowTickets",
+      "chatRead:TicketFlowTickets",
+      "chatFile:TicketFlowTickets"
     ]
   }
 }

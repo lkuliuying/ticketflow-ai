@@ -132,7 +132,7 @@ class TestOnlineReverseIndex:
 class TestOnlineLayersBatch:
     """批量在线 channel 查询：展示口径走 5s 快照，动作口径（强制下线）强制实时。"""
 
-    def test_snapshot_builds_once_and_serves_from_cache(self, layer):
+    def test_snapshot_builds_once_and_serves_from_cache(self, layer, monkeypatch):
         _beat(layer, 9001, "c1")
         _beat(layer, 9002, "c2")
         calls = []
@@ -142,7 +142,7 @@ class TestOnlineLayersBatch:
             calls.append(list(groups))
             return await original(groups)
 
-        layer.get_layers_for_groups = spy
+        monkeypatch.setattr(layer, "get_layers_for_groups", spy)
 
         first = msg_utils.get_online_users_layers([9001, 9002, 9001])  # 重复 pk 自动去重
         second = msg_utils.get_online_users_layers([9002])
@@ -280,11 +280,51 @@ class TestBatchPush:
         SiteMessageUtil.push_notice_messages(msg, list(range(50)))
         assert calls == {"push_messages": 1}
 
-    def test_push_notice_messages_dispatches_celery_job(self, monkeypatch):
+    def test_concurrent_eager_pushes_leave_task_join_available(self, monkeypatch, settings):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+
+        from celery import _state
+
+        settings.CELERY_TASK_ALWAYS_EAGER = True
+        monkeypatch.setattr(_state, "_task_join_will_block", False)
+        monkeypatch.setattr("notifications.message.get_online_users", lambda: [1, 2])
+        monkeypatch.setattr(
+            "notifications.message.batch_user_config", lambda pks, key, default=None: dict.fromkeys(pks, True)
+        )
+        msg = self._make_message()
+        first_entered, second_entered, first_returned = Event(), Event(), Event()
+        delivered = []
+
+        def push(pks, message, message_type):
+            if pks == [1]:
+                first_entered.set()
+                assert second_entered.wait(10)
+            else:
+                second_entered.set()
+                assert first_returned.wait(10)
+            delivered.extend(pks)
+
+        monkeypatch.setattr("message.ws.utils.push_messages", push)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(SiteMessageUtil.push_notice_messages, msg, [1])
+            assert first_entered.wait(10)
+            second = pool.submit(SiteMessageUtil.push_notice_messages, msg, [2])
+            try:
+                first.result(timeout=10)
+            finally:
+                first_returned.set()
+            second.result(timeout=10)
+
+        assert sorted(delivered) == [1, 2]
+        assert not _state.task_join_will_block()
+
+    def test_push_notice_messages_dispatches_celery_job(self, monkeypatch, settings):
         """全量扇出改由 Celery 任务投递（请求线程不再直接逐人推送），参数为 JSON 原生类型。"""
         import json
         from types import SimpleNamespace
 
+        settings.CELERY_TASK_ALWAYS_EAGER = False
         msg = self._make_message()
         monkeypatch.setattr("notifications.message.get_online_users", lambda: [1, 2])
         monkeypatch.setattr(

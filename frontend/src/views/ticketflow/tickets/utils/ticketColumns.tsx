@@ -53,6 +53,21 @@ function renderTag(type: TagType | undefined, text: string) {
 export function useTicketColumns({ t, te }: { t: TFunction; te: TeFunction }) {
   const listColumnsFormat = (columns: PageTableColumn[]) =>
     formatPageColumns(columns, {
+      title: column => {
+        column["cellRenderer"] = ({ row }) => {
+          const item = row as TicketItem;
+          const unread = item.unread_chat_count ?? 0;
+          if (!unread) return h("span", item.title);
+          return h("div", { class: "flex items-center gap-2 min-w-0" }, [
+            h("span", { class: "truncate" }, item.title),
+            h(
+              ElTag,
+              { size: "small", type: "danger", effect: "dark", round: true },
+              () => t("ticketflow.detail.unreadCount", { count: unread })
+            )
+          ]);
+        };
+      },
       status: column => {
         column["cellRenderer"] = ({ row }) => {
           const status = (row as TicketItem).status;

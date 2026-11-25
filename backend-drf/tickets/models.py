@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Upper
 
 from common.core.models import DbAuditModel, DbBaseModel, DbUuidModel, SoftDeleteModel
 
@@ -67,6 +69,8 @@ class Ticket(DbAuditModel, DbUuidModel):
             models.Index(fields=["department", "status"], name="tf_dept_status_idx"),
             models.Index(fields=["submitter", "-created_time"], name="tf_submitter_created_idx"),
             models.Index(fields=["sla_due_at"], condition=models.Q(resolved_at__isnull=True), name="tf_active_sla_idx"),
+            GinIndex(OpClass(Upper("title"), name="gin_trgm_ops"), name="tf_ticket_title_trgm_idx"),
+            GinIndex(OpClass(Upper("number"), name="gin_trgm_ops"), name="tf_ticket_number_trgm_idx"),
         ]
 
     def __str__(self) -> str:
@@ -264,3 +268,61 @@ class AssistantFeedback(DbBaseModel, DbUuidModel):
         verbose_name = "助手反馈"
         ordering = ("-updated_time", "-id")
         indexes = [models.Index(fields=["vote", "-updated_time", "-id"], name="tf_assistant_feedback_idx")]
+
+
+class TicketAttachment(DbUuidModel):
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="attachments")
+    file = models.ForeignKey("file.UploadFile", on_delete=models.PROTECT, related_name="ticket_attachments")
+    uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "工单图片附件"
+        ordering = ("sort_order", "created_time", "id")
+        constraints = [models.UniqueConstraint(fields=["ticket", "file"], name="tf_ticket_attachment_once")]
+
+
+class TicketChatMessage(DbUuidModel):
+    class Kind(models.TextChoices):
+        TEXT = "TEXT", "文本"
+        IMAGE = "IMAGE", "图片"
+        VIDEO = "VIDEO", "视频"
+        SYSTEM = "SYSTEM", "系统"
+
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="chat_messages")
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    kind = models.CharField(max_length=8, choices=Kind.choices, default=Kind.TEXT)
+    content = models.TextField(blank=True, default="")
+    attachment = models.ForeignKey(
+        "file.UploadFile", on_delete=models.PROTECT, null=True, blank=True, related_name="ticket_chat_messages"
+    )
+    media_meta = models.JSONField(default=dict, blank=True)
+    media_expired = models.BooleanField(default=False)
+    client_msg_id = models.CharField(max_length=64, blank=True, default="")
+    created_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "工单排查消息"
+        ordering = ("created_time", "id")
+        indexes = [models.Index(fields=["ticket", "created_time", "id"], name="tf_chat_msg_ticket_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ticket", "sender", "client_msg_id"],
+                condition=~models.Q(client_msg_id=""),
+                name="tf_chat_msg_client_once",
+            )
+        ]
+
+
+class TicketChatReadState(DbUuidModel):
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="chat_read_states")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    last_read_time = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "工单会话已读游标"
+        constraints = [models.UniqueConstraint(fields=["ticket", "user"], name="tf_chat_read_once")]
+        indexes = [models.Index(fields=["user", "ticket"], name="tf_chat_read_user_idx")]

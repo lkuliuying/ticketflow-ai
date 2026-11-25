@@ -29,12 +29,20 @@ logger = logging.getLogger(__name__)
 
 class ChatStream:
     def __init__(
-        self, resources: Resources, body: ChatRequest, context: QuestionContext, raw_token: str, slot: AsyncExitStack
+        self,
+        resources: Resources,
+        body: ChatRequest,
+        context: QuestionContext,
+        raw_token: str,
+        slot: AsyncExitStack,
+        *,
+        user_id: str | int | None = None,
     ) -> None:
         self.resources = resources
         self.body = body
         self.context = context
         self.raw_token = raw_token
+        self.user_id = user_id
         self.slot = slot
         self.meta = ChatMeta(
             session_id=body.session_id,
@@ -55,7 +63,9 @@ class ChatStream:
         )
         with CancelScope(shield=True):
             await self.slot.aclose()
-            result = await record_answer(self.resources, self.meta.session_id, body, self.raw_token)
+            result = await record_answer(
+                self.resources, self.meta.session_id, body, self.raw_token, user_id=self.user_id
+            )
         return result.assistant_message_id
 
     async def _store_partial(self, status: AnswerStatus) -> None:

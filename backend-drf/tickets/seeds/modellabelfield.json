@@ -376,5 +376,25 @@
       "label": "助手会话",
       "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
     }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000212",
+    "fields": {
+      "field_type": 0,
+      "name": "unread_chat_count",
+      "label": "未读会话消息数",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
+  },
+  {
+    "model": "system.modellabelfield",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000213",
+    "fields": {
+      "field_type": 0,
+      "name": "attachment_ids",
+      "label": "工单图片",
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000012"
+    }
   }
 ]

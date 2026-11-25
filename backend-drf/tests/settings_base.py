@@ -20,6 +20,7 @@ from server.settings import *  # noqa: F401,F403
 DEBUG = False
 DEBUG_DEV = False
 SECRET_KEY = "test-only-secret-key-0123456789abcdef"
+TICKETFLOW_INTERNAL_API_SECRET = "test-shared-internal-secret"
 
 # 验证码测试基座：保持既有用例的最小语义（风险层/强绑定由专项用例显式打开），
 # 生产默认值仍是 enforce + 强绑定（见 server/conf/settings_defaults.py）。

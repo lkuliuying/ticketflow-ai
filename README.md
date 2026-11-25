@@ -1,7 +1,6 @@
 # TicketFlow AI
 
-TicketFlow AI 是一个面向企业内部支持团队的工单与知识库协作平台：提交人建单，客服接单处理，AI 帮客服分析工单、起草回复，
-解决的问题可以一键沉淀为知识库文章。底座是 [xadmin-server](https://github.com/nineaiyu/xadmin-server)（Django / DRF）
+TicketFlow AI 是一个面向企业内部支持团队的工单与知识库协作平台：普通员工可先向 AI 助手提问或建单（支持附带必要截图），技术员接单后通过实时排查会话（文字/图片/视频）协作解决，AI 帮技术员分析工单、起草回复，解决的问题可以一键（或由 AI 提炼）沉淀为知识库文章。底座是 [xadmin-server](https://github.com/nineaiyu/xadmin-server)（Django / DRF）
 和 [xadmin-client](https://github.com/nineaiyu/xadmin-client)（Vue 3 / Element Plus），AI 能力是独立的 FastAPI 异步服务。
 
 | 目录 | 内容 |
@@ -49,8 +48,8 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 python deploy/local.py seed
 ```
 
-打开 `http://127.0.0.1:8080`，演示账号的口令在 Git 忽略的 `deploy/.accounts.local.json`。`tf_requester` 是提交人，
-`tf_agent` 是客服（看得到 AI 面板），`tf_agent_other` 是另一个部门的客服，`tf_admin` 是业务管理员。
+打开 `http://127.0.0.1:8080`，演示账号的口令在 Git 忽略的 `deploy/.accounts.local.json`。`tf_requester` 是普通员工，
+`tf_agent` 是技术员（看得到 AI 面板与排查会话），`tf_agent_other` 是网络支持组技术员，`tf_admin` 是管理员。
 
 前置条件、日志、停止与清理、升级、常见故障都在 [deploy/README.md](deploy/README.md)。验收与冒烟：
 

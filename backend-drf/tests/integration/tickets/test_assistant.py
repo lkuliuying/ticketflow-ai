@@ -115,15 +115,17 @@ def test_role_guards_apply_even_after_extra_menu_grants(users, employee, client_
 
 
 def test_internal_context_uses_bearer_scope_published_articles_and_bounded_history(users, teammate):
-    employee = authenticated(users["requester"])
+    employee = authenticated(users["requester"], internal=True)
     session_id = new_session(employee)["pk"]
     path = f"{INTERNAL}/{session_id}"
     assert_error(APIClient().post(f"{path}/question", {"message": "VPN"}, format="json"), 401)
     refresh = RefreshToken.for_user(users["requester"])
     assert_error(APIClient(HTTP_AUTHORIZATION=f"Bearer {refresh}").get(f"{path}/context"), 401)
-    assert_error(authenticated(teammate).post(f"{path}/question", {"message": "VPN"}, format="json"), 404)
-    assert_error(authenticated(users["agent"]).get(f"{path}/context"), 403)
-    assert_error(authenticated(users["admin"]).get(f"{path}/context"), 403)
+    assert_error(
+        authenticated(teammate, internal=True).post(f"{path}/question", {"message": "VPN"}, format="json"), 404
+    )
+    assert_error(authenticated(users["agent"], internal=True).get(f"{path}/context"), 403)
+    assert_error(authenticated(users["admin"], internal=True).get(f"{path}/context"), 403)
 
     articles = [
         KnowledgeArticle.objects.create(

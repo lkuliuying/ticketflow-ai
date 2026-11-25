@@ -1,4 +1,5 @@
-from collections.abc import Iterator
+import time
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from hashlib import sha256
 from uuid import uuid4
@@ -11,6 +12,8 @@ from rest_framework.exceptions import APIException, Throttled
 TICKET_CACHE_KEY_PREFIX = "ticketflow:ticket:"
 IDEMPOTENCY_TTL = 86400
 WINDOW_SECONDS = 60
+LOCK_WAIT_ATTEMPTS = 20
+LOCK_WAIT_INTERVAL = 0.05
 RELEASE = """
 if redis.call('GET', KEYS[1]) == ARGV[1] then
     return redis.call('DEL', KEYS[1])
@@ -49,11 +52,17 @@ def check_rate(user_id: int, action: str, limit: int) -> None:
 
 @contextmanager
 def reserve_create(key: str) -> Iterator[None]:
+    """Serialize duplicate create requests in Redis before hitting DB constraints."""
     lock_key = cache.make_key(f"{key}:lock")
     owner = uuid4().hex
     redis = get_redis_connection()
+    acquired = False
     try:
-        acquired = redis.set(lock_key, owner, nx=True, ex=15)
+        for _ in range(LOCK_WAIT_ATTEMPTS):
+            acquired = bool(redis.set(lock_key, owner, nx=True, ex=15))
+            if acquired or cache.get(key) is not None:
+                break
+            time.sleep(LOCK_WAIT_INTERVAL)
     except RedisError:
         acquired = False
     try:
@@ -71,15 +80,36 @@ def request_key(user_id: int, key_hash: str) -> str:
     return f"{TICKET_CACHE_KEY_PREFIX}create:{user_id}:{key_hash}"
 
 
-def invalidate_dashboard() -> None:
-    cache.set(f"{TICKET_CACHE_KEY_PREFIX}dashboard:revision", uuid4().hex, timeout=None)
+def _admin_revision_key() -> str:
+    return f"{TICKET_CACHE_KEY_PREFIX}dashboard:rev:admin"
 
 
-def dashboard_key(user_id: int, sql: str, params: tuple[object, ...]) -> str:
-    revision_key = f"{TICKET_CACHE_KEY_PREFIX}dashboard:revision"
+def _user_revision_key(user_id: int) -> str:
+    return f"{TICKET_CACHE_KEY_PREFIX}dashboard:rev:user:{user_id}"
+
+
+def invalidate_dashboard(user_ids: Iterable[int | None] | None = None) -> None:
+    """Bump admin revision and affected users' dashboard revisions."""
+    revision = uuid4().hex
+    cache.set(_admin_revision_key(), revision, timeout=None)
+    if user_ids is None:
+        cache.set(f"{TICKET_CACHE_KEY_PREFIX}dashboard:revision", revision, timeout=None)
+        return
+    for user_id in {uid for uid in user_ids if uid is not None}:
+        cache.set(_user_revision_key(user_id), revision, timeout=None)
+
+
+def _get_or_init_revision(revision_key: str) -> str:
     revision = cache.get(revision_key)
     if revision is None:
-        cache.add(revision_key, uuid4().hex, timeout=None)
-        revision = cache.get(revision_key)
+        token = uuid4().hex
+        cache.add(revision_key, token, timeout=None)
+        revision = cache.get(revision_key) or token
+    return str(revision)
+
+
+def dashboard_key(user_id: int, sql: str, params: tuple[object, ...], *, is_admin: bool = False) -> str:
+    global_rev = _get_or_init_revision(f"{TICKET_CACHE_KEY_PREFIX}dashboard:revision")
+    scope_rev = _get_or_init_revision(_admin_revision_key() if is_admin else _user_revision_key(user_id))
     digest = sha256(repr((sql, params)).encode()).hexdigest()
-    return f"{TICKET_CACHE_KEY_PREFIX}dashboard:{user_id}:{revision}:{digest}"
+    return f"{TICKET_CACHE_KEY_PREFIX}dashboard:{user_id}:{global_rev}:{scope_rev}:{digest}"

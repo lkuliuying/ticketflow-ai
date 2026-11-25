@@ -23,6 +23,19 @@ export const analyzeTicket = (ticketId: string) =>
     data: { ticket_id: ticketId }
   });
 
+export type TicketKbDraft = {
+  ticket_id: string;
+  title: string;
+  category: string;
+  tags: string[];
+  body_markdown: string;
+};
+
+export const generateKbDraft = (ticketId: string) =>
+  http.request<TicketKbDraft>("post", `${BASE}/kb-draft`, {
+    data: { ticket_id: ticketId }
+  });
+
 export type ReplyStatus =
   "idle" | "streaming" | "done" | "error" | "stopped" | "interrupted";
 

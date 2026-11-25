@@ -53,5 +53,6 @@
   "src/views/ticketflow/assistant/components/FeedbackForm.vue": "AI 回答点踩：提交目标是回答的反馈动作（可改投），固定词表单选原因与补充说明无对应模型元数据面",
   "src/views/ticketflow/assistant/components/HandoffForm.vue": "AI 转人工提单：表单由 AI 草稿预填，提交时需附带会话关联与建单幂等键，元数据表单无法表达",
   "src/views/ticketflow/knowledge/components/ArticleEditor.vue": "知识库文章编辑：标签为可自由新增的字符串数组、正文需 Markdown 预览，且同一表单承担从工单转存的预填与 source_ticket_id 提交，元数据表单无法表达",
-  "src/views/ticketflow/ratings/components/RatingForm.vue": "工单评价：提交目标是工单的评价动作（一次性、不可修改），星级与固定词表多选标签无对应模型元数据面"
+  "src/views/ticketflow/ratings/components/RatingForm.vue": "工单评价：提交目标是工单的评价动作（一次性、不可修改），星级与固定词表多选标签无对应模型元数据面",
+  "src/views/ticketflow/tickets/components/TicketCreateForm.vue": "新建工单：需支持必要图片多图上传、粘贴截图与幂等键提交流程，元数据表单无法表达"
 }

@@ -18,7 +18,7 @@
       "properties": {
         "can_handle": {"type": "boolean"},
         "can_assign": {"type": "boolean", "description": "管理员在工单未关闭时，且同时持有 assign:TicketFlowTickets 和 assignees:TicketFlowTickets；超级用户免菜单权限检查。"},
-        "can_reply": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。"},
+        "can_reply": {"type": "boolean", "description": "持有 chatSend:TicketFlowTickets 菜单权限且为提交人或可处理工单。实际能否发消息以 chat_state.can_send 为准。"},
         "can_comment_internal": {"type": "boolean", "description": "持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"},
         "can_archive": {"type": "boolean", "description": "已关闭且尚未转存时，管理员或当前及历史技术员持有知识库创建权限即可转存。"},
         "can_return": {"type": "boolean", "description": "仅当前处理工单且有退回权限的技术员，工单须未关闭。"},
@@ -66,7 +66,154 @@
         "description": {"type": "string", "minLength": 1, "maxLength": 20000},
         "category": {"$ref": "#/$defs/category"},
         "priority": {"$ref": "#/$defs/priority"},
-        "assistant_session_id": {"type": ["string", "null"], "format": "uuid", "description": "可选，null 等同省略。仅普通员工可提交本人未删除且尚未关联工单的会话。关联与建单同事务，参与幂等请求摘要。"}
+        "assistant_session_id": {"type": ["string", "null"], "format": "uuid", "description": "可选，null 等同省略。仅普通员工可提交本人未删除且尚未关联工单的会话。关联与建单同事务，参与幂等请求摘要。"},
+        "attachment_ids": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/ticketMediaId"}, "description": "可选，工单媒体上传接口返回的本人图片 ID，最多 5 张。"}
+      }
+    },
+    "ticketMediaId": {"type": "string", "pattern": "^[1-9][0-9]{0,18}$", "description": "正整数文件主键的十进制字符串，最大值 9223372036854775807。写入端点兼容已有的 JSON 整数输入。"},
+    "ticketMediaUpload": {
+      "type": "object",
+      "description": "POST /api/tickets/attachments/upload（图片）或 POST /api/tickets/{id}/chat/upload（图片或视频），multipart 字段 file。成功 201，图片上限 10 MiB，视频上限 30 MiB，超频 429，限流依赖不可用 503。",
+      "required": ["file_pk", "kind", "filename", "filesize", "mime_type"],
+      "properties": {
+        "file_pk": {"$ref": "#/$defs/ticketMediaId"},
+        "kind": {"enum": ["IMAGE", "VIDEO"]},
+        "filename": {"type": "string"},
+        "filesize": {"type": "integer", "minimum": 1},
+        "mime_type": {"type": "string"}
+      }
+    },
+    "ticketAttachment": {
+      "type": "object",
+      "description": "GET /api/tickets/{id}/attachments/{attachment_id} 返回图片文件。可指定 size=thumb 或 size=preview。",
+      "required": ["id", "filename", "filesize", "mime_type", "url", "thumb_url"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "filename": {"type": "string"},
+        "filesize": {"type": "integer"},
+        "mime_type": {"type": "string"},
+        "url": {"type": "string"},
+        "thumb_url": {"type": "string"}
+      }
+    },
+    "ticketChatState": {
+      "type": "object",
+      "required": ["can_send", "lock_reason"],
+      "properties": {
+        "can_send": {"type": "boolean"},
+        "lock_reason": {"enum": ["", "CLOSED", "WAITING_ACCEPT", "WAITING_RESUME", "UNASSIGNED", "READ_ONLY"]}
+      }
+    },
+    "ticketListChat": {
+      "type": "object",
+      "required": ["unread_chat_count"],
+      "properties": {"unread_chat_count": {"type": "integer", "minimum": 0}}
+    },
+    "ticketDetailChat": {
+      "type": "object",
+      "required": ["attachments", "chat_state"],
+      "properties": {
+        "attachments": {"type": "array", "items": {"$ref": "#/$defs/ticketAttachment"}},
+        "chat_state": {"$ref": "#/$defs/ticketChatState"}
+      }
+    },
+    "ticketChatQuery": {
+      "type": "object",
+      "description": "GET /api/tickets/{id}/chat/messages。游标必须属于本工单，两个游标互斥，无效参数返回 400。",
+      "not": {"required": ["before_id", "after_id"]},
+      "properties": {
+        "before_id": {"type": "string", "format": "uuid"},
+        "after_id": {"type": "string", "format": "uuid"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}
+      }
+    },
+    "ticketChatInput": {
+      "type": "object",
+      "description": "POST /api/tickets/{id}/chat/messages。新消息 201，工单内同一发送人的 client_msg_id 幂等重放返回 200。",
+      "properties": {
+        "kind": {"enum": ["TEXT", "IMAGE", "VIDEO"], "default": "TEXT"},
+        "content": {"type": "string", "maxLength": 4000},
+        "file_pk": {"oneOf": [{"$ref": "#/$defs/ticketMediaId"}, {"type": "null"}]},
+        "client_msg_id": {"type": "string", "maxLength": 64}
+      }
+    },
+    "ticketChatMessage": {
+      "type": "object",
+      "description": "GET /api/tickets/{id}/chat/messages/{message_id}/file 返回图片或视频。视频支持 206 分段和 416 不可满足的 Range；过期媒体返回 404。",
+      "required": ["id", "ticket_id", "sender_id", "sender_name", "kind", "content", "media_meta", "media_expired", "file_url", "thumb_url", "client_msg_id", "created_time"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "ticket_id": {"type": "string", "format": "uuid"},
+        "sender_id": {"type": ["integer", "null"]},
+        "sender_name": {"type": "string"},
+        "kind": {"enum": ["TEXT", "IMAGE", "VIDEO", "SYSTEM"]},
+        "content": {"type": "string"},
+        "media_meta": {"type": "object", "properties": {"filename": {"type": "string"}, "filesize": {"type": "integer"}, "mime_type": {"type": "string"}}},
+        "media_expired": {"type": "boolean"},
+        "file_url": {"type": ["string", "null"]},
+        "thumb_url": {"type": ["string", "null"]},
+        "client_msg_id": {"type": "string"},
+        "created_time": {"type": "string", "format": "date-time"}
+      }
+    },
+    "ticketChatPage": {
+      "type": "object",
+      "description": "消息按时间及 ID 升序返回。默认取最新页，before_id 向前翻页，after_id 向后补拉。has_more 表示指定方向有下一页。",
+      "required": ["results", "has_more", "chat_state"],
+      "properties": {
+        "results": {"type": "array", "items": {"$ref": "#/$defs/ticketChatMessage"}},
+        "has_more": {"type": "boolean"},
+        "chat_state": {"$ref": "#/$defs/ticketChatState"}
+      }
+    },
+    "ticketChatMarkRead": {
+      "type": "object",
+      "description": "POST /api/tickets/{id}/chat/read 无请求体，成功更新当前用户已读时间。",
+      "required": ["code"],
+      "properties": {"code": {"const": 1000}}
+    },
+    "ticketChatWsInput": {
+      "type": "object",
+      "description": "客户端帧，连接 /ws/tickets/{id}/chat/。",
+      "required": ["action"],
+      "properties": {"action": {"enum": ["ping", "mark_read"]}}
+    },
+    "ticketChatWsFrame": {
+      "description": "服务端帧。连接发送 chat.state，新消息发送 chat.message，ping 返回 pong。失去访问权限关闭码 4403，通道故障 1011。",
+      "oneOf": [
+        {"type": "object", "required": ["event", "data"], "properties": {"event": {"const": "chat.state"}, "data": {"$ref": "#/$defs/ticketChatState"}}},
+        {"type": "object", "required": ["event", "data"], "properties": {"event": {"const": "chat.message"}, "data": {"$ref": "#/$defs/ticketChatMessage"}}},
+        {"type": "object", "required": ["event"], "properties": {"event": {"const": "pong"}}}
+      ]
+    },
+    "ticketCommentInput": {
+      "type": "object",
+      "description": "POST /api/tickets/{id}/comments 仅新建内部备注。PUBLIC 返回 400，请使用排查会话。",
+      "required": ["body", "visibility"],
+      "properties": {"body": {"type": "string", "minLength": 1, "maxLength": 20000}, "visibility": {"const": "INTERNAL"}}
+    },
+    "ticketAiContext": {
+      "type": "object",
+      "description": "GET /api/tickets/{id}/ai-context 需要用户 JWT 和内部令牌。purpose=kb-draft 也允许持有草稿转存权限的历史处理人访问未转存的已关闭工单。省略或留空使用普通上下文，其他 purpose 返回 400。",
+      "required": ["ticket", "categories", "references", "recent_messages"],
+      "properties": {
+        "ticket": {"type": "object", "required": ["id", "title", "description", "category", "priority", "version"], "properties": {"id": {"type": "string", "format": "uuid"}, "title": {"type": "string"}, "description": {"type": "string"}, "category": {"$ref": "#/$defs/category"}, "priority": {"$ref": "#/$defs/priority"}, "version": {"type": "integer"}}},
+        "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+        "references": {"type": "array", "items": {"$ref": "#/$defs/assistantExcerpt"}},
+        "recent_messages": {"type": "array", "maxItems": 12, "items": {"type": "object", "required": ["role", "sender", "content", "created_time"], "properties": {"role": {"enum": ["submitter", "handler", "system"]}, "sender": {"type": "string"}, "content": {"type": "string"}, "created_time": {"type": "string", "format": "date-time"}}}}
+      }
+    },
+    "ticketKnowledgeDraft": {
+      "type": "object",
+      "description": "POST /ai/v1/tickets/kb-draft 接收 ticket_id (UUID)，以获准的工单、排查消息和知识片段生成草稿，不自动保存。",
+      "required": ["ticket_id", "title", "category", "tags", "body_markdown", "references"],
+      "properties": {
+        "ticket_id": {"type": "string", "format": "uuid"},
+        "title": {"type": "string"},
+        "category": {"$ref": "#/$defs/category"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "body_markdown": {"type": "string"},
+        "references": {"type": "array", "items": {"$ref": "#/$defs/assistantReference"}}
       }
     },
     "ticketDetailAssistant": {
@@ -255,7 +402,7 @@
     },
     "ticketReturn": {
       "type": "object",
-      "description": "POST /api/tickets/{id}/return。返回更新后的工单，处理人为空，状态不变，版本递增；可见但无权退回为 403，状态或版本冲突为 409。",
+      "description": "POST /api/tickets/{id}/return。返回更新后的工单，处理人为空，处理中状态回退为待处理，版本递增；可见但无权退回为 403，状态或版本冲突为 409。",
       "required": ["version", "reason"],
       "properties": {
         "version": {"type": "integer", "minimum": 1},

@@ -40,8 +40,8 @@ class TicketViewerSerializer(serializers.Serializer):
     can_handle = serializers.BooleanField()
     can_assign = serializers.BooleanField(help_text="管理员对未关闭工单同时持有指派和候选人权限时可用。")
     can_reply = serializers.BooleanField(
-        help_text="持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。"
-        "超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。"
+        help_text="持有 chatSend:TicketFlowTickets 菜单权限且为提交人或可处理工单。"
+        "实际能否发送以 chat_state.can_send 为准。"
     )
     can_comment_internal = serializers.BooleanField(
         help_text="持有 comments:TicketFlowTickets 菜单权限且可处理工单时可写内部备注。超级用户免菜单权限检查。"
@@ -57,9 +57,25 @@ class TicketViewerSerializer(serializers.Serializer):
     )
 
 
+class TicketAttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    filename = serializers.CharField()
+    filesize = serializers.IntegerField()
+    mime_type = serializers.CharField()
+    thumb_url = serializers.CharField()
+    url = serializers.CharField()
+
+
+class TicketChatStateSerializer(serializers.Serializer):
+    can_send = serializers.BooleanField()
+    lock_reason = serializers.CharField(allow_blank=True)
+
+
 class TicketDetailSerializer(TicketSerializer):
     viewer = TicketViewerSerializer(read_only=True)
     assistant_session_id = serializers.UUIDField(read_only=True, allow_null=True)
+    attachments = TicketAttachmentSerializer(many=True, read_only=True)
+    chat_state = TicketChatStateSerializer(read_only=True)
     rating = TicketRatingSerializer(
         read_only=True,
         allow_null=True,
@@ -79,6 +95,8 @@ class TicketDetailSerializer(TicketSerializer):
             "timeline",
             "rating",
             "assistant_session_id",
+            "attachments",
+            "chat_state",
         )
 
 

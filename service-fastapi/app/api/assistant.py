@@ -25,7 +25,7 @@ async def prepare_chat(body: ChatRequest, user: CurrentUser, resources: AppResou
         # Reserve capacity before creating a question so a full queue leaves no unanswered turn.
         await slot.enter_async_context(upstream_slot(resources))
         context = await record_question(resources, body, user.raw_token)
-        yield ChatStream(resources, body, context, user.raw_token, slot)
+        yield ChatStream(resources, body, context, user.raw_token, slot, user_id=user.user_id)
 
 
 @router.post(

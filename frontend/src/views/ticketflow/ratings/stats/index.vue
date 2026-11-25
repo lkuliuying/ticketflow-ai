@@ -21,13 +21,15 @@ const period = ref<[string, string] | null>(null);
 const {
   api,
   auth,
+  canSummary,
   summary,
   summaryLoading,
   loadSummary,
   listColumnsFormat,
+  searchColumnsFormat,
   operationButtonsProps
   // 评价列表与汇总在后端共用一组路径权限点（list / summary:TicketFlowMyRatings）
-} = useRatings("TicketFlowMyRatings");
+} = useRatings("TicketFlowMyRatings", { mode: "stats" });
 
 const handlers = computed(() => summary.value?.by_handler ?? []);
 
@@ -65,7 +67,9 @@ const rowClassName = ({ row }: { row: HandlerRatingStats }) =>
 
 defineExpose({ drillDown, applyPeriod });
 
-onMounted(() => loadSummary());
+onMounted(() => {
+  if (canSummary) void loadSummary();
+});
 </script>
 
 <template>
@@ -80,7 +84,11 @@ onMounted(() => loadSummary());
         @change="applyPeriod"
       />
     </div>
-    <RatingSummaryCards :stats="summary" :loading="summaryLoading" />
+    <RatingSummaryCards
+      v-if="canSummary"
+      :stats="summary"
+      :loading="summaryLoading"
+    />
     <el-card shadow="never" data-testid="rating-by-handler">
       <template #header>
         <span class="font-medium">{{ t("ticketflow.rating.byHandler") }}</span>
@@ -132,6 +140,7 @@ onMounted(() => loadSummary());
       locale-name="ticketflow.rating"
       :selection="false"
       :listColumnsFormat="listColumnsFormat"
+      :searchColumnsFormat="searchColumnsFormat"
       :operationButtonsProps="operationButtonsProps"
     />
   </div>

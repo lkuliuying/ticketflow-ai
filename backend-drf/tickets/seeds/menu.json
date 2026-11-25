@@ -7,13 +7,13 @@
       "path": "/ticketflow/tickets/index",
       "component": "ticketflow/tickets/index",
       "menu_type": 1,
-      "rank": 1,
+      "rank": 30,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000011",
       "method": "",
       "model": [
         "d2431bc0-217a-49eb-a6fa-000000000012"
       ],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -248,13 +248,13 @@
       "path": "/ticketflow/ratings/mine/index",
       "component": "ticketflow/ratings/mine/index",
       "menu_type": 1,
-      "rank": 3,
+      "rank": 33,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000099",
       "method": "",
       "model": [
         "d2431bc0-217a-49eb-a6fa-000000000110"
       ],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -265,13 +265,13 @@
       "path": "/ticketflow/ratings/stats/index",
       "component": "ticketflow/ratings/stats/index",
       "menu_type": 1,
-      "rank": 4,
+      "rank": 34,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000101",
       "method": "",
       "model": [
         "d2431bc0-217a-49eb-a6fa-000000000110"
       ],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -330,11 +330,11 @@
       "path": "/ticketflow/accounts/index",
       "component": "ticketflow/accounts/index",
       "menu_type": 1,
-      "rank": 5,
+      "rank": 35,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000131",
       "method": "",
       "model": [],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -415,11 +415,11 @@
       "path": "/ticketflow/skill-groups/index",
       "component": "ticketflow/skill-groups/index",
       "menu_type": 1,
-      "rank": 6,
+      "rank": 36,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000145",
       "method": "",
       "model": [],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -528,11 +528,11 @@
       "path": "/ticketflow/assistant/index",
       "component": "ticketflow/assistant/index",
       "menu_type": 1,
-      "rank": 7,
+      "rank": 32,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000183",
       "method": "",
       "model": [],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -543,11 +543,11 @@
       "path": "/ticketflow/assistant/feedback/index",
       "component": "ticketflow/assistant/feedback/index",
       "menu_type": 1,
-      "rank": 8,
+      "rank": 37,
       "meta": "d2431bc0-217a-49eb-a6fa-000000000185",
       "method": "",
       "model": [],
-      "parent": "d2431bc0-217a-49eb-a6fa-000000000090"
+      "parent": null
     }
   },
   {
@@ -715,6 +715,104 @@
       "path": "api/assistant/feedback/summary$",
       "method": "GET",
       "meta": "d2431bc0-217a-49eb-a6fa-000000000209",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000210",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "uploadAttachment:TicketFlowTickets",
+      "rank": 19,
+      "path": "api/tickets/attachments/upload$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000211",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000212",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "attachmentFile:TicketFlowTickets",
+      "rank": 20,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/attachments/(?P<attachment_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000213",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000214",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "chatMessages:TicketFlowTickets",
+      "rank": 21,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/chat/messages$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000215",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000216",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "chatSend:TicketFlowTickets",
+      "rank": 22,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/chat/messages$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000217",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000218",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "chatUpload:TicketFlowTickets",
+      "rank": 23,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/chat/upload$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000219",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000220",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "chatRead:TicketFlowTickets",
+      "rank": 24,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/chat/read$",
+      "method": "POST",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000221",
+      "model": []
+    }
+  },
+  {
+    "model": "system.menu",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000222",
+    "fields": {
+      "parent": "d2431bc0-217a-49eb-a6fa-000000000010",
+      "menu_type": 2,
+      "name": "chatFile:TicketFlowTickets",
+      "rank": 25,
+      "path": "api/tickets/(?P<pk>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/chat/messages/(?P<message_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/file$",
+      "method": "GET",
+      "meta": "d2431bc0-217a-49eb-a6fa-000000000223",
       "model": []
     }
   }

@@ -44,15 +44,17 @@ def _menu_tree(db):
     """两级菜单树，parent/child 均带 meta"""
     parent_meta = MenuMeta.objects.create(title="系统管理")
     parent = Menu.objects.create(name="系统管理", path="system", menu_type=Menu.MenuChoices.DIRECTORY, meta=parent_meta)
-    for i, name in enumerate(["用户管理", "角色管理"]):
+    # 按 rank 的逆序创建，确保断言覆盖显式菜单顺序。
+    for name, resource, rank in [("角色管理", "role", 20), ("用户管理", "user", 10)]:
         meta = MenuMeta.objects.create(title=name)
         Menu.objects.create(
             name=name,
-            path=f"api/system/{'user' if i == 0 else 'role'}$",
+            path=f"api/system/{resource}$",
             method="GET",
             menu_type=Menu.MenuChoices.MENU,
             parent=parent,
             meta=meta,
+            rank=rank,
         )
     return parent
 

@@ -3,9 +3,10 @@ from uuid import UUID
 
 from django.apps import apps
 from django.core.cache import cache
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, F, Q, QuerySet
 from django.http import Http404
 from django.urls.converters import UUIDConverter
+from django.utils import timezone
 from django.utils.functional import cached_property
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework.decorators import action
@@ -20,7 +21,7 @@ from common.core.modelset.metadata import SearchColumnsAction, SearchFieldsActio
 from common.core.permission import get_user_permission_codes
 from common.core.response import ApiResponse
 from identity.models import UserInfo
-from tickets import services
+from tickets import chat_services, services
 from tickets.api_schema import (
     assignees_result,
     comment_result,
@@ -35,6 +36,7 @@ from tickets.api_schema import (
 from tickets.assistant_schema import assistant_errors, page_parameters, ticket_session_result
 from tickets.assistant_serializers import AssistantSessionSerializer, AssistantTranscriptMessageSerializer
 from tickets.cache import check_rate, dashboard_key
+from tickets.chat_views import TicketMediaChatMixin
 from tickets.filters import TicketFilter
 from tickets.models import Status, Ticket
 from tickets.policy import TicketAccess, assignment_candidates, has_permission
@@ -55,7 +57,13 @@ from tickets.timeline import first_page, timeline_rows
 
 @extend_schema_view(list=extend_schema(responses=ticket_list_result))
 class TicketViewSet(
-    BaseViewSet, DetailAction, SearchColumnsAction, SearchFieldsAction, OnlyExportDataAction, GenericViewSet
+    TicketMediaChatMixin,
+    BaseViewSet,
+    DetailAction,
+    SearchColumnsAction,
+    SearchFieldsAction,
+    OnlyExportDataAction,
+    GenericViewSet,
 ):
     """工单"""
 
@@ -87,7 +95,9 @@ class TicketViewSet(
             return self.queryset.none()
         queryset = self.access.scope(super().get_queryset())
         if self.action == "retrieve":
-            return queryset.select_related("rating__rater", "rating__handler", "assistant_session")
+            return queryset.select_related("rating__rater", "rating__handler", "assistant_session").prefetch_related(
+                "attachments__file"
+            )
         return queryset
 
     def data_permission_fallback_q(self, request: Request) -> Q:
@@ -109,6 +119,18 @@ class TicketViewSet(
         serializer.is_valid(raise_exception=True)
         return serializer.validated_data
 
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> ApiResponse:
+        """工单列表"""
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        items = list(page) if page is not None else list(queryset)
+        counts = chat_services.unread_counts([item.pk for item in items], self.actor.pk)
+        context = {**self.get_serializer_context(), "unread_chat_counts": counts}
+        serializer = self.get_serializer(items, many=True, context=context)
+        if page is not None:
+            return ApiResponse(data=self.get_paginated_response(serializer.data).data)
+        return ApiResponse(data=serializer.data)
+
     @extend_schema(
         parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)],
         responses={200: ticket_result, 201: ticket_result, **assistant_errors, 409: ticket_error_result},
@@ -121,10 +143,15 @@ class TicketViewSet(
         check_rate(self.actor.pk, "create", 30)
         values = dict(self._values(request))
         session_id = values.pop("assistant_session_id", None)
+        attachment_ids = values.pop("attachment_ids", None)
         if session_id is None and request.data.get("assistant_session_id") is not None:
             raise PermissionDenied("无权关联助手会话")
         ticket, created = services.create_ticket(
-            self.actor, key, cast(services.NewTicket, values), assistant_session_id=session_id
+            self.actor,
+            key,
+            cast(services.NewTicket, values),
+            assistant_session_id=session_id,
+            attachment_ids=attachment_ids,
         )
         return self._ticket_response(ticket, status=201 if created else 200)
 
@@ -138,13 +165,14 @@ class TicketViewSet(
         is_superuser = self.actor.is_superuser
         permission_codes = set() if is_superuser else get_user_permission_codes(self.actor)
         can_comment = is_superuser or "comments:TicketFlowTickets" in permission_codes
+        can_send = is_superuser or chat_services.CHAT_SEND_PERMISSION in permission_codes
         rating = getattr(ticket, "rating", None)
         data["viewer"] = {
             "can_handle": can_handle,
             "can_assign": self.access.admin
             and ticket.status != Status.CLOSED
             and (is_superuser or {"assign:TicketFlowTickets", "assignees:TicketFlowTickets"} <= permission_codes),
-            "can_reply": can_comment and self.access.can_reply(ticket),
+            "can_reply": can_send and self.access.can_reply(ticket),
             "can_comment_internal": can_comment and can_handle,
             "can_return": self.access.can_return(ticket) and "returnTicket:TicketFlowTickets" in permission_codes,
             "can_rate": (
@@ -174,6 +202,18 @@ class TicketViewSet(
             is_superuser or "assistantSession:TicketFlowTickets" in permission_codes
         )
         data["assistant_session_id"] = str(session.pk) if session is not None and can_read_session else None
+        data["attachments"] = [
+            {
+                "id": str(att.pk),
+                "filename": att.file.filename,
+                "filesize": att.file.filesize,
+                "mime_type": att.file.mime_type or "",
+                "thumb_url": f"/api/tickets/{ticket.pk}/attachments/{att.pk}?size=thumb",
+                "url": f"/api/tickets/{ticket.pk}/attachments/{att.pk}",
+            }
+            for att in ticket.attachments.all()
+        ]
+        data["chat_state"] = chat_services.chat_state(ticket, self.access, can_send=can_send)
         return ApiResponse(data=data)
 
     @extend_schema(parameters=page_parameters, responses={200: ticket_session_result, **assistant_errors})
@@ -267,7 +307,7 @@ class TicketViewSet(
         ticket = services.return_ticket(scope, pk, self.actor, self.access, **self._values(request))
         return self._ticket_response(ticket)
 
-    @extend_schema(responses={201: comment_result})
+    @extend_schema(responses={201: comment_result, 400: ticket_error_result})
     @action(detail=True, methods=["post"])
     def comments(self, request: Request, pk: UUID) -> ApiResponse:
         """工单回复"""
@@ -293,22 +333,39 @@ class TicketViewSet(
         queryset = self.filter_queryset(self.get_queryset()).order_by()
         sql, params = ("", ()) if queryset.query.is_empty() else queryset.query.sql_with_params()
         assignments = ("unassigned",) if self.access.admin else ("current", "history") if self.access.agent else ()
-        key = dashboard_key(self.actor.pk, sql, (*params, assignments))
+        key = dashboard_key(self.actor.pk, sql, (*params, assignments), is_admin=self.access.admin)
         data = cache.get(key)
         if data is None:
+            now = timezone.now()
+            active = Q(resolved_at__isnull=True)
+            aggregates: dict[str, Any] = {
+                "sla_DUE_SOON": Count(
+                    "pk", filter=active & Q(sla_due_at__gt=now, sla_due_at__lte=now + services.SLA_WARNING)
+                ),
+                "sla_OVERDUE": Count(
+                    "pk", filter=(active & Q(sla_due_at__lte=now)) | Q(resolved_at__gt=F("sla_due_at"))
+                ),
+                "sla_MET": Count("pk", filter=Q(resolved_at__lte=F("sla_due_at"))),
+                "sla_ON_TRACK": Count("pk", filter=active & Q(sla_due_at__gt=now + services.SLA_WARNING)),
+            }
+            if "unassigned" in assignments:
+                aggregates["assign_unassigned"] = Count(
+                    "pk", filter=Q(assignee__isnull=True) & ~Q(status=Status.CLOSED)
+                )
+            if "current" in assignments:
+                aggregates["assign_current"] = Count("pk", filter=Q(assignee_id=self.actor.pk))
+            if "history" in assignments:
+                aggregates["assign_history"] = Count(
+                    "pk", filter=Q(self.access.history()) & ~Q(assignee_id=self.actor.pk)
+                )
+            totals = queryset.aggregate(**aggregates)
             data = {
                 "status": dict(queryset.values("status").annotate(total=Count("pk")).values_list("status", "total")),
                 "priority": dict(
                     queryset.values("priority").annotate(total=Count("pk")).values_list("priority", "total")
                 ),
-                "sla": {
-                    state: TicketFilter().filter_sla(queryset, "sla", state).count()
-                    for state in ("DUE_SOON", "OVERDUE", "MET", "ON_TRACK")
-                },
-                "assignment": {
-                    assignment: self.access.assignment_filter(queryset, assignment).count()
-                    for assignment in assignments
-                },
+                "sla": {state: totals[f"sla_{state}"] for state in ("DUE_SOON", "OVERDUE", "MET", "ON_TRACK")},
+                "assignment": {assignment: totals[f"assign_{assignment}"] for assignment in assignments},
             }
-            cache.set(key, data, 30)
+            cache.set(key, data, 15)
         return ApiResponse(data=data)

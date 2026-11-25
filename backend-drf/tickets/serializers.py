@@ -1,4 +1,7 @@
+from typing import Any
+
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from common.core.serializers import BaseModelSerializer
@@ -23,6 +26,7 @@ class TicketSerializer(BaseModelSerializer):
     assignee_name = serializers.CharField(source="assignee.username", read_only=True, allow_null=True)
     department_name = serializers.CharField(source="department.name", read_only=True, help_text="技能组名称")
     sla_state = serializers.SerializerMethodField()
+    unread_chat_count = serializers.SerializerMethodField()
     sla_due_at = serializers.DateTimeField(format="iso-8601", read_only=True)
     first_response_at = serializers.DateTimeField(format="iso-8601", read_only=True, allow_null=True)
     resolved_at = serializers.DateTimeField(format="iso-8601", read_only=True, allow_null=True)
@@ -47,6 +51,7 @@ class TicketSerializer(BaseModelSerializer):
             "department_name",
             "sla_due_at",
             "sla_state",
+            "unread_chat_count",
             "first_response_at",
             "resolved_at",
             "ai_summary",
@@ -66,6 +71,20 @@ class TicketSerializer(BaseModelSerializer):
             return "OVERDUE"
         return "DUE_SOON" if ticket.sla_due_at <= now + SLA_WARNING else "ON_TRACK"
 
+    def get_unread_chat_count(self, ticket: Ticket) -> int:
+        counts = self.context.get("unread_chat_counts")
+        if not isinstance(counts, dict):
+            return 0
+        return int(counts.get(ticket.pk, 0))
+
+
+@extend_schema_field({"type": "string", "pattern": "^[1-9][0-9]{0,18}$"})
+class TicketMediaIdField(serializers.IntegerField):
+    """Decimal string on the wire, integer for database lookups."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(min_value=1, max_value=2**63 - 1, **kwargs)
+
 
 class TicketCreateSerializer(BaseModelSerializer):
     title = serializers.CharField(max_length=200)
@@ -73,10 +92,17 @@ class TicketCreateSerializer(BaseModelSerializer):
     category = serializers.ChoiceField(choices=Category.choices)
     priority = serializers.ChoiceField(choices=Priority.choices)
     assistant_session_id = serializers.UUIDField(required=False, allow_null=True, write_only=True, label="助手会话")
+    attachment_ids = serializers.ListField(
+        child=TicketMediaIdField(),
+        max_length=5,
+        required=False,
+        write_only=True,
+        label="工单图片",
+    )
 
     class Meta:
         model = Ticket
-        fields = ("title", "description", "category", "priority", "assistant_session_id")
+        fields = ("title", "description", "category", "priority", "assistant_session_id", "attachment_ids")
 
 
 class TicketColumnsSerializer(TicketSerializer):
@@ -104,7 +130,10 @@ class AssignmentReturnSerializer(serializers.Serializer):
 
 class CommentSerializer(serializers.Serializer):
     body = serializers.CharField(max_length=20000)
-    visibility = serializers.ChoiceField(choices=Visibility.choices)
+    visibility = serializers.ChoiceField(
+        choices=(Visibility.INTERNAL,),
+        error_messages={"invalid_choice": "仅支持内部备注。对外回复请使用工单排查会话"},
+    )
 
 
 class SuggestionSerializer(serializers.Serializer):

@@ -225,6 +225,10 @@ if any(app.split(".", 1)[0] == "tickets" for app in CONFIG.XADMIN_APPS):
         "task": "tickets.tasks.scan_ticket_sla",
         "schedule": 60.0,
     }
+    CELERY_BEAT_SCHEDULE["cleanup-ticketflow-expired-videos"] = {
+        "task": "tickets.tasks.cleanup_expired_ticket_videos",
+        "schedule": 86400.0,
+    }
 
 # 队列路由：heavy 队列承载导入/导出/批量操作等重任务（background_task_view_set_job），
 # 避免慢任务阻塞邮件/短信/站内信等轻量任务；worker 由 start celery_heavy 拉起消费 heavy 队列。

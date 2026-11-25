@@ -291,10 +291,11 @@ class TestValidate:
         # 工单评价：两页和三个权限点、14 个字段节点、8 条字段白名单。
         # 账号与技能组管理：两页和 11 个权限点。
         # 员工助手和管理员反馈：两页、13 个权限点、一个建单的会话 ID 字段。
-        assert summary.totals["menu"] == 801
-        assert summary.totals["field"] == 2211
+        # 工单媒体与排查会话：移除目录、增加七个权限点及两个字段节点。
+        assert summary.totals["menu"] == 807
+        assert summary.totals["field"] == 2213
         assert summary.totals["grant"] == 306
-        assert summary.permission_total == 713
+        assert summary.permission_total == 720
 
 
 class TestRows:

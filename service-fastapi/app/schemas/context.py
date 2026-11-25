@@ -22,10 +22,18 @@ class KnowledgeReference(Reference):
     excerpt: str
 
 
+class TicketChatTurn(BaseModel):
+    role: str
+    sender: str
+    content: str
+    created_time: str = ""
+
+
 class TicketContext(BaseModel):
     ticket: ContextTicket
     categories: Annotated[list[str], Field(min_length=1)]
     references: list[KnowledgeReference]
+    recent_messages: list[TicketChatTurn] = Field(default_factory=list)
 
 
 class DrfResponse[T](BaseModel):

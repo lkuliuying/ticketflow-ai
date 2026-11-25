@@ -470,6 +470,12 @@
             },
             "type": "array"
           },
+          "recent_messages": {
+            "items": {
+              "$ref": "#/components/schemas/TicketChatTurn"
+            },
+            "type": "array"
+          },
           "references": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeReference"
@@ -482,6 +488,7 @@
         },
         "required": [
           "categories",
+          "recent_messages",
           "references",
           "ticket"
         ],
@@ -4481,6 +4488,137 @@
         ],
         "type": "object"
       },
+      "ChatMessage": {
+        "properties": {
+          "client_msg_id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "created_time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "file_url": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChatMessageKindEnum"
+          },
+          "media_expired": {
+            "type": "boolean"
+          },
+          "media_meta": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "sender_id": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "sender_name": {
+            "type": "string"
+          },
+          "thumb_url": {
+            "nullable": true,
+            "type": "string"
+          },
+          "ticket_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_msg_id",
+          "content",
+          "created_time",
+          "file_url",
+          "id",
+          "kind",
+          "media_expired",
+          "media_meta",
+          "sender_id",
+          "sender_name",
+          "thumb_url",
+          "ticket_id"
+        ],
+        "type": "object"
+      },
+      "ChatMessageInput": {
+        "properties": {
+          "client_msg_id": {
+            "default": "",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "content": {
+            "default": "",
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "file_pk": {
+            "nullable": true,
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMessageInputKindEnum"
+              }
+            ],
+            "default": "TEXT"
+          }
+        },
+        "type": "object"
+      },
+      "ChatMessageInputKindEnum": {
+        "description": "* `TEXT` - TEXT\n* `IMAGE` - IMAGE\n* `VIDEO` - VIDEO",
+        "enum": [
+          "TEXT",
+          "IMAGE",
+          "VIDEO"
+        ],
+        "type": "string"
+      },
+      "ChatMessageKindEnum": {
+        "description": "* `TEXT` - 文本\n* `IMAGE` - 图片\n* `VIDEO` - 视频\n* `SYSTEM` - 系统",
+        "enum": [
+          "TEXT",
+          "IMAGE",
+          "VIDEO",
+          "SYSTEM"
+        ],
+        "type": "string"
+      },
+      "ChatPage": {
+        "properties": {
+          "chat_state": {
+            "$ref": "#/components/schemas/TicketChatState"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "chat_state",
+          "has_more",
+          "results"
+        ],
+        "type": "object"
+      },
       "CodegenPlan": {
         "properties": {
           "created_time": {
@@ -6717,14 +6855,6 @@
         ],
         "type": "object"
       },
-      "KindEnum": {
-        "description": "* `log` - log\n* `comment` - comment",
-        "enum": [
-          "log",
-          "comment"
-        ],
-        "type": "string"
-      },
       "KnowledgeArticlePage": {
         "properties": {
           "can_create_standalone": {
@@ -7567,6 +7697,55 @@
           "url"
         ],
         "type": "object"
+      },
+      "MediaUpload": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      },
+      "MediaUploadResult": {
+        "properties": {
+          "file_pk": {
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "filesize": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MediaUploadResultKindEnum"
+          },
+          "mime_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_pk",
+          "filename",
+          "filesize",
+          "kind",
+          "mime_type"
+        ],
+        "type": "object"
+      },
+      "MediaUploadResultKindEnum": {
+        "description": "* `IMAGE` - IMAGE\n* `VIDEO` - VIDEO",
+        "enum": [
+          "IMAGE",
+          "VIDEO"
+        ],
+        "type": "string"
       },
       "Menu": {
         "description": "「未删除数据」条件唯一校验（软删模型序列化器复用）。\n\n名称/编码的唯一性为 ``Meta.constraints`` 的活跃行条件约束：DRF 不会为带\ncondition 的 UniqueConstraint 自动生成校验器，此处显式校验保证重复时返回\n400 而非数据库 IntegrityError；软删除行不占用名称/编码。\n\n使用：混入序列化器并提供 ``Meta.model``（默认管理器即活跃行口径）。",
@@ -19671,6 +19850,10 @@
             "title": "标题",
             "type": "string"
           },
+          "unread_chat_count": {
+            "readOnly": true,
+            "type": "integer"
+          },
           "updated_time": {
             "format": "date-time",
             "readOnly": true,
@@ -19702,6 +19885,7 @@
           "submitter_id",
           "submitter_name",
           "title",
+          "unread_chat_count",
           "updated_time",
           "version"
         ],
@@ -19806,6 +19990,163 @@
         ],
         "type": "object"
       },
+      "TicketAttachment": {
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "filesize": {
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "thumb_url": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "filesize",
+          "id",
+          "mime_type",
+          "thumb_url",
+          "url"
+        ],
+        "type": "object"
+      },
+      "TicketChatMessageResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChatMessage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketChatPageResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChatPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketChatReadResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketChatState": {
+        "properties": {
+          "can_send": {
+            "type": "boolean"
+          },
+          "lock_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "can_send",
+          "lock_reason"
+        ],
+        "type": "object"
+      },
+      "TicketChatTurn": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "created_time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/TicketChatTurnRoleEnum"
+          },
+          "sender": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "created_time",
+          "role",
+          "sender"
+        ],
+        "type": "object"
+      },
+      "TicketChatTurnRoleEnum": {
+        "description": "* `submitter` - submitter\n* `handler` - handler\n* `system` - system",
+        "enum": [
+          "submitter",
+          "handler",
+          "system"
+        ],
+        "type": "string"
+      },
       "TicketCommentResult": {
         "properties": {
           "code": {
@@ -19872,6 +20213,16 @@
             "nullable": true,
             "title": "助手会话",
             "type": "string",
+            "writeOnly": true
+          },
+          "attachment_ids": {
+            "items": {
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "工单图片",
+            "type": "array",
             "writeOnly": true
           },
           "category": {
@@ -19986,6 +20337,13 @@
             "readOnly": true,
             "type": "string"
           },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/TicketAttachment"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
           "available_transitions": {
             "description": "提交人的验收或重开动作在历史只读时仍可用。",
             "items": {
@@ -20002,6 +20360,14 @@
             ],
             "readOnly": true,
             "title": "分类"
+          },
+          "chat_state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TicketChatState"
+              }
+            ],
+            "readOnly": true
           },
           "created_time": {
             "format": "date-time",
@@ -20099,6 +20465,10 @@
             "title": "标题",
             "type": "string"
           },
+          "unread_chat_count": {
+            "readOnly": true,
+            "type": "integer"
+          },
           "updated_time": {
             "format": "date-time",
             "readOnly": true,
@@ -20123,8 +20493,10 @@
           "assignee_id",
           "assignee_name",
           "assistant_session_id",
+          "attachments",
           "available_transitions",
           "category",
+          "chat_state",
           "created_time",
           "department_id",
           "department_name",
@@ -20142,6 +20514,7 @@
           "submitter_name",
           "timeline",
           "title",
+          "unread_chat_count",
           "updated_time",
           "version",
           "viewer"
@@ -20440,6 +20813,33 @@
           },
           "data": {
             "$ref": "#/components/schemas/TicketPage"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "data",
+          "detail",
+          "requestId",
+          "timestamp"
+        ],
+        "type": "object"
+      },
+      "TicketMediaUploadResult": {
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MediaUploadResult"
           },
           "detail": {
             "type": "string"
@@ -20769,7 +21169,7 @@
             "type": "boolean"
           },
           "can_reply": {
-            "description": "持有 comments:TicketFlowTickets 菜单权限，且可处理工单或为工单提交人时可对外回复。超级用户免菜单权限检查。工单状态和提交人的历史处理身份不影响此能力。",
+            "description": "持有 chatSend:TicketFlowTickets 菜单权限且为提交人或可处理工单。实际能否发送以 chat_state.can_send 为准。",
             "type": "boolean"
           },
           "can_return": {
@@ -20817,7 +21217,7 @@
             "type": "string"
           },
           "kind": {
-            "$ref": "#/components/schemas/KindEnum"
+            "$ref": "#/components/schemas/TimelineEntryKindEnum"
           },
           "to_status": {
             "nullable": true,
@@ -20839,6 +21239,14 @@
           "visibility"
         ],
         "type": "object"
+      },
+      "TimelineEntryKindEnum": {
+        "description": "* `log` - log\n* `comment` - comment",
+        "enum": [
+          "log",
+          "comment"
+        ],
+        "type": "string"
       },
       "TokenRefresh": {
         "properties": {
@@ -21831,9 +22239,8 @@
         "type": "object"
       },
       "VisibilityEnum": {
-        "description": "* `PUBLIC` - 对外回复\n* `INTERNAL` - 内部备注",
+        "description": "* `INTERNAL` - INTERNAL",
         "enum": [
-          "PUBLIC",
           "INTERNAL"
         ],
         "type": "string"
@@ -34331,9 +34738,24 @@
     },
     "/api/assistant/internal/sessions/{id}/answer": {
       "post": {
-        "description": "仅供 FastAPI 内网调用。转人工后仍可写回已有提问的回答，重放返回首次保存的回答 ID。",
+        "description": "FastAPI 可使用内部令牌与用户 ID 写回已有提问的回答。用户 JWT 若提供须通过认证。重放返回首次保存的回答 ID。",
         "operationId": "api_assistant_internal_sessions_answer_create",
         "parameters": [
+          {
+            "in": "header",
+            "name": "X-Internal-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Internal-User-Id",
+            "schema": {
+              "type": "integer"
+            }
+          },
           {
             "description": "会话 UUID",
             "in": "path",
@@ -34470,6 +34892,14 @@
         "operationId": "api_assistant_internal_sessions_context_retrieve",
         "parameters": [
           {
+            "in": "header",
+            "name": "X-Internal-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "会话 UUID",
             "in": "path",
             "name": "id",
@@ -34574,6 +35004,14 @@
         "description": "仅供 FastAPI 从内网转发同一用户 Bearer token。返回历史和发布知识片段，历史排除本次问题。会话已转人工时返回 409，请新建对话。",
         "operationId": "api_assistant_internal_sessions_question_create",
         "parameters": [
+          {
+            "in": "header",
+            "name": "X-Internal-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "description": "会话 UUID",
             "in": "path",
@@ -101772,7 +102210,7 @@
     },
     "/api/tickets": {
       "get": {
-        "description": "获取{cls}的列表",
+        "description": "工单列表",
         "operationId": "api_tickets_list",
         "parameters": [
           {
@@ -102028,6 +102466,72 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/attachments/upload": {
+      "post": {
+        "description": "上传工单图片",
+        "operationId": "api_tickets_attachments_upload_create",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketMediaUploadResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -102450,11 +102954,30 @@
         "operationId": "api_tickets_ai_context_retrieve",
         "parameters": [
           {
+            "in": "header",
+            "name": "X-Internal-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "id",
             "required": true,
             "schema": {
               "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "已关闭工单的知识库草稿提炼。省略或留空使用普通上下文，其他值返回 400。",
+            "in": "query",
+            "name": "purpose",
+            "schema": {
+              "enum": [
+                "kb-draft"
+              ],
               "type": "string"
             }
           }
@@ -102465,6 +102988,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketAiContextResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
                 }
               }
             },
@@ -102769,6 +103352,559 @@
         ]
       }
     },
+    "/api/tickets/{id}/attachments/{attachment_id}": {
+      "get": {
+        "description": "读取工单图片",
+        "operationId": "api_tickets_attachments_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "图片尺寸：thumb 或 preview",
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/chat/messages": {
+      "get": {
+        "description": "查询排查消息",
+        "operationId": "api_tickets_chat_messages_retrieve",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after_id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChatPageResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      },
+      "post": {
+        "description": "发送排查消息",
+        "operationId": "api_tickets_chat_messages_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            },
+            "text/xlsx": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChatMessageResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChatMessageResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/chat/messages/{message_id}/file": {
+      "get": {
+        "description": "读取排查媒体",
+        "operationId": "api_tickets_chat_messages_file_retrieve",
+        "parameters": [
+          {
+            "description": "视频的单字节范围",
+            "in": "header",
+            "name": "Range",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "图片尺寸：thumb 或 preview",
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "video/mp4": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "video/webm": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          },
+          "206": {
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "video/webm": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Content-Range": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "416": {
+            "description": "No response body",
+            "headers": {
+              "Content-Range": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/chat/read": {
+      "post": {
+        "description": "标记会话已读",
+        "operationId": "api_tickets_chat_read_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChatReadResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
+    "/api/tickets/{id}/chat/upload": {
+      "post": {
+        "description": "上传排查媒体",
+        "operationId": "api_tickets_chat_upload_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketMediaUploadResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "CookieJWTAuthentication": []
+          }
+        ],
+        "tags": [
+          "TicketViewSet"
+        ]
+      }
+    },
     "/api/tickets/{id}/comments": {
       "post": {
         "description": "工单回复",
@@ -102820,6 +103956,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketCommentResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
                 }
               }
             },

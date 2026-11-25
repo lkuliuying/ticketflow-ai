@@ -11,19 +11,27 @@ const tableRef = ref();
 const {
   api,
   auth,
+  canSummary,
   summary,
   summaryLoading,
   loadSummary,
   listColumnsFormat,
+  searchColumnsFormat,
   operationButtonsProps
-} = useRatings("TicketFlowMyRatings");
+} = useRatings("TicketFlowMyRatings", { mode: "mine" });
 
-onMounted(() => loadSummary());
+onMounted(() => {
+  if (canSummary) void loadSummary();
+});
 </script>
 
 <template>
   <div class="main flex flex-col gap-4">
-    <RatingSummaryCards :stats="summary" :loading="summaryLoading" />
+    <RatingSummaryCards
+      v-if="canSummary"
+      :stats="summary"
+      :loading="summaryLoading"
+    />
     <RePlusPage
       ref="tableRef"
       :api="api"
@@ -31,6 +39,7 @@ onMounted(() => loadSummary());
       locale-name="ticketflow.rating"
       :selection="false"
       :listColumnsFormat="listColumnsFormat"
+      :searchColumnsFormat="searchColumnsFormat"
       :operationButtonsProps="operationButtonsProps"
     />
   </div>

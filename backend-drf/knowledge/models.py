@@ -1,6 +1,7 @@
 from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models.functions import Upper
+from pgvector.django import VectorField
 
 from common.core.models import DbAuditModel, DbUuidModel
 
@@ -33,3 +34,20 @@ class KnowledgeArticle(DbAuditModel, DbUuidModel):
 
     def __str__(self) -> str:
         return self.title
+
+
+class KnowledgeChunk(DbUuidModel):
+    article = models.ForeignKey(KnowledgeArticle, on_delete=models.CASCADE, related_name="chunks")
+    chunk_index = models.PositiveIntegerField()
+    content = models.TextField()
+    embedding_vector = VectorField(blank=True, editable=False, null=True)
+    embedding_model = models.CharField(max_length=128, blank=True, default="")
+
+    class Meta:
+        verbose_name = "知识分块"
+        ordering = ("article", "chunk_index")
+        constraints = [models.UniqueConstraint(fields=["article", "chunk_index"], name="tf_kb_chunk_once")]
+        indexes = [models.Index(fields=["article", "chunk_index"], name="tf_kb_chunk_order_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.article_id}#{self.chunk_index}"
