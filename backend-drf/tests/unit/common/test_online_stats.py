@@ -132,7 +132,7 @@ class TestOnlineReverseIndex:
 class TestOnlineLayersBatch:
     """批量在线 channel 查询：展示口径走 5s 快照，动作口径（强制下线）强制实时。"""
 
-    def test_snapshot_builds_once_and_serves_from_cache(self, layer):
+    def test_snapshot_builds_once_and_serves_from_cache(self, layer, monkeypatch):
         _beat(layer, 9001, "c1")
         _beat(layer, 9002, "c2")
         calls = []
@@ -142,7 +142,7 @@ class TestOnlineLayersBatch:
             calls.append(list(groups))
             return await original(groups)
 
-        layer.get_layers_for_groups = spy
+        monkeypatch.setattr(layer, "get_layers_for_groups", spy)
 
         first = msg_utils.get_online_users_layers([9001, 9002, 9001])  # 重复 pk 自动去重
         second = msg_utils.get_online_users_layers([9002])
