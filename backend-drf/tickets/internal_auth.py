@@ -20,13 +20,11 @@ def has_valid_internal_token(request: Request) -> bool:
     if not expected:
         return False
     provided = str(request.headers.get(INTERNAL_TOKEN_HEADER, "") or "").strip()
-    return bool(provided) and hmac.compare_digest(provided, expected)
+    return bool(provided) and hmac.compare_digest(provided.encode(), expected.encode())
 
 
 def verify_internal_request(request: Request) -> None:
-    """Enforce the shared internal service secret when configured."""
-    if not configured_internal_secret():
-        return
+    """Require a configured, valid shared secret for all internal routes."""
     if not has_valid_internal_token(request):
         raise PermissionDenied("缺少有效的内部服务凭证")
 
@@ -41,7 +39,7 @@ class InternalServiceUserAuthentication(BaseAuthentication):
         if not has_valid_internal_token(request):
             return None
         raw_user_id = str(request.headers.get(INTERNAL_USER_HEADER, "") or "").strip()
-        if not raw_user_id or not raw_user_id.isdigit():
+        if not raw_user_id.isascii() or not raw_user_id.isdecimal() or len(raw_user_id) > 19:
             return None
         user_model = get_user_model()
         user = user_model.objects.filter(pk=int(raw_user_id), is_active=True).first()

@@ -45,6 +45,10 @@ CAPTCHA_TICKET_SECRET:
 # DEBUG 模式 开启DEBUG后遇到错误时可以看到更多日志，正式服要禁用，开发阶段，需要取消该注释，否则会导致前端ws连接失败
 # DEBUG: true
 
+# 仅本地开发示例，需与本地 FastAPI 的 INTERNAL_API_SECRET 一致。
+# 生产请使用独立生成的密钥。
+TICKETFLOW_INTERNAL_API_SECRET: "local-ticketflow-internal-dev-only"
+
 # DEBUG, INFO, WARNING, ERROR, CRITICAL can set. See https://docs.djangoproject.com/zh-hans/5.0/topics/logging/
 # 日志级别
 # LOG_LEVEL: DEBUG

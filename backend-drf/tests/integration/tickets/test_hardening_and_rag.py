@@ -5,9 +5,11 @@ import pytest
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from common.cache.storage import UserTokenRevokedCache
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from knowledge.services import references_for_text
 from notifications.models import MessageContent
+from system.models import Menu
 from tests.integration.tickets.test_ticket_api import assert_error, authenticated
 from tickets.models import Category, Priority, Status, Ticket, TicketSlaAlert
 from tickets.tasks import scan_ticket_sla
@@ -45,9 +47,8 @@ def test_internal_secret_guards_ai_context_and_allows_service_answer_writeback(u
     assert asked.status_code == 201, asked.data
     user_message_id = asked.data["data"]["user_message_id"]
 
-    # Simulate an expired or missing user JWT while FastAPI writes back with service credentials.
+    # A service-only callback can finish a turn after the user JWT expires.
     service_client = APIClient()
-    service_client.credentials(HTTP_AUTHORIZATION="Bearer expired-invalid-token")
     saved = service_client.post(
         f"{INTERNAL_SESSIONS}/{session['pk']}/answer",
         {
@@ -62,6 +63,58 @@ def test_internal_secret_guards_ai_context_and_allows_service_answer_writeback(u
     )
     assert saved.status_code == 200, saved.data
     assert saved.data["data"]["assistant_message_id"]
+
+
+def test_internal_reads_never_accept_service_identity_or_revoked_jwt(users, make_ticket, settings):
+    user = users["requester"]
+    employee = authenticated(user)
+    session_id = employee.post("/api/assistant/sessions", {}, format="json").data["data"]["pk"]
+    path = f"{INTERNAL_SESSIONS}/{session_id}"
+    service = {
+        "HTTP_X_INTERNAL_TOKEN": settings.TICKETFLOW_INTERNAL_API_SECRET,
+        "HTTP_X_INTERNAL_USER_ID": str(user.pk),
+    }
+    payload = {"message": "VPN"}
+    unauthenticated = APIClient()
+    assert_error(unauthenticated.post(f"{path}/question", payload, format="json", **service), 401)
+    assert_error(unauthenticated.get(f"{path}/context", **service), 401)
+    assert_error(unauthenticated.get(f"{TICKETS}/{make_ticket().pk}/ai-context"), 401)
+    revoked = UserTokenRevokedCache(user.pk)
+    revoked.set_storage_cache(timezone.now().timestamp())
+    try:
+        assert_error(employee.post(f"{path}/question", payload, format="json", **service), 401)
+        assert_error(employee.get(f"{path}/context", **service), 401)
+        assert_error(employee.post(f"{path}/answer", {}, format="json", **service), 401)
+    finally:
+        revoked.del_storage_cache()
+    forged = APIClient(HTTP_AUTHORIZATION="Bearer invalid")
+    assert_error(forged.post(f"{path}/question", payload, format="json", **service), 401)
+
+
+def test_internal_routes_fail_closed_when_secret_is_empty(users, make_ticket, settings):
+    employee = authenticated(users["requester"])
+    session_id = employee.post("/api/assistant/sessions", {}, format="json").data["data"]["pk"]
+    settings.TICKETFLOW_INTERNAL_API_SECRET = " "
+    assert_error(employee.get(f"{INTERNAL_SESSIONS}/{session_id}/context", HTTP_X_INTERNAL_TOKEN="anything"), 403)
+    ticket = make_ticket(assignee=users["agent"])
+    assert_error(authenticated(users["agent"]).get(f"{TICKETS}/{ticket.pk}/ai-context"), 403)
+
+
+def test_kb_draft_context_requires_unarchived_ticket_and_create_permission(users, make_ticket, client_for):
+    agent = users["agent"]
+    ticket = make_ticket(status=Status.CLOSED, assignee=users["admin"])
+    ticket.assignments.create(assignee=agent, started_at=timezone.now(), ended_at=timezone.now())
+    api = client_for(agent)
+    path = f"{TICKETS}/{ticket.pk}/ai-context"
+    assert_error(api.get(path), 403)
+    assert api.get(path, {"purpose": "kb-draft"}).status_code == 200
+    grant = Menu.objects.get(name="create:TicketFlowKnowledge")
+    role = agent.roles.get()
+    role.menu.remove(grant)
+    assert_error(api.get(path, {"purpose": "kb-draft"}), 403)
+    role.menu.add(grant)
+    KnowledgeArticle.objects.create(title="已有转存", source_ticket=ticket)
+    assert_error(api.get(path, {"purpose": "kb-draft"}), 403)
 
 
 def test_save_ai_metadata_blocks_closed_and_recalculates_sla_on_priority_change(users, make_ticket, client_for):

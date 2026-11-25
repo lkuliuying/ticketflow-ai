@@ -45,6 +45,22 @@ async def test_drf_forwards_internal_secret_and_user_id_on_answer(context_respon
     assert result.assistant_message_id == TICKET
     assert seen_headers["x-internal-token"] == "shared-secret-value"
     assert seen_headers["x-internal-user-id"] == "42"
+    assert "authorization" not in seen_headers
+
+
+async def test_drf_reads_forward_user_jwt_without_service_identity(context_response):
+    seen_headers = {}
+
+    def transport(request):
+        seen_headers.update(dict(request.headers))
+        return httpx.Response(200, json=context_response)
+
+    async with make_resources(transport, internal_api_secret="shared-secret-value") as resources:
+        await drf.fetch_ticket_context(resources, TICKET, "user-jwt")
+
+    assert seen_headers["authorization"] == "Bearer user-jwt"
+    assert seen_headers["x-internal-token"] == "shared-secret-value"
+    assert "x-internal-user-id" not in seen_headers
 
 
 async def test_openai_provider_parses_fenced_json_and_kb_draft(context_response):
