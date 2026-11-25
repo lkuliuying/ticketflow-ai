@@ -111,7 +111,34 @@ export default defineComponent({
       { immediate: true }
     );
 
+    let accountSwitchNotified = false;
+    function handleAccountStorageChange(event: StorageEvent) {
+      if (event.key !== "user-info" || onLoginPage.value) return;
+      if (userStore.pk == null || accountSwitchNotified) return;
+      let nextPk: unknown = null;
+      if (event.newValue) {
+        try {
+          nextPk = (JSON.parse(event.newValue) as { pk?: unknown })?.pk ?? null;
+        } catch {
+          nextPk = null;
+        }
+      }
+      if (String(nextPk ?? "") === String(userStore.pk)) return;
+      accountSwitchNotified = true;
+      import("@/utils/message")
+        .then(({ message }) => {
+          message(transformI18n($t("commonLabels.accountSwitched")), {
+            type: "warning"
+          });
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          window.setTimeout(() => window.location.reload(), 800);
+        });
+    }
+
     onMounted(() => {
+      window.addEventListener("storage", handleAccountStorageChange);
       timer = window.setInterval(() => {
         if (siteWatermarkVisible.value)
           watermarkTime.value = formatWatermarkTime();
@@ -173,6 +200,7 @@ export default defineComponent({
     emitter.on("checkUpdatesChange", applyCheckUpdates);
 
     onBeforeUnmount(() => {
+      window.removeEventListener("storage", handleAccountStorageChange);
       if (timer) window.clearInterval(timer);
       emitter.off("checkUpdatesChange", applyCheckUpdates);
     });

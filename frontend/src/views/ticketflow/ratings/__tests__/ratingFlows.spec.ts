@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   addDialog: vi.fn(),
   rate: vi.fn(),
   summary: vi.fn(),
-  message: vi.fn()
+  message: vi.fn(),
+  canSummary: true
 }));
 
 vi.mock("vue-i18n", async importOriginal => {
@@ -29,7 +30,14 @@ vi.mock("@/api/ticketflow/ratings", async importOriginal => {
   return { ...actual, ratingApi: { summary: mocks.summary } };
 });
 vi.mock("@/router/utils", () => ({
-  usePageAuth: () => ({ list: true })
+  hasAuth: () => true,
+  usePageAuth: () => ({ list: true, summary: mocks.canSummary })
+}));
+vi.mock("@/store/modules/user", () => ({
+  useUserStoreHook: () => ({
+    username: "tf_agent",
+    nickname: "工单支持技术员"
+  })
 }));
 
 import { openRatingDialog } from "../utils/ratingDialog";
@@ -130,6 +138,64 @@ describe("评价汇总加载", () => {
     mocks.summary.mockRejectedValueOnce(new Error("boom"));
     await ratings.loadSummary();
     expect(ratings.summary.value).toBeNull();
+  });
+
+  it("无汇总权限时不请求 summary 接口，避免触发 403", async () => {
+    mocks.canSummary = false;
+    try {
+      let ratings!: ReturnType<typeof useRatings>;
+      const Host = defineComponent({
+        setup() {
+          ratings = useRatings("TicketFlowMyRatings");
+          return () => h("div");
+        }
+      });
+      mount(Host);
+      await ratings.loadSummary();
+      expect(ratings.canSummary).toBe(false);
+      expect(mocks.summary).not.toHaveBeenCalled();
+    } finally {
+      mocks.canSummary = true;
+    }
+  });
+
+  it("mine 模式将处理人筛选固定为当前技术员只读名称，stats 模式转为技术员名称下拉框", async () => {
+    mocks.summary.mockResolvedValue({
+      code: 1000,
+      data: {
+        count: 2,
+        by_handler: [{ handler_id: 3, handler_name: "tf_agent", count: 2 }]
+      }
+    });
+    let mine!: ReturnType<typeof useRatings>;
+    let stats!: ReturnType<typeof useRatings>;
+    const Host = defineComponent({
+      setup() {
+        mine = useRatings("TicketFlowMyRatings", { mode: "mine" });
+        stats = useRatings("TicketFlowMyRatings", { mode: "stats" });
+        return () => h("div");
+      }
+    });
+    mount(Host);
+    await stats.loadSummary();
+
+    const [mineCol] = mine.searchColumnsFormat([
+      { prop: "handler_id" } as never
+    ]);
+    expect(mineCol.valueType).toBe("input");
+    expect(typeof mineCol.renderField).toBe("function");
+    const rendered = mineCol.renderField?.(undefined, vi.fn(), {} as never) as {
+      props?: Record<string, unknown>;
+    };
+    expect(rendered?.props?.modelValue).toBe("工单支持技术员");
+    expect(rendered?.props?.disabled).toBe(true);
+
+    const [statsCol] = stats.searchColumnsFormat([
+      { prop: "handler_id" } as never
+    ]);
+    expect(statsCol.valueType).toBe("select");
+    const opts = (statsCol.options as { value: unknown[] }).value;
+    expect(opts).toEqual([{ label: "tf_agent", value: 3 }]);
   });
 });
 
