@@ -2,19 +2,16 @@
   "version": 1,
   "roles": {
     "default": [
-      "TicketFlow",
       "TicketFlowKnowledge",
       "list:TicketFlowKnowledge",
       "retrieve:TicketFlowKnowledge"
     ],
     "ticketflow_requester": [
-      "TicketFlow",
       "TicketFlowKnowledge",
       "list:TicketFlowKnowledge",
       "retrieve:TicketFlowKnowledge"
     ],
     "ticketflow_agent": [
-      "TicketFlow",
       "TicketFlowKnowledge",
       "list:TicketFlowKnowledge",
       "retrieve:TicketFlowKnowledge",
@@ -22,7 +19,6 @@
       "partialUpdate:TicketFlowKnowledge"
     ],
     "ticketflow_admin": [
-      "TicketFlow",
       "TicketFlowKnowledge",
       "list:TicketFlowKnowledge",
       "retrieve:TicketFlowKnowledge",

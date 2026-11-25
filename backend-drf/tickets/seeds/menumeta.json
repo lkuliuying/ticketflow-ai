@@ -348,5 +348,54 @@
     "fields": {
       "title": "AI 问答统计"
     }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000211",
+    "fields": {
+      "title": "上传工单图片"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000213",
+    "fields": {
+      "title": "读取工单图片"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000215",
+    "fields": {
+      "title": "查询排查消息"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000217",
+    "fields": {
+      "title": "发送排查消息"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000219",
+    "fields": {
+      "title": "上传排查媒体"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000221",
+    "fields": {
+      "title": "标记会话已读"
+    }
+  },
+  {
+    "model": "system.menumeta",
+    "pk": "d2431bc0-217a-49eb-a6fa-000000000223",
+    "fields": {
+      "title": "读取排查媒体"
+    }
   }
 ]
