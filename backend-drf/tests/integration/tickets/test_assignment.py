@@ -99,7 +99,7 @@ def test_reopen_dispatches_again_if_previous_handler_is_no_longer_eligible(users
 
 
 @pytest.mark.django_db
-def test_return_preserves_status_and_makes_the_previous_technician_read_only(
+def test_return_moves_in_progress_to_open_and_makes_the_previous_technician_read_only(
     users, make_ticket, client_for, django_capture_on_commit_callbacks
 ):
     agent = users["agent"]
@@ -137,7 +137,7 @@ def test_return_preserves_status_and_makes_the_previous_technician_read_only(
 
     for action, payload in (
         ("transition", {"target_status": Status.PENDING_VERIFY, "version": 2}),
-        ("comments", {"visibility": Visibility.PUBLIC, "body": "补充"}),
+        ("chat/messages", {"content": "补充"}),
         ("ai-metadata", {"version": 2, "summary": "草稿", "tags": []}),
         ("return", {"version": 2, "reason": reason}),
     ):
@@ -191,12 +191,35 @@ def test_historical_technician_keeps_own_ticket_submitter_actions(
     assert data["available_transitions"] == available
     assert api.get(f"{path}/ai-context").status_code == 403
 
-    for visibility, expected in ((Visibility.PUBLIC, 201), (Visibility.INTERNAL, 403)):
-        result = api.post(f"{path}/comments", {"body": "验收说明", "visibility": visibility}, format="json")
-        assert result.status_code == expected, result.data
+    result = api.post(f"{path}/comments", {"body": "验收说明", "visibility": Visibility.INTERNAL}, format="json")
+    assert result.status_code == 403, result.data
+    reply = api.post(f"{path}/chat/messages", {"content": "验收说明"}, format="json")
+    assert reply.status_code == (403 if status == Status.CLOSED else 201), reply.data
     result = api.post(f"{path}/transition", {"version": ticket.version, "target_status": target}, format="json")
     assert result.status_code == 200, result.data
     assert result.data["data"]["status"] == target
+
+
+@pytest.mark.django_db
+def test_status_change_invalidates_previous_handlers_dashboard(
+    users, make_ticket, client_for, django_capture_on_commit_callbacks
+):
+    previous = users["agent"]
+    current = technician(previous, "current-dashboard-handler")
+    ticket = make_ticket(assignee=current, status=Status.IN_PROGRESS)
+    now = timezone.now()
+    ticket.assignments.create(assignee=previous, started_at=now, ended_at=now, end_reason="REASSIGNED")
+    api = client_for(previous)
+    dashboard = "/api/tickets/dashboard"
+    assert api.get(dashboard, {"assignment": "history"}).data["data"]["status"] == {Status.IN_PROGRESS: 1}
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client_for(current).post(
+            f"/api/tickets/{ticket.pk}/transition",
+            {"target_status": Status.PENDING_VERIFY, "version": ticket.version},
+            format="json",
+        )
+        assert response.status_code == 200, response.data
+    assert api.get(dashboard, {"assignment": "history"}).data["data"]["status"] == {Status.PENDING_VERIFY: 1}
 
 
 @pytest.mark.django_db

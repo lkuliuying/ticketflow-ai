@@ -41,6 +41,7 @@ class UploadFile(SoftDeleteModel, AutoCleanFileMixin, DbAuditModel):
         help_text=_("Temporary files are automatically cleared by scheduled tasks"),
     )
     is_upload = models.BooleanField(verbose_name=_("Upload file"), default=False)
+    upload_source = models.CharField(max_length=32, blank=True, default="", editable=False)
     # 分类选项由数据字典 upload_category 提供（DictChoiceField 约束写入路径）
     category = models.CharField(
         verbose_name=_("Category"),

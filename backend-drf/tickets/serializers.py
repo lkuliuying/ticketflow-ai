@@ -1,4 +1,7 @@
+from typing import Any
+
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from common.core.serializers import BaseModelSerializer
@@ -75,6 +78,14 @@ class TicketSerializer(BaseModelSerializer):
         return int(counts.get(ticket.pk, 0))
 
 
+@extend_schema_field({"type": "string", "pattern": "^[1-9][0-9]{0,18}$"})
+class TicketMediaIdField(serializers.IntegerField):
+    """Decimal string on the wire, integer for database lookups."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(min_value=1, max_value=2**63 - 1, **kwargs)
+
+
 class TicketCreateSerializer(BaseModelSerializer):
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(max_length=20000)
@@ -82,7 +93,7 @@ class TicketCreateSerializer(BaseModelSerializer):
     priority = serializers.ChoiceField(choices=Priority.choices)
     assistant_session_id = serializers.UUIDField(required=False, allow_null=True, write_only=True, label="助手会话")
     attachment_ids = serializers.ListField(
-        child=serializers.IntegerField(min_value=1),
+        child=TicketMediaIdField(),
         max_length=5,
         required=False,
         write_only=True,
@@ -119,7 +130,10 @@ class AssignmentReturnSerializer(serializers.Serializer):
 
 class CommentSerializer(serializers.Serializer):
     body = serializers.CharField(max_length=20000)
-    visibility = serializers.ChoiceField(choices=Visibility.choices)
+    visibility = serializers.ChoiceField(
+        choices=(Visibility.INTERNAL,),
+        error_messages={"invalid_choice": "仅支持内部备注。对外回复请使用工单排查会话"},
+    )
 
 
 class SuggestionSerializer(serializers.Serializer):

@@ -45,9 +45,9 @@ class UploadError(Exception):
         self.detail = detail
 
 
-def get_upload_max_size(user_obj: Any) -> int:
+def get_upload_max_size(user_obj: Any, *, max_bytes: int | None = None) -> int:
     """单文件上传大小上限：系统级为天花板，真实个人行只能收紧（min 语义）。"""
-    system_value: int = SysConfig.FILE_UPLOAD_SIZE
+    system_value: int = SysConfig.FILE_UPLOAD_SIZE if max_bytes is None else max_bytes
     personal_data = get_personal_config_data(user_obj, "FILE_UPLOAD_SIZE")
     if personal_data is not None and isinstance(personal_data.get("value"), int) and personal_data["value"] > 0:
         personal_value: int = personal_data["value"]
@@ -113,13 +113,13 @@ def invalidate_upload_stats_cache(user_pk: Any) -> None:
     cache.delete(f"magic_cache_response_UploadFileViewSet_stats_{user_pk}")
 
 
-def check_upload_limits(user_obj: Any, file_objs: Any) -> list[int]:
+def check_upload_limits(user_obj: Any, file_objs: Any, *, max_bytes: int | None = None) -> list[int]:
     """批量前置校验：返回各文件字节大小；任一不合规抛 UploadError（不落盘）。
 
     配额与数量上限按本批累计判定（与逐文件提交的语义一致），使多文件上传
     「前面的已落库、后面的被拒」不可能发生。
     """
-    max_size = get_upload_max_size(user_obj)
+    max_size = get_upload_max_size(user_obj, max_bytes=max_bytes)
     quota_mb = get_user_quota_mb(user_obj) or 0
     count_limit = get_user_count_limit(user_obj) or 0
     # 软删除只置 deleted_at、物理文件保留到回收站彻底清除：配额必须按全量行统计，
@@ -156,7 +156,9 @@ def check_upload_limits(user_obj: Any, file_objs: Any) -> list[int]:
     return sizes
 
 
-def store_upload_file(user_obj: Any, file_obj: Any, *, is_tmp: bool = True, md5sum: str = "") -> tuple[Any, bool]:
+def store_upload_file(
+    user_obj: Any, file_obj: Any, *, is_tmp: bool = True, md5sum: str = "", upload_source: str = ""
+) -> tuple[Any, bool]:
     """单文件落库：md5 前置计算 → 同属主去重（复用物理文件）→ 分类 → 写记录。
 
     返回 ``(upload, dedup_hit)``；调用方负责事务边界与 stats 缓存失效。
@@ -184,6 +186,7 @@ def store_upload_file(user_obj: Any, file_obj: Any, *, is_tmp: bool = True, md5s
             filesize=file_obj.size,
             md5sum=md5sum,
             category=category,
+            upload_source=upload_source,
         )
         return upload, True
     upload = UploadFile.objects.create(
@@ -197,5 +200,6 @@ def store_upload_file(user_obj: Any, file_obj: Any, *, is_tmp: bool = True, md5s
         filesize=file_obj.size,
         md5sum=md5sum,
         category=category,
+        upload_source=upload_source,
     )
     return upload, False

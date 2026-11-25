@@ -165,13 +165,14 @@ class TicketViewSet(
         is_superuser = self.actor.is_superuser
         permission_codes = set() if is_superuser else get_user_permission_codes(self.actor)
         can_comment = is_superuser or "comments:TicketFlowTickets" in permission_codes
+        can_send = is_superuser or chat_services.CHAT_SEND_PERMISSION in permission_codes
         rating = getattr(ticket, "rating", None)
         data["viewer"] = {
             "can_handle": can_handle,
             "can_assign": self.access.admin
             and ticket.status != Status.CLOSED
             and (is_superuser or {"assign:TicketFlowTickets", "assignees:TicketFlowTickets"} <= permission_codes),
-            "can_reply": can_comment and self.access.can_reply(ticket),
+            "can_reply": can_send and self.access.can_reply(ticket),
             "can_comment_internal": can_comment and can_handle,
             "can_return": self.access.can_return(ticket) and "returnTicket:TicketFlowTickets" in permission_codes,
             "can_rate": (
@@ -212,7 +213,7 @@ class TicketViewSet(
             }
             for att in ticket.attachments.all()
         ]
-        data["chat_state"] = chat_services.chat_state(ticket, self.access)
+        data["chat_state"] = chat_services.chat_state(ticket, self.access, can_send=can_send)
         return ApiResponse(data=data)
 
     @extend_schema(parameters=page_parameters, responses={200: ticket_session_result, **assistant_errors})
@@ -306,7 +307,7 @@ class TicketViewSet(
         ticket = services.return_ticket(scope, pk, self.actor, self.access, **self._values(request))
         return self._ticket_response(ticket)
 
-    @extend_schema(responses={201: comment_result})
+    @extend_schema(responses={201: comment_result, 400: ticket_error_result})
     @action(detail=True, methods=["post"])
     def comments(self, request: Request, pk: UUID) -> ApiResponse:
         """工单回复"""

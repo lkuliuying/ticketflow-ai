@@ -45,7 +45,8 @@ def generate_ticket_number() -> str:
 
 
 def _affected_users(ticket: Ticket, *extra_ids: int | None) -> tuple[int | None, ...]:
-    return (ticket.submitter_id, ticket.assignee_id, *extra_ids)
+    past_ids = ticket.assignments.order_by().values_list("assignee_id", flat=True).distinct()
+    return (ticket.submitter_id, ticket.assignee_id, *extra_ids, *past_ids)
 
 
 class TicketConflict(APIException):
@@ -108,7 +109,7 @@ def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
             ),
             robust=True,
         )
-    transaction.on_commit(partial(invalidate_dashboard, _affected_users(ticket)), robust=True)
+    transaction.on_commit(partial(invalidate_dashboard, (ticket.submitter_id, ticket.assignee_id)), robust=True)
     return ticket
 
 

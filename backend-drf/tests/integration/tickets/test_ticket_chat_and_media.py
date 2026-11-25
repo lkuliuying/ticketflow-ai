@@ -1,15 +1,24 @@
 from datetime import timedelta
 from io import BytesIO
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError
 from django.utils import timezone
 from PIL import Image
 
+from file.models import UploadFile
+from file.services.cleanup import auto_clean_upload_file
+from file.utils.upload_store import get_upload_max_size
 from identity.models import UserInfo
 from tests.integration.tickets.test_ticket_api import assert_error
+from tickets.cache import TICKET_CACHE_KEY_PREFIX, check_rate
+from tickets.chat_services import send_chat_message
 from tickets.models import Status, Ticket, TicketChatMessage
+from tickets.policy import TicketAccess
 from tickets.tasks import cleanup_expired_ticket_videos
 
 pytestmark = pytest.mark.django_db
@@ -137,3 +146,137 @@ def test_ticket_chat_lifecycle_media_range_unread_and_video_cleanup(users, make_
     assert cleanup_expired_ticket_videos.run(days=90) == 1
     assert TicketChatMessage.objects.get(pk=vid_msg.data["data"]["id"]).media_expired is True
     assert_error(admin.get(video_url), 404)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"before_id": "invalid"},
+        {"after_id": "123"},
+        {"limit": "oops"},
+        {"limit": 0},
+        {"limit": 101},
+        {"before_id": str(uuid4()), "after_id": str(uuid4())},
+        {"after_id": str(uuid4())},
+    ],
+)
+def test_chat_rejects_invalid_pagination(users, make_ticket, client_for, params):
+    ticket = make_ticket(assignee=users["agent"])
+    assert_error(client_for(users["requester"]).get(f"{TICKETS}/{ticket.pk}/chat/messages", params), 400)
+
+
+def test_chat_catchup_reports_more_pages_and_breaks_timestamp_ties(users, make_ticket, client_for):
+    ticket = make_ticket(assignee=users["agent"])
+    rows = [ticket.chat_messages.create(sender=users["agent"], content=str(i)) for i in range(6)]
+    ticket.chat_messages.update(created_time=timezone.now())
+    ids = sorted(str(row.pk) for row in rows)
+    client = client_for(users["requester"])
+    path = f"{TICKETS}/{ticket.pk}/chat/messages"
+    cursor = ids[0]
+    for expected, has_more in ((ids[1:3], True), (ids[3:5], True), (ids[5:], False)):
+        response = client.get(path, {"after_id": cursor, "limit": 2})
+        assert response.status_code == 200, response.data
+        data = response.data["data"]
+        assert [row["id"] for row in data["results"]] == expected
+        assert data["has_more"] is has_more
+        cursor = expected[-1]
+    older = client.get(path, {"before_id": ids[-1], "limit": 2}).data["data"]
+    assert [row["id"] for row in older["results"]] == ids[-3:-1]
+    assert older["has_more"] is True
+
+
+def test_chat_preserves_integrity_error_without_client_id(users, make_ticket):
+    agent = users["agent"]
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=agent)
+    error = IntegrityError("write failed")
+    with patch.object(TicketChatMessage.objects, "create", side_effect=error), pytest.raises(IntegrityError) as caught:
+        send_chat_message(
+            Ticket.objects.all(), ticket.pk, agent, TicketAccess.for_user(agent), kind="TEXT", content="测试"
+        )
+    assert caught.value is error
+
+
+def test_admin_chat_notifies_both_participants(users, make_ticket, client_for, django_capture_on_commit_callbacks):
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
+    with patch("tickets.chat_services.notify_users") as notify, django_capture_on_commit_callbacks(execute=True):
+        response = client_for(users["admin"]).post(
+            f"{TICKETS}/{ticket.pk}/chat/messages", {"content": "请补充截图"}, format="json"
+        )
+        assert response.status_code == 201, response.data
+    notify.assert_called_once()
+    assert set(notify.call_args.args[0]) == {users["requester"].pk, users["agent"].pk}
+
+
+def test_generic_and_cross_owner_uploads_cannot_bind(users, make_ticket, client_for, details):
+    user = users["requester"]
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
+    api = client_for(user)
+    generic = UploadFile.objects.create(
+        creator=user,
+        is_upload=True,
+        is_tmp=True,
+        filename="generic.png",
+        filepath=make_png(),
+        filesize=100,
+        mime_type="image/png",
+    )
+    uploaded = client_for(users["agent"]).post(
+        f"{TICKETS}/attachments/upload", {"file": make_png()}, format="multipart"
+    )
+    assert uploaded.status_code == 201, uploaded.data
+    for file_pk in (str(generic.pk), uploaded.data["data"]["file_pk"]):
+        assert_error(
+            api.post(
+                TICKETS, {**details, "attachment_ids": [file_pk]}, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid4())
+            ),
+            400,
+        )
+        assert_error(
+            api.post(f"{TICKETS}/{ticket.pk}/chat/messages", {"kind": "IMAGE", "file_pk": file_pk}, format="json"), 400
+        )
+
+
+def test_video_over_global_limit_can_bind_and_survives_file_cleanup(users, make_ticket, client_for):
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
+    api = client_for(users["requester"])
+    path = f"{TICKETS}/{ticket.pk}/chat"
+    data = make_mp4().read().ljust(11 * 1024 * 1024, b"\x00")
+    assert get_upload_max_size(users["requester"]) == 10 * 1024 * 1024
+    upload = api.post(f"{path}/upload", {"file": SimpleUploadedFile("large.mp4", data)}, format="multipart")
+    assert upload.status_code == 201, upload.data
+    file_pk = upload.data["data"]["file_pk"]
+    assert isinstance(file_pk, str)
+    message = api.post(f"{path}/messages", {"kind": "VIDEO", "file_pk": file_pk}, format="json")
+    assert message.status_code == 201, message.data
+    UploadFile.objects.filter(pk=file_pk).update(created_time=timezone.now() - timedelta(days=2))
+    auto_clean_upload_file(keep_days=1)
+    assert api.get(message.data["data"]["file_url"], HTTP_RANGE="bytes=0-15").status_code == 206
+    assert api.get(message.data["data"]["file_url"], HTTP_RANGE=f"bytes={len(data)}-").status_code == 416
+
+
+def test_both_upload_routes_share_the_users_media_limit(users, make_ticket, client_for):
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
+    user = users["requester"]
+    api = client_for(user)
+    key = f"{TICKET_CACHE_KEY_PREFIX}rate:ticket-media-upload:{user.pk}"
+    try:
+        for _ in range(29):
+            check_rate(user.pk, "ticket-media-upload", 30)
+        upload = api.post(f"{TICKETS}/attachments/upload", {"file": make_png()}, format="multipart")
+        assert upload.status_code == 201, upload.data
+        response = api.post(f"{TICKETS}/{ticket.pk}/chat/upload", {"file": make_png()}, format="multipart")
+        assert_error(response, 429)
+        assert int(response["Retry-After"]) > 0
+    finally:
+        cache.delete(key)
+
+
+def test_historical_handler_can_read_but_cannot_upload_or_send(users, make_ticket, client_for):
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["admin"])
+    agent = users["agent"]
+    ticket.assignments.create(assignee=agent, started_at=timezone.now(), ended_at=timezone.now())
+    api = client_for(agent)
+    path = f"{TICKETS}/{ticket.pk}/chat"
+    assert api.get(f"{path}/messages").data["data"]["chat_state"] == {"can_send": False, "lock_reason": "READ_ONLY"}
+    assert_error(api.post(f"{path}/messages", {"content": "越权发送"}, format="json"), 403)
+    assert_error(api.post(f"{path}/upload", {"file": make_png()}, format="multipart"), 403)

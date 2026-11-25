@@ -5,6 +5,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -24,6 +25,7 @@ from tickets.models import (
     Status,
     Ticket,
     TicketAssignment,
+    TicketChatMessage,
     TicketComment,
     TicketCreateRequest,
     TicketLog,
@@ -34,9 +36,10 @@ pytestmark = pytest.mark.django_db
 TICKETS = "/api/tickets"
 
 
-def authenticated(user: UserInfo) -> APIClient:
+def authenticated(user: UserInfo, *, internal: bool = False) -> APIClient:
     token = RefreshToken.for_user(user).access_token
-    client = APIClient()
+    headers = {"HTTP_X_INTERNAL_TOKEN": settings.TICKETFLOW_INTERNAL_API_SECRET} if internal else {}
+    client = APIClient(**headers)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client
 
@@ -144,17 +147,19 @@ def test_closed_ticket_rejects_assignment(users, make_ticket, client_for, clear_
 
 
 @pytest.mark.parametrize("status", [Status.IN_PROGRESS, Status.CLOSED])
-def test_ticket_submitter_can_reply_at_either_status(users, make_ticket, client_for, status):
-    ticket = make_ticket(status=status)
+def test_public_comment_requires_chat_at_either_status(users, make_ticket, client_for, status):
+    ticket = make_ticket(status=status, assignee=users["agent"])
     requester = client_for(users["requester"])
     endpoint = f"{TICKETS}/{ticket.pk}/comments"
     response = requester.post(endpoint, {"body": "补充问题描述", "visibility": Visibility.PUBLIC}, format="json")
-    assert response.status_code == 201, response.data
-    assert ticket.comments.get().author_id == users["requester"].pk
+    assert_error(response, 400)
+    assert "排查会话" in response.data["detail"]
+    assert not ticket.comments.exists()
+    assert not ticket.chat_messages.exists()
 
 
-def test_comments_preserve_first_staff_response_and_hide_internal_activity(users, make_ticket, client_for):
-    ticket = make_ticket(assignee=users["agent"])
+def test_chat_preserves_first_staff_response_and_timeline_hides_internal_activity(users, make_ticket, client_for):
+    ticket = make_ticket(assignee=users["agent"], status=Status.IN_PROGRESS)
     resource = f"{TICKETS}/{ticket.pk}"
     agent = client_for(users["agent"])
     requester = client_for(users["requester"])
@@ -163,18 +168,22 @@ def test_comments_preserve_first_staff_response_and_hide_internal_activity(users
         return api.post(f"{resource}/comments", {"body": body, "visibility": visibility}, format="json")
 
     assert_error(comment(requester, "越权备注", Visibility.INTERNAL), 403)
-    requester_reply = comment(requester, "补充问题描述", Visibility.PUBLIC)
+
+    def reply(api, content):
+        return api.post(f"{resource}/chat/messages", {"content": content}, format="json")
+
+    requester_reply = reply(requester, "补充问题描述")
     internal = comment(agent, "内部排查记录", Visibility.INTERNAL)
     assert requester_reply.status_code == internal.status_code == 201
     ticket.refresh_from_db()
     assert ticket.first_response_at is None
 
-    replied = comment(agent, "首次对外回复", Visibility.PUBLIC)
+    replied = reply(agent, "首次对外回复")
     assert replied.status_code == 201, replied.data
-    first_response = TicketComment.objects.get(pk=replied.data["data"]["id"]).created_time
+    first_response = TicketChatMessage.objects.get(pk=replied.data["data"]["id"]).created_time
     ticket.refresh_from_db()
     assert ticket.first_response_at == first_response
-    assert comment(agent, "后续答复", Visibility.PUBLIC).status_code == 201
+    assert reply(agent, "后续答复").status_code == 201
     ticket.refresh_from_db()
     assert ticket.first_response_at == first_response
 
@@ -193,8 +202,9 @@ def test_comments_preserve_first_staff_response_and_hide_internal_activity(users
             timeline = data[data_key] if data_key else data
             ids = {row["id"] for row in timeline["results"]}
             assert ids & hidden == (hidden if is_handler else set())
-            assert timeline["total"] == (5 if is_handler else 3)
-            assert str(replied.data["data"]["id"]) in ids
+            assert timeline["total"] == (2 if is_handler else 0)
+    messages = requester.get(f"{resource}/chat/messages").data["data"]["results"]
+    assert [row["content"] for row in messages] == ["补充问题描述", "首次对外回复", "后续答复"]
 
 
 def test_timeline_first_page_matches_full_pagination_across_timestamp_ties(users, make_ticket, client_for):
