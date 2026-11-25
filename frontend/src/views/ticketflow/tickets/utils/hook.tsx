@@ -38,6 +38,7 @@ export function useTickets(tableRef: PageRef) {
     openTicketCreateDialog({
       title: t("ticketflow.detail.createTitle"),
       createdText: t("ticketflow.detail.created"),
+      failedText: t("ticketflow.detail.createFailed"),
       onCreated: reload
     });
   }

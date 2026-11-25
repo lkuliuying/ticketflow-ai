@@ -47,10 +47,7 @@ export function useTicketChat(
   async function syncMissed() {
     const lastId = messages.value[messages.value.length - 1]?.id;
     if (!lastId) return load();
-    const data = await chat.fetchChatPage(ticketId(), {
-      after_id: lastId,
-      limit: 100
-    });
+    const data = await chat.fetchMissedMessages(ticketId(), lastId);
     if (!data || disposed) return;
     applyState(data.chat_state);
     if (data.results.length) {

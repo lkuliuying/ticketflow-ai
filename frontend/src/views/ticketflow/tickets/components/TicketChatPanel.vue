@@ -1,12 +1,9 @@
 <script lang="ts" setup>
-import { nextTick, onMounted, ref, watch } from "vue";
+import { nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { message } from "@/utils/message";
 import { useUserStoreHook } from "@/store/modules/user";
-import {
-  ticketApi,
-  type TicketChatState,
-  type TicketDetail
-} from "@/api/ticketflow/tickets";
+import type { TicketChatState, TicketDetail } from "@/api/ticketflow/tickets";
 import { useAuthorizedMedia } from "../utils/useAuthorizedMedia";
 import { useTicketChat } from "../utils/useTicketChat";
 
@@ -46,21 +43,34 @@ function scrollToBottom() {
   });
 }
 
+/**
+ * 图片随消息预取（缩略图 + 原图供预览）；视频体积大且后端支持分段，
+ * 不在打开会话时整段拉取，由用户点击“加载视频”后按需获取。
+ */
 watch(
   messages,
   rows => {
     for (const row of rows) {
-      if (row.kind === "IMAGE" || row.kind === "VIDEO") {
-        const fileUrl =
-          row.file_url || ticketApi.chatFileUrl(props.ticket.pk, row.id);
-        if (row.thumb_url) void ensureMedia(row.thumb_url);
-        if (row.file_url) void ensureMedia(fileUrl);
-      }
+      if (row.kind !== "IMAGE") continue;
+      if (row.thumb_url) void ensureMedia(row.thumb_url);
+      if (row.file_url) void ensureMedia(row.file_url);
     }
     scrollToBottom();
   },
   { deep: true }
 );
+
+const videoLoading = reactive<Record<string, boolean>>({});
+
+async function loadVideo(url: string) {
+  if (videoLoading[url]) return;
+  videoLoading[url] = true;
+  const ok = await ensureMedia(url);
+  videoLoading[url] = false;
+  if (!ok && !mediaUrls[url]) {
+    message(t("ticketflow.chat.videoLoadFailed"), { type: "error" });
+  }
+}
 
 watch(
   () => props.ticket.chat_state,
@@ -215,6 +225,19 @@ defineExpose({
               preload="metadata"
               class="max-w-72 max-h-56 rounded"
             />
+            <div v-else-if="item.file_url" class="flex items-center gap-2">
+              <span class="text-xs">
+                {{ item.media_meta?.filename || "[VIDEO]" }}
+              </span>
+              <el-button
+                size="small"
+                :loading="videoLoading[item.file_url]"
+                data-testid="ticket-chat-load-video"
+                @click="loadVideo(item.file_url)"
+              >
+                {{ t("ticketflow.chat.loadVideo") }}
+              </el-button>
+            </div>
             <span v-else class="text-xs">
               {{ item.media_meta?.filename || "[VIDEO]" }}
             </span>

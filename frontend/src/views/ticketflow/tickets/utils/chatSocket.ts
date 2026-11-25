@@ -83,6 +83,38 @@ export async function fetchChatPage(
   return res && isSuccess(res) ? res.data : null;
 }
 
+const SYNC_PAGE_SIZE = 100;
+const SYNC_MAX_PAGES = 20;
+
+/**
+ * 断线重连后按 after_id 补拉，直到后端返回 has_more=false；
+ * 页数设上限，防止异常响应导致死循环。全部失败返回 null，部分成功返回已拉到的消息。
+ */
+export async function fetchMissedMessages(
+  ticketId: string,
+  afterId: string
+): Promise<{
+  results: TicketChatMessage[];
+  chat_state: TicketChatState;
+} | null> {
+  const results: TicketChatMessage[] = [];
+  let chatState: TicketChatState | null = null;
+  let cursor = afterId;
+  for (let page = 0; page < SYNC_MAX_PAGES; page++) {
+    const data = await fetchChatPage(ticketId, {
+      after_id: cursor,
+      limit: SYNC_PAGE_SIZE
+    });
+    if (!data) break;
+    chatState = data.chat_state;
+    results.push(...data.results);
+    const last = data.results[data.results.length - 1];
+    if (!data.has_more || !last) break;
+    cursor = last.id;
+  }
+  return chatState ? { results, chat_state: chatState } : null;
+}
+
 export async function postChatText(
   ticketId: string,
   content: string

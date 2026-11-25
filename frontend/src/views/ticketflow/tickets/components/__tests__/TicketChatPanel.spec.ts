@@ -8,6 +8,15 @@ const apiMocks = vi.hoisted(() => ({
   chatRead: vi.fn()
 }));
 
+const mediaMocks = vi.hoisted(() => ({
+  urls: {} as Record<string, string>,
+  ensure: vi.fn()
+}));
+
+const messageMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/utils/message", () => ({ message: messageMock }));
+
 vi.mock("vue-i18n", async importOriginal => {
   const actual = await importOriginal<typeof import("vue-i18n")>();
   return {
@@ -25,7 +34,7 @@ vi.mock("@/api/ticketflow/tickets", () => ({
 }));
 
 vi.mock("../../utils/useAuthorizedMedia", () => ({
-  useAuthorizedMedia: () => ({ urls: {}, ensure: vi.fn() })
+  useAuthorizedMedia: () => mediaMocks
 }));
 
 import TicketChatPanel from "../TicketChatPanel.vue";
@@ -145,5 +154,56 @@ describe("TicketChatPanel 实时排查会话", () => {
       })
     );
     expect(wrapper.findAll('[data-testid="ticket-chat-item"]')).toHaveLength(1);
+  });
+
+  it("视频消息不随会话预取，点击“加载视频”后才拉取，失败时提示", async () => {
+    mediaMocks.ensure.mockReset();
+    mediaMocks.ensure.mockResolvedValue(false);
+    messageMock.mockReset();
+    const fileUrl = (id: string) =>
+      `/api/tickets/ticket-1/chat/messages/${id}/file`;
+    const media = (id: string, kind: "IMAGE" | "VIDEO") => ({
+      id,
+      ticket_id: "ticket-1",
+      sender_id: 20,
+      sender_name: "tech",
+      kind,
+      content: "",
+      media_meta: { filename: `${id}.bin` },
+      media_expired: false,
+      file_url: fileUrl(id),
+      thumb_url: kind === "IMAGE" ? `${fileUrl(id)}?size=thumb` : null,
+      client_msg_id: "",
+      created_time: "2026-11-25T10:00:00Z"
+    });
+    apiMocks.chatMessages.mockResolvedValueOnce({
+      code: 1000,
+      data: {
+        results: [media("img1", "IMAGE"), media("vid1", "VIDEO")],
+        has_more: false,
+        chat_state: { can_send: true, lock_reason: "" }
+      }
+    });
+    apiMocks.chatRead.mockResolvedValue({ code: 1000, data: null });
+
+    const wrapper = mount(TicketChatPanel, {
+      props: { ticket: makeTicket() }
+    });
+    await flushPromises();
+
+    const fetched = mediaMocks.ensure.mock.calls.map(call => String(call[0]));
+    expect(fetched).toContain(`${fileUrl("img1")}?size=thumb`);
+    expect(fetched).toContain(fileUrl("img1"));
+    expect(fetched.some(url => url.includes("vid1"))).toBe(false);
+
+    await wrapper
+      .get('[data-testid="ticket-chat-load-video"]')
+      .trigger("click");
+    await flushPromises();
+    expect(mediaMocks.ensure).toHaveBeenLastCalledWith(fileUrl("vid1"));
+    expect(messageMock).toHaveBeenCalledWith(
+      "ticketflow.chat.videoLoadFailed",
+      { type: "error" }
+    );
   });
 });

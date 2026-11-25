@@ -400,11 +400,6 @@ class TicketApi extends BaseApi {
       `${this.baseApi}/${pk}/chat/read`
     );
   };
-
-  chatFileUrl = (pk: string, messageId: string, size?: "thumb" | "preview") => {
-    const base = `${this.baseApi}/${pk}/chat/messages/${messageId}/file`;
-    return size ? `${base}?size=${size}` : base;
-  };
 }
 
 export const ticketApi = new TicketApi("/api/tickets");

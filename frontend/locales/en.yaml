@@ -4664,6 +4664,7 @@ ticketflow:
     internalNoteSent: Internal note saved
     createTitle: New Ticket
     created: Ticket created
+    createFailed: Failed to create the ticket, please try again later
     uploadImages: Attach images (up to 5)
     uploadImagesHint: Supports JPG/PNG/WEBP/GIF up to 10MB each, or paste screenshots with Ctrl+V
     imageLimitReached: Up to 5 images allowed
@@ -4677,6 +4678,8 @@ ticketflow:
     uploadVideo: Video
     loadMore: Load earlier messages
     mediaExpired: Video attachment has expired and been archived
+    loadVideo: Load video
+    videoLoadFailed: Failed to load the video, please retry
     locked:
       WAITING_ACCEPT: Waiting for a technician to accept before starting live chat
       WAITING_RESUME: Ticket reopened; waiting for technician to resume handling
