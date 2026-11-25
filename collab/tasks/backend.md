@@ -667,3 +667,52 @@ DeepSeek 的 Chat Completions **默认开启思考模式**，关闭方式是请�
 4. 测试：单测覆盖帧序、断开写回、无引用时的提示、草稿校验；网关验收补对话流与草稿各一条。
 
 完成标准：`service-fastapi` 门禁通过；在 Mock 模式的交付栈上跑网关验收并贴输出。
+
+---
+
+# AGY 分支修复
+
+用户在 `ticketflow-ai-agy` @ `2f4aaa5c` 自行完成了工单图片、实时排查会话、内部令牌、中文混合检索等改动。
+首轮审查（Codex 测试报告 `collab/reports/AGY-01.codex.md`、Gemini 评审 `collab/reviews/AGY-01.md`）结论为退回修订。
+功能口径以该分支现状为准（例如退回时“处理中”回到“待处理”是有意改动），本任务只修问题，不扩展功能。
+
+## AGY-01 后端修复
+
+分支：`be/agy-fixes`（已从 `2f4aaa5c` 切出并检出在 Codex worktree）。范围 `backend-drf/`、`service-fastapi/`、`deploy/`。
+
+必须修：
+
+1. 全量测试的 6 个稳定失败：按新授权与平铺菜单更新种子数量、菜单数、目录用例的断言（断言要反映新口径，不是删掉）；
+   在 `ops/legacy/structure.py` 的 `PREREQUISITE_CALLABLES` 为 0011、0012 的 `RunPython` 明确登记“执行”或“保持跳过”并说明理由。
+2. `GET /api/tickets/{id}/chat/messages`：`before_id` / `after_id` 非法、`limit` 越界返回 400（用序列化器校验，不要裸 `UUID()`）。
+   `after_id` 补拉要返回真实的 `has_more`；前端会据此循环补拉。
+3. WebSocket 授权持续有效：投递 `chat.message` 前确认连接用户仍在职、仍在工单范围内（与 HTTP 同一套 `TicketAccess`，
+   包括菜单 / 角色授权），失去权限即以 4403 关闭；`receive_json` 对非对象帧容错；用户停用、改角色、登出撤销后不再收到推送。
+   补守护测试。
+4. 内部令牌：`InternalServiceUserAuthentication`（凭服务令牌 + `X-Internal-User-Id` 代表用户）只用于确实需要它的写回动作，
+   `question` 等其余内网接口必须走用户 JWT（含撤销校验）。生产启动时 `TICKETFLOW_INTERNAL_API_SECRET` 为空要失败关闭
+   （拒绝内网接口或启动报错，二选一并写明），测试与本地开发配置显式给值。未登录访问内网接口的状态码与 `ai-context` 一致。
+   FastAPI 侧对应调整（`service-fastapi/app/services/drf.py`），保持 FastAPI 测试全绿。
+5. 契约：`docs/schema/ticketflow.schema.json` 的 `attachment_ids` 改为与实现一致的类型（上传返回的 `file_pk` 也统一，
+   报告写明最终是整数还是字符串）；补齐详情 `attachments` / `chat_state`、列表 `unread_chat_count`、附件与会话 7 个接口、
+   WS 帧、`ai-context` 的 `purpose=kb-draft` 与 `recent_messages`；OpenAPI 的状态码与运行时一致（上传 / 发送 201，
+   文件下载为文件响应，视频 206 / 416）。Phase 1 设计文档同步退回状态机变化与新接口；`test_assignment.py` 中与断言相反的用例名改正。
+
+应修：
+
+6. `send_chat_message` 捕获 `IntegrityError` 时，`client_msg_id` 为空要原样抛出，不要按空串 `.get()`。
+7. 媒体绑定：建单与发消息只接受经工单媒体上传入口校验过的文件（可用上传来源标记或类别区分），不能绑定本人文件库里的任意文件。
+   上传入口接入 `check_rate` 限流。视频 30 MB 上限要么真正生效（工单媒体按自己的上限，不被全局 10 MB 截断），
+   要么把常量和提示改成实际值——选前者，做不到再说明。
+8. 文件清理要能看到工单附件 / 会话媒体的引用（去掉 `related_name="+"` 或在清理逻辑登记），清理不能因 `PROTECT` 异常中断。
+9. `0004_knowledgechunk`：去掉形同虚设的“扩展创建失败后告警继续”，缺 pgvector 时给出明确错误（部署镜像均自带 pgvector）；
+   `vector_candidates` 的检索放进独立 savepoint，失败回退关键词通道且不污染外层事务；存量文章提供分块回填（管理命令或迁移后任务，写明用法）。
+   embedding 外调不要在文章保存请求里同步阻塞（改为提交后异步任务），同一文章分块重建加锁或事务，避免唯一约束冲突。
+10. `0012` 的反向迁移恢复旧父菜单与层级；`deploy/README.md` 写明降级到 0010 之前会丢失会话与分块数据、必须先备份。
+11. 会话通知接收者：发言人以外的提交人与当前处理人都要收到（管理员发言时两者都通知）。
+12. 旧 `POST /comments` 的 `PUBLIC` 可见性：先查前端、FastAPI、E2E 是否还有调用方；没有就返回 400 并提示改用排查会话，
+    有调用方则改为写入会话消息。二者选一写进报告。
+13. `group_add` / `group_discard` 在通道层不可用时明确关闭连接（如 1011）而不是抛未处理异常。
+
+完成标准：后端全量（Linux 测试栈）无本分支失败、FastAPI 全量通过、第六节静态门禁与 `dump_openapi --check` 通过；
+新增守护测试覆盖第 2、3、4、6、7、11、12 点；迁移在空库升级、回退 0008 / 0003、再升级跑通。
