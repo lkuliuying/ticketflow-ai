@@ -73,15 +73,16 @@ class TicketChatConsumer(AsyncJsonWebsocketConsumer):
         if close_code:
             await self.close(code=close_code)
             return
-        self.group_name = chat_group_name(self.ticket_id)
+        group_name = chat_group_name(self.ticket_id)
         await self.accept()
         try:
-            await self.channel_layer.group_add(self.group_name, self.channel_name)
+            await self.channel_layer.group_add(group_name, self.channel_name)
         except Exception:
             logger.warning("无法加入工单会话通道", exc_info=True)
             self.closing = True
             await self.close(code=1011)
             return
+        self.group_name = group_name
         await self.send_json({"event": "chat.state", "data": state})
 
     async def disconnect(self, code: int) -> None:

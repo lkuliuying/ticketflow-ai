@@ -6,7 +6,7 @@ from django.db.models import Q, QuerySet
 from django.http import Http404
 from django.utils.functional import cached_property
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.request import Request
 
 from common.core.auth import CookieJWTAuthentication
@@ -146,16 +146,23 @@ class TicketAiContextView(TicketViewSet):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("purpose", str, enum=["kb-draft"], description="已关闭工单的知识库草稿提炼"),
+            OpenApiParameter(
+                "purpose",
+                str,
+                enum=["kb-draft"],
+                description="已关闭工单的知识库草稿提炼。省略或留空使用普通上下文，其他值返回 400。",
+            ),
             OpenApiParameter("X-Internal-Token", str, OpenApiParameter.HEADER, required=True),
         ],
-        responses={200: context_result, **dict.fromkeys((401, 403, 404, 429, 503), ticket_error_result)},
+        responses={200: context_result, **dict.fromkeys((400, 401, 403, 404, 429, 503), ticket_error_result)},
     )
     def context(self, request: Request, **kwargs: Any) -> ApiResponse:
         """读取工单 AI 上下文"""
         verify_internal_request(request)
         ticket = self.get_object()
         purpose = request.query_params.get("purpose", "").strip()
+        if purpose and purpose != "kb-draft":
+            raise ValidationError({"purpose": "仅支持 kb-draft"})
         can_use_ai = (
             self.access.can_handle(ticket)
             if purpose != "kb-draft"

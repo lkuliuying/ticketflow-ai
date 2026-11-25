@@ -194,7 +194,7 @@
     },
     "ticketAiContext": {
       "type": "object",
-      "description": "GET /api/tickets/{id}/ai-context 需要用户 JWT 和内部令牌。purpose=kb-draft 也允许持有草稿转存权限的历史处理人访问未转存的已关闭工单。",
+      "description": "GET /api/tickets/{id}/ai-context 需要用户 JWT 和内部令牌。purpose=kb-draft 也允许持有草稿转存权限的历史处理人访问未转存的已关闭工单。省略或留空使用普通上下文，其他 purpose 返回 400。",
       "required": ["ticket", "categories", "references", "recent_messages"],
       "properties": {
         "ticket": {"type": "object", "required": ["id", "title", "description", "category", "priority", "version"], "properties": {"id": {"type": "string", "format": "uuid"}, "title": {"type": "string"}, "description": {"type": "string"}, "category": {"$ref": "#/$defs/category"}, "priority": {"$ref": "#/$defs/priority"}, "version": {"type": "integer"}}},

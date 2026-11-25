@@ -107,8 +107,8 @@ def test_chat_closes_without_delivering_after_access_loss(users, make_ticket, se
             blacklist.del_storage_cache()
 
 
-@pytest.mark.parametrize("operation", ["group_add", "group_discard"])
-def test_chat_handles_unavailable_channel_layer(users, make_ticket, settings, operation):
+@pytest.mark.parametrize("join_fails", [True, False], ids=["group-add", "group-discard"])
+def test_chat_handles_unavailable_channel_layer(users, make_ticket, settings, join_fails):
     settings.CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
     ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
     user = users["requester"]
@@ -116,15 +116,22 @@ def test_chat_handles_unavailable_channel_layer(users, make_ticket, settings, op
 
     async def scenario():
         comm = _communicator(ticket.pk, token)
-        failure = AsyncMock(side_effect=ConnectionError("channel layer unavailable"))
-        with patch.object(get_channel_layer(), operation, failure):
+        layer = get_channel_layer()
+        error = ConnectionError("channel layer unavailable")
+        add = AsyncMock(wraps=layer.group_add, side_effect=error if join_fails else None)
+        discard = AsyncMock(side_effect=error)
+        with patch.object(layer, "group_add", add), patch.object(layer, "group_discard", discard):
             connected, _ = await comm.connect()
             assert connected
-            if operation == "group_add":
+            if join_fails:
                 assert await comm.receive_output() == {"type": "websocket.close", "code": 1011}
             else:
-                await comm.receive_json_from()
+                assert (await comm.receive_json_from())["event"] == "chat.state"
             await comm.disconnect()
-        failure.assert_awaited_once()
+        add.assert_awaited_once()
+        if join_fails:
+            discard.assert_not_awaited()
+        else:
+            discard.assert_awaited_once()
 
     async_to_sync(scenario)()

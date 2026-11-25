@@ -102971,7 +102971,7 @@
             }
           },
           {
-            "description": "已关闭工单的知识库草稿提炼",
+            "description": "已关闭工单的知识库草稿提炼。省略或留空使用普通上下文，其他值返回 400。",
             "in": "query",
             "name": "purpose",
             "schema": {
@@ -102988,6 +102988,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketAiContextResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketErrorResult"
                 }
               }
             },
