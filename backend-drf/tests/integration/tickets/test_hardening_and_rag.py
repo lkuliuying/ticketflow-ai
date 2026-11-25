@@ -1,7 +1,9 @@
 from datetime import timedelta
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -65,6 +67,20 @@ def test_internal_secret_guards_ai_context_and_allows_service_answer_writeback(u
     assert saved.data["data"]["assistant_message_id"]
 
 
+@pytest.mark.parametrize("user_id", ["0", str(2**63), "9" * 19])
+def test_service_answer_rejects_user_ids_outside_bigint_range(settings, user_id):
+    with patch("tickets.internal_auth.get_user_model", wraps=get_user_model) as lookup:
+        response = APIClient().post(
+            f"{INTERNAL_SESSIONS}/{uuid4()}/answer",
+            {},
+            format="json",
+            HTTP_X_INTERNAL_TOKEN=settings.TICKETFLOW_INTERNAL_API_SECRET,
+            HTTP_X_INTERNAL_USER_ID=user_id,
+        )
+    assert_error(response, 401)
+    lookup.assert_not_called()
+
+
 def test_internal_reads_never_accept_service_identity_or_revoked_jwt(users, make_ticket, settings):
     user = users["requester"]
     employee = authenticated(user)
@@ -115,6 +131,17 @@ def test_kb_draft_context_requires_unarchived_ticket_and_create_permission(users
     role.menu.add(grant)
     KnowledgeArticle.objects.create(title="已有转存", source_ticket=ticket)
     assert_error(api.get(path, {"purpose": "kb-draft"}), 403)
+
+
+def test_ai_context_rejects_unknown_purpose_and_accepts_empty_purpose(users, make_ticket):
+    agent = users["agent"]
+    ticket = make_ticket(assignee=agent)
+    api = authenticated(agent, internal=True)
+    path = f"{TICKETS}/{ticket.pk}/ai-context"
+    response = api.get(path, {"purpose": "unknown"})
+    assert_error(response, 400)
+    assert "purpose" in response.data["detail"]
+    assert api.get(path, {"purpose": ""}).status_code == 200
 
 
 def test_save_ai_metadata_blocks_closed_and_recalculates_sla_on_priority_change(users, make_ticket, client_for):

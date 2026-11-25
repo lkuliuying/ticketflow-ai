@@ -41,8 +41,11 @@ class InternalServiceUserAuthentication(BaseAuthentication):
         raw_user_id = str(request.headers.get(INTERNAL_USER_HEADER, "") or "").strip()
         if not raw_user_id.isascii() or not raw_user_id.isdecimal() or len(raw_user_id) > 19:
             return None
+        user_id = int(raw_user_id)
+        if not 1 <= user_id <= 2**63 - 1:
+            return None
         user_model = get_user_model()
-        user = user_model.objects.filter(pk=int(raw_user_id), is_active=True).first()
+        user = user_model.objects.filter(pk=user_id, is_active=True).first()
         if user is None:
             return None
         return user, {"internal_service": True}

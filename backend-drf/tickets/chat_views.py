@@ -185,7 +185,8 @@ class TicketMediaChatMixin:
     def chat_upload(self, request: Request, pk: UUID) -> ApiResponse:
         """上传排查媒体"""
         ticket = self.get_object()
-        if not chat_services.chat_state(ticket, self.access)["can_send"]:
+        can_send = has_permission(self.actor, chat_services.CHAT_SEND_PERMISSION)
+        if not chat_services.chat_state(ticket, self.access, can_send=can_send)["can_send"]:
             raise PermissionDenied("当前工单会话不可上传媒体")
         check_rate(self.actor.pk, "ticket-media-upload", 30)
         data = upload_ticket_media(self.actor, request.FILES.get("file"), allow_video=True)

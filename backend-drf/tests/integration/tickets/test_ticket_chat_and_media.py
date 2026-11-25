@@ -14,7 +14,8 @@ from file.models import UploadFile
 from file.services.cleanup import auto_clean_upload_file
 from file.utils.upload_store import get_upload_max_size
 from identity.models import UserInfo
-from tests.integration.tickets.test_ticket_api import assert_error
+from system.models import Menu
+from tests.integration.tickets.test_ticket_api import assert_error, authenticated
 from tickets.cache import TICKET_CACHE_KEY_PREFIX, check_rate
 from tickets.chat_services import send_chat_message
 from tickets.models import Status, Ticket, TicketChatMessage
@@ -280,3 +281,20 @@ def test_historical_handler_can_read_but_cannot_upload_or_send(users, make_ticke
     assert api.get(f"{path}/messages").data["data"]["chat_state"] == {"can_send": False, "lock_reason": "READ_ONLY"}
     assert_error(api.post(f"{path}/messages", {"content": "越权发送"}, format="json"), 403)
     assert_error(api.post(f"{path}/upload", {"file": make_png()}, format="multipart"), 403)
+
+
+def test_chat_upload_requires_send_permission(users, make_ticket):
+    ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
+    user = users["requester"]
+    role = user.roles.get()
+    assert role.menu.filter(name="chatUpload:TicketFlowTickets").exists()
+    role.menu.remove(Menu.objects.get(name="chatSend:TicketFlowTickets"))
+    api = authenticated(user)
+    path = f"{TICKETS}/{ticket.pk}"
+    state = {"can_send": False, "lock_reason": "READ_ONLY"}
+    assert api.get(path).data["data"]["chat_state"] == state
+    assert api.get(f"{path}/chat/messages").data["data"]["chat_state"] == state
+    before = UploadFile.objects.filter(creator=user).count()
+    response = api.post(f"{path}/chat/upload", {"file": make_png()}, format="multipart")
+    assert_error(response, 403)
+    assert UploadFile.objects.filter(creator=user).count() == before
