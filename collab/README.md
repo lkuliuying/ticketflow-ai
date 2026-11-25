@@ -76,8 +76,8 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 | FE-14 | 账号与技能组管理页面 | Claude | BE-10 | 评审通过，已合入 main |
 | FE-15 | AI 助手与 AI 反馈页面 | Claude | BE-11、SV-05 | 评审通过，已合入 main |
 
-| AGY-01 | 用户分支 `ticketflow-ai-agy` 后端修复（测试失败、WS 授权、内部令牌、契约、媒体与迁移） | Codex | — | 进行中 |
-| AGY-02 | 用户分支 `ticketflow-ai-agy` 前端修复（建单失败提示、视频按需加载、补拉分页、契约跟进） | Claude | AGY-01 | 进行中 |
+| AGY-01 | 用户分支 `ticketflow-ai-agy` 后端修复（测试失败、WS 授权、内部令牌、契约、媒体与迁移） | Codex | — | 评审通过，已集成到 fe/agy-fixes |
+| AGY-02 | 用户分支 `ticketflow-ai-agy` 前端修复（建单失败提示、视频按需加载、补拉分页、契约跟进） | Claude | AGY-01 | 评审通过，待合入 ticketflow-ai-agy |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)，
 迭代 6 的任务在任务书末尾。集成分支 `integration/iter6`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。
