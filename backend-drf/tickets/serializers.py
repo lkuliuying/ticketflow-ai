@@ -23,6 +23,7 @@ class TicketSerializer(BaseModelSerializer):
     assignee_name = serializers.CharField(source="assignee.username", read_only=True, allow_null=True)
     department_name = serializers.CharField(source="department.name", read_only=True, help_text="技能组名称")
     sla_state = serializers.SerializerMethodField()
+    unread_chat_count = serializers.SerializerMethodField()
     sla_due_at = serializers.DateTimeField(format="iso-8601", read_only=True)
     first_response_at = serializers.DateTimeField(format="iso-8601", read_only=True, allow_null=True)
     resolved_at = serializers.DateTimeField(format="iso-8601", read_only=True, allow_null=True)
@@ -47,6 +48,7 @@ class TicketSerializer(BaseModelSerializer):
             "department_name",
             "sla_due_at",
             "sla_state",
+            "unread_chat_count",
             "first_response_at",
             "resolved_at",
             "ai_summary",
@@ -66,6 +68,12 @@ class TicketSerializer(BaseModelSerializer):
             return "OVERDUE"
         return "DUE_SOON" if ticket.sla_due_at <= now + SLA_WARNING else "ON_TRACK"
 
+    def get_unread_chat_count(self, ticket: Ticket) -> int:
+        counts = self.context.get("unread_chat_counts")
+        if not isinstance(counts, dict):
+            return 0
+        return int(counts.get(ticket.pk, 0))
+
 
 class TicketCreateSerializer(BaseModelSerializer):
     title = serializers.CharField(max_length=200)
@@ -73,10 +81,17 @@ class TicketCreateSerializer(BaseModelSerializer):
     category = serializers.ChoiceField(choices=Category.choices)
     priority = serializers.ChoiceField(choices=Priority.choices)
     assistant_session_id = serializers.UUIDField(required=False, allow_null=True, write_only=True, label="助手会话")
+    attachment_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        max_length=5,
+        required=False,
+        write_only=True,
+        label="工单图片",
+    )
 
     class Meta:
         model = Ticket
-        fields = ("title", "description", "category", "priority", "assistant_session_id")
+        fields = ("title", "description", "category", "priority", "assistant_session_id", "attachment_ids")
 
 
 class TicketColumnsSerializer(TicketSerializer):

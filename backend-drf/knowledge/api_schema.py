@@ -39,10 +39,18 @@ class TicketContextSerializer(serializers.Serializer):
     version = serializers.IntegerField()
 
 
+class TicketChatTurnSerializer(serializers.Serializer):
+    role = serializers.CharField()
+    sender = serializers.CharField()
+    content = serializers.CharField()
+    created_time = serializers.CharField()
+
+
 class AiContextSerializer(serializers.Serializer):
     ticket = TicketContextSerializer()
     categories = serializers.ListField(child=serializers.CharField())
     references = KnowledgeReferenceSerializer(many=True)
+    recent_messages = TicketChatTurnSerializer(many=True)
 
 
 article_result = envelope("KnowledgeArticleResult", ArticleResultSerializer())

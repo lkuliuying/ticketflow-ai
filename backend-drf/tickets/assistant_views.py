@@ -10,6 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
 from common.core.modelset.base import BaseViewSet
@@ -30,6 +31,7 @@ from tickets.assistant_serializers import (
     SessionTitleSerializer,
 )
 from tickets.cache import check_rate
+from tickets.internal_auth import InternalServiceUserAuthentication, verify_internal_request
 from tickets.models import AssistantFeedback, AssistantSession
 from tickets.policy import TicketAccess
 
@@ -127,6 +129,12 @@ class AssistantSessionViewSet(EmployeeAssistantViewSet):
 
 class AssistantInternalViewSet(EmployeeAssistantViewSet):
     """助手内网调用"""
+
+    authentication_classes = (InternalServiceUserAuthentication, *api_settings.DEFAULT_AUTHENTICATION_CLASSES)
+
+    def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
+        verify_internal_request(request)
+        super().initial(request, *args, **kwargs)
 
     @extend_schema(
         description=(

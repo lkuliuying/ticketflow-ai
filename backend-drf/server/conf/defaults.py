@@ -49,6 +49,10 @@ BASE_CONFIG = {
     "XADMIN_APPS": [],
     "TICKETFLOW_DEFAULT_DEPARTMENT": "",
     "TICKETFLOW_CATEGORY_DEPARTMENTS": {},
+    "TICKETFLOW_INTERNAL_API_SECRET": "",
+    "TICKETFLOW_EMBEDDING_BASE_URL": "",
+    "TICKETFLOW_EMBEDDING_API_KEY": "",
+    "TICKETFLOW_EMBEDDING_MODEL": "",
     # ------------------------------------------------------------------
     # 功能模块裁剪（软裁剪）：预设 + 显式增删，模块清单与裁剪语义见
     # packages/xadmin-common/common/core/modules.py；默认 full = 全部开启，与改造前行为一致

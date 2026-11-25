@@ -57,9 +57,25 @@ class TicketViewerSerializer(serializers.Serializer):
     )
 
 
+class TicketAttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    filename = serializers.CharField()
+    filesize = serializers.IntegerField()
+    mime_type = serializers.CharField()
+    thumb_url = serializers.CharField()
+    url = serializers.CharField()
+
+
+class TicketChatStateSerializer(serializers.Serializer):
+    can_send = serializers.BooleanField()
+    lock_reason = serializers.CharField(allow_blank=True)
+
+
 class TicketDetailSerializer(TicketSerializer):
     viewer = TicketViewerSerializer(read_only=True)
     assistant_session_id = serializers.UUIDField(read_only=True, allow_null=True)
+    attachments = TicketAttachmentSerializer(many=True, read_only=True)
+    chat_state = TicketChatStateSerializer(read_only=True)
     rating = TicketRatingSerializer(
         read_only=True,
         allow_null=True,
@@ -79,6 +95,8 @@ class TicketDetailSerializer(TicketSerializer):
             "timeline",
             "rating",
             "assistant_session_id",
+            "attachments",
+            "chat_state",
         )
 
 

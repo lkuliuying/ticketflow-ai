@@ -1,5 +1,7 @@
 import json
+import secrets
 from datetime import timedelta
+from functools import partial
 from hashlib import sha256
 from typing import NotRequired, TypedDict, Unpack
 from uuid import UUID, uuid4
@@ -14,22 +16,36 @@ from identity.models import DeptInfo, UserInfo
 from tickets.assignment import dispatch, end_assignment, set_assignee
 from tickets.assistant_services import owned_session, require_employee
 from tickets.cache import IDEMPOTENCY_TTL, invalidate_dashboard, request_key, reserve_create
+from tickets.media import mark_media_permanent, resolve_owned_media
 from tickets.models import (
     Priority,
     Status,
     Ticket,
     TicketAssignment,
+    TicketAttachment,
     TicketComment,
     TicketCreateRequest,
     TicketLog,
     TicketRating,
     Visibility,
 )
-from tickets.policy import TRANSITIONS, TicketAccess, assignment_candidates
+from tickets.notify import broadcast_chat_event, notify_users
+from tickets.policy import ADMIN_ROLE, TRANSITIONS, TicketAccess, assignment_candidates
 from tickets.skill_groups import destination
 
 SLA_HOURS = {str(Priority.P0): 2, str(Priority.P1): 8, str(Priority.P2): 24, str(Priority.P3): 72}
 SLA_WARNING = timedelta(minutes=30)
+NUMBER_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def generate_ticket_number() -> str:
+    day = timezone.localdate().strftime("%Y%m%d")
+    suffix = "".join(secrets.choice(NUMBER_ALPHABET) for _ in range(6))
+    return f"TF-{day}-{suffix}"
+
+
+def _affected_users(ticket: Ticket, *extra_ids: int | None) -> tuple[int | None, ...]:
+    return (ticket.submitter_id, ticket.assignee_id, *extra_ids)
 
 
 class TicketConflict(APIException):
@@ -52,12 +68,25 @@ class RatingInput(TypedDict):
     comment: NotRequired[str | None]
 
 
+def _admin_user_ids() -> list[int]:
+    return list(
+        UserInfo.objects.filter(
+            is_active=True,
+            roles__code=ADMIN_ROLE,
+            roles__is_active=True,
+            roles__deleted_at__isnull=True,
+        )
+        .values_list("pk", flat=True)
+        .distinct()
+    )
+
+
 def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
     ticket_id = uuid4()
     department = destination(values["category"])
     ticket = Ticket.objects.create(
         id=ticket_id,
-        number=f"TF-{ticket_id.hex.upper()}",
+        number=generate_ticket_number(),
         submitter=user,
         creator=user,
         modifier=user,
@@ -70,29 +99,54 @@ def _make_ticket(user: UserInfo, values: NewTicket) -> Ticket:
     dispatch(ticket)
     if ticket.assignee_id is not None:
         ticket.save(update_fields=["assignee"])
-    transaction.on_commit(invalidate_dashboard, robust=True)
+        transaction.on_commit(
+            partial(
+                notify_users,
+                [ticket.assignee_id],
+                f"新工单 {ticket.number} 已自动指派给您",
+                f"标题：{ticket.title}",
+            ),
+            robust=True,
+        )
+    transaction.on_commit(partial(invalidate_dashboard, _affected_users(ticket)), robust=True)
     return ticket
 
 
+def _cached_ticket(user: UserInfo, redis_key: str, digest: str) -> Ticket | None:
+    cached = cache.get(redis_key)
+    if not cached:
+        return None
+    if digest != cached["hash"]:
+        raise TicketConflict("相同幂等键已用于其他请求")
+    return Ticket.objects.filter(pk=cached["ticket"], submitter=user).first()
+
+
 def create_ticket(
-    user: UserInfo, key: str, values: NewTicket, *, assistant_session_id: UUID | None = None
+    user: UserInfo,
+    key: str,
+    values: NewTicket,
+    *,
+    assistant_session_id: UUID | None = None,
+    attachment_ids: list[int] | None = None,
 ) -> tuple[Ticket, bool]:
     key_hash = sha256(key.encode()).hexdigest()
-    request_values = dict(values)
+    request_values: dict[str, object] = dict(values)
     if assistant_session_id is not None:
         require_employee(TicketAccess.for_user(user))
         request_values["assistant_session_id"] = str(assistant_session_id)
+    cleaned_attachments = list(dict.fromkeys(attachment_ids or []))
+    if cleaned_attachments:
+        request_values["attachment_ids"] = [str(item) for item in cleaned_attachments]
     digest = sha256(json.dumps(request_values, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     redis_key = request_key(user.pk, key_hash)
-    cached = cache.get(redis_key)
-    if cached:
-        if digest != cached["hash"]:
-            raise TicketConflict("相同幂等键已用于其他请求")
-        ticket = Ticket.objects.filter(pk=cached["ticket"], submitter=user).first()
-        if ticket is not None:
-            return ticket, False
+    existing = _cached_ticket(user, redis_key, digest)
+    if existing is not None:
+        return existing, False
     with reserve_create(redis_key):
-        return _persist_ticket(user, key_hash, digest, redis_key, values, assistant_session_id)
+        existing = _cached_ticket(user, redis_key, digest)
+        if existing is not None:
+            return existing, False
+        return _persist_ticket(user, key_hash, digest, redis_key, values, assistant_session_id, cleaned_attachments)
 
 
 @transaction.atomic
@@ -103,6 +157,7 @@ def _persist_ticket(
     redis_key: str,
     values: NewTicket,
     assistant_session_id: UUID | None = None,
+    attachment_ids: list[int] | None = None,
 ) -> tuple[Ticket, bool]:
     now = timezone.now()
     record, inserted = TicketCreateRequest.objects.select_for_update().get_or_create(
@@ -120,7 +175,16 @@ def _persist_ticket(
         session = owned_session(user.pk, assistant_session_id, lock=True)
         if session.ticket_id is not None:
             raise TicketConflict("此会话已关联工单")
+    uploads = [resolve_owned_media(user, file_pk, expected_kind="IMAGE") for file_pk in (attachment_ids or [])]
     ticket = _make_ticket(user, values)
+    if uploads:
+        mark_media_permanent(uploads)
+        TicketAttachment.objects.bulk_create(
+            [
+                TicketAttachment(ticket=ticket, file=upload, uploader=user, sort_order=idx)
+                for idx, upload in enumerate(uploads)
+            ]
+        )
     if session is not None:
         session.ticket = ticket
         session.save(update_fields=["ticket", "updated_time"])
@@ -163,7 +227,14 @@ def create_rating(
 
 
 def _record_change(
-    ticket: Ticket, user: UserInfo, action: str, previous: str, fields: list[str], note: str = ""
+    ticket: Ticket,
+    user: UserInfo,
+    action: str,
+    previous: str,
+    fields: list[str],
+    note: str = "",
+    *,
+    extra_users: tuple[int | None, ...] = (),
 ) -> Ticket:
     ticket.version += 1
     ticket.modifier = user
@@ -177,7 +248,9 @@ def _record_change(
         note=note,
         internal=action in ("ASSIGN", "RETURN", "AI_METADATA", "DEACTIVATED"),
     )
-    transaction.on_commit(invalidate_dashboard, robust=True)
+    transaction.on_commit(partial(invalidate_dashboard, _affected_users(ticket, *extra_users)), robust=True)
+    if action in ("TRANSITION", "ASSIGN", "RETURN", "DEACTIVATED"):
+        transaction.on_commit(partial(broadcast_chat_event, ticket.pk, "chat_state", {}), robust=True)
     return ticket
 
 
@@ -252,8 +325,19 @@ def assign(
         if assignee is None:
             raise ValidationError({"assignee_id": "处理人不在可指派范围内"})
         note = f"处理人：{assignee.username}"
+    previous_assignee = ticket.assignee_id
     set_assignee(ticket, assignee_id, user)
-    return _record_change(ticket, user, "ASSIGN", ticket.status, ["assignee"], note)
+    if assignee_id is not None and assignee_id != user.pk:
+        transaction.on_commit(
+            partial(
+                notify_users,
+                [assignee_id],
+                f"工单 {ticket.number} 已指派给您",
+                f"标题：{ticket.title}",
+            ),
+            robust=True,
+        )
+    return _record_change(ticket, user, "ASSIGN", ticket.status, ["assignee"], note, extra_users=(previous_assignee,))
 
 
 def release_assigned_tickets(assignee: UserInfo, actor: UserInfo, note: str) -> None:
@@ -261,7 +345,7 @@ def release_assigned_tickets(assignee: UserInfo, actor: UserInfo, note: str) -> 
     for ticket in tickets:
         end_assignment(ticket, str(TicketAssignment.EndReason.DEACTIVATED), note)
         ticket.assignee_id = None
-        _record_change(ticket, actor, "DEACTIVATED", ticket.status, ["assignee"], note)
+        _record_change(ticket, actor, "DEACTIVATED", ticket.status, ["assignee"], note, extra_users=(assignee.pk,))
 
 
 @transaction.atomic
@@ -274,9 +358,24 @@ def return_ticket(
     _check_version(ticket, version)
     if ticket.status == Status.CLOSED:
         raise TicketConflict("已关闭的工单不能退回")
+    previous_status = ticket.status
+    previous_assignee = ticket.assignee_id
     end_assignment(ticket, str(TicketAssignment.EndReason.RETURNED), reason)
     ticket.assignee_id = None
-    return _record_change(ticket, user, "RETURN", ticket.status, ["assignee"], reason)
+    fields = ["assignee"]
+    if ticket.status == Status.IN_PROGRESS:
+        ticket.status = Status.OPEN
+        fields.append("status")
+    transaction.on_commit(
+        partial(
+            notify_users,
+            _admin_user_ids(),
+            f"工单 {ticket.number} 已被退回待分配",
+            f"退回人：{user.username}；原因：{reason}",
+        ),
+        robust=True,
+    )
+    return _record_change(ticket, user, "RETURN", previous_status, fields, reason, extra_users=(previous_assignee,))
 
 
 @transaction.atomic
@@ -316,13 +415,25 @@ def save_ai_metadata(
     if not access.can_handle(ticket):
         raise PermissionDenied("无权更新此工单的 AI 建议")
     _check_version(ticket, version)
+    if ticket.status == Status.CLOSED:
+        raise TicketConflict("已关闭的工单不能修改 AI 建议")
     ticket.ai_summary = summary
     ticket.ai_tags = tags
     fields = ["ai_summary", "ai_tags"]
+    note = ""
     if category is not None:
         ticket.category = category
         fields.append("category")
-    if priority is not None:
+    if priority is not None and priority != ticket.priority:
+        old_priority = ticket.priority
         ticket.priority = priority
         fields.append("priority")
-    return _record_change(ticket, user, "AI_METADATA", ticket.status, fields)
+        if ticket.resolved_at is None:
+            cycle_start = ticket.sla_due_at - timedelta(hours=SLA_HOURS[old_priority])
+            ticket.sla_due_at = cycle_start + timedelta(hours=SLA_HOURS[priority])
+            fields.append("sla_due_at")
+            note = f"优先级调整为 {priority}，已同步更新本轮 SLA"
+    elif priority is not None:
+        ticket.priority = priority
+        fields.append("priority")
+    return _record_change(ticket, user, "AI_METADATA", ticket.status, fields, note)

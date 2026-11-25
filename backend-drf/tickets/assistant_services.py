@@ -12,6 +12,49 @@ from tickets.policy import TicketAccess
 
 HISTORY_TURNS = 10
 HISTORY_CHARACTERS = 8000
+FOLLOW_UP_CUES = (
+    "这个",
+    "那个",
+    "这样",
+    "上面",
+    "刚才",
+    "第一步",
+    "第二步",
+    "第三步",
+    "下一步",
+    "还是不行",
+    "依然",
+    "还是",
+    "不行",
+    "试了",
+    "尝试",
+    "继续",
+    "怎么操作",
+    "具体",
+    "然后呢",
+    "mac",
+    "windows",
+    "linux",
+    "ios",
+    "android",
+    "still",
+    "that",
+    "above",
+)
+
+
+def _needs_history_context(message: str) -> bool:
+    lowered = message.strip().lower()
+    return any(cue in lowered for cue in FOLLOW_UP_CUES)
+
+
+def _retrieval_text(message: str, history: list[dict[str, str]]) -> str:
+    if not history or not _needs_history_context(message):
+        return message
+    recent_questions = [item["content"] for item in history if item.get("role") == AssistantMessage.Role.USER][-2:]
+    if not recent_questions:
+        return message
+    return " ".join([*recent_questions, message])
 
 
 class SessionHandedOff(APIException):
@@ -63,7 +106,9 @@ def record_question(user_id: int, session_id: UUID, message: str) -> dict[str, o
     if apps.is_installed("knowledge"):
         from knowledge.services import references_for_text
 
-        references = references_for_text(message)
+        history_rows = context.get("history")
+        query_text = _retrieval_text(message, history_rows if isinstance(history_rows, list) else [])
+        references = references_for_text(query_text)
     question = AssistantMessage.objects.create(session=session, role=AssistantMessage.Role.USER, content=message)
     session.save(update_fields=["updated_time"])
     return {**context, "user_message_id": question.pk, "references": references}

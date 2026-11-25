@@ -123,7 +123,7 @@ def test_return_preserves_status_and_makes_the_previous_technician_read_only(
         returned = operator.post(f"{path}/return", {"version": 2, "reason": reason}, format="json")
     assert returned.status_code == 200, returned.data
     data = returned.data["data"]
-    assert (data["assignee_id"], data["status"], data["version"]) == (None, Status.IN_PROGRESS, 3)
+    assert (data["assignee_id"], data["status"], data["version"]) == (None, Status.OPEN, 3)
     history = ticket.assignments.get()
     assert history.ended_at is not None and history.end_reason == TicketAssignment.EndReason.RETURNED
     assert history.note == ticket.logs.get(action="RETURN").note == reason

@@ -14,6 +14,7 @@ from common.core.modelset.viewsets import OnlyListModelSet
 from common.core.response import ApiResponse
 from identity.models import UserInfo
 from knowledge.api_schema import article_list_result, article_result, context_result
+from knowledge.embeddings import sync_article_chunks
 from knowledge.filters import ArticleFilter
 from knowledge.models import ArticleStatus, KnowledgeArticle
 from knowledge.serializers import (
@@ -25,7 +26,9 @@ from knowledge.serializers import (
 )
 from knowledge.services import article_key, create_article, load_article_detail, references_for
 from tickets.cache import check_rate
-from tickets.models import Category
+from tickets.chat_services import recent_chat_context
+from tickets.internal_auth import verify_internal_request
+from tickets.models import Category, Status
 from tickets.policy import TicketAccess, has_permission
 from tickets.serializers import TicketSerializer
 from tickets.views import TicketViewSet
@@ -129,6 +132,7 @@ class ArticleViewSet(OnlyListModelSet, DetailAction):
             raise PermissionDenied("只有管理员可发布、归档或编辑非草稿文章")
         old_key = article_key(article)
         serializer.save(modifier=self.actor)
+        sync_article_chunks(article)
         transaction.on_commit(lambda: cache.delete(old_key), robust=True)
         return self._response(article)
 
@@ -139,8 +143,13 @@ class TicketAiContextView(TicketViewSet):
     @extend_schema(responses=context_result)
     def context(self, request: Request, **kwargs: Any) -> ApiResponse:
         """读取工单 AI 上下文"""
+        verify_internal_request(request)
         ticket = self.get_object()
-        if not self.access.can_handle(ticket):
+        purpose = request.query_params.get("purpose", "").strip()
+        can_use_ai = self.access.can_handle(ticket) or (
+            purpose == "kb-draft" and ticket.status == Status.CLOSED and self.access.can_archive(ticket)
+        )
+        if not can_use_ai:
             raise PermissionDenied("无权使用此工单的 AI 上下文")
         check_rate(self.actor.pk, "ai-context", 60)
         payload = TicketSerializer(ticket, context=self.get_serializer_context()).data
@@ -152,5 +161,6 @@ class TicketAiContextView(TicketViewSet):
                 "ticket": {"id" if field == "pk" else field: payload[field] for field in fields},
                 "categories": list(Category.values),
                 "references": references_for(ticket),
+                "recent_messages": recent_chat_context(ticket),
             }
         )

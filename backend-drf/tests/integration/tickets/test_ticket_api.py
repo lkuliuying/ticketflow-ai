@@ -449,7 +449,7 @@ def test_ticket_list_and_detail_queries_do_not_grow_with_rows(users, make_ticket
         for _ in range(8)
     )
     large = query_counts(total=12, timeline_size=18)
-    assert small == large == (7, 13)
+    assert small == large == (8, 14)
 
 
 def test_create_rate_limit_returns_retry_after_without_creating_another_ticket(users, client_for, details):

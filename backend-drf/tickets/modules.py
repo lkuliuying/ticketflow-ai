@@ -29,5 +29,6 @@ MODULES = (
             r"^/api/ticketflow/skill-groups(?:/|$)",
             r"^/api/assistant/",
         ),
+        ws_routes=(r"^/?ws/tickets/",),
     ),
 )
