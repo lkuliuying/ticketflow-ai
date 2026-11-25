@@ -20,6 +20,7 @@ ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_VIDEO_EXTS = {".mp4", ".webm"}
 RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
 CHUNK_SIZE = 65536
+TICKET_MEDIA_SOURCE = "ticket_media"
 
 
 def sniff_media_kind(uploaded: Any, filename: str) -> tuple[str, str]:
@@ -30,13 +31,13 @@ def sniff_media_kind(uploaded: Any, filename: str) -> tuple[str, str]:
     if hasattr(uploaded, "seek"):
         uploaded.seek(pos)
     if ext in ALLOWED_IMAGE_EXTS:
-        if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        if ext == ".png" and header.startswith(b"\x89PNG\r\n\x1a\n"):
             return "IMAGE", "image/png"
-        if header.startswith(b"\xff\xd8\xff"):
+        if ext in (".jpg", ".jpeg") and header.startswith(b"\xff\xd8\xff"):
             return "IMAGE", "image/jpeg"
-        if header[:6] in (b"GIF87a", b"GIF89a"):
+        if ext == ".gif" and header[:6] in (b"GIF87a", b"GIF89a"):
             return "IMAGE", "image/gif"
-        if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        if ext == ".webp" and header[:4] == b"RIFF" and header[8:12] == b"WEBP":
             return "IMAGE", "image/webp"
         raise ValidationError({"file": "图片文件内容与扩展名不匹配"})
     if ext in ALLOWED_VIDEO_EXTS:
@@ -61,14 +62,12 @@ def upload_ticket_media(user: Any, uploaded: Any, *, allow_video: bool) -> dict[
         limit_mb = max_bytes // (1024 * 1024)
         raise ValidationError({"file": f"文件大小须在 1 字节至 {limit_mb} MB 之间"})
     try:
-        check_upload_limits(user, [uploaded])
-        record, _ = store_upload_file(user, uploaded, is_tmp=True)
+        check_upload_limits(user, [uploaded], max_bytes=max_bytes)
+        uploaded.content_type = safe_mime
+        record, _ = store_upload_file(user, uploaded, is_tmp=True, upload_source=TICKET_MEDIA_SOURCE)
         invalidate_upload_stats_cache(user.pk)
     except UploadError as exc:
         raise ValidationError({"file": str(exc)}) from exc
-    if record.mime_type != safe_mime:
-        record.mime_type = safe_mime
-        record.save(update_fields=["mime_type", "updated_time"])
     return {
         "file_pk": str(record.pk),
         "kind": kind,
@@ -79,7 +78,11 @@ def upload_ticket_media(user: Any, uploaded: Any, *, allow_video: bool) -> dict[
 
 
 def resolve_owned_media(user: Any, file_pk: int | str | UUID, *, expected_kind: str) -> UploadFile:
-    upload = UploadFile.objects.filter(pk=file_pk, is_upload=True, creator_id=user.pk).first()
+    upload = (
+        UploadFile.objects.select_for_update()
+        .filter(pk=file_pk, is_upload=True, creator_id=user.pk, upload_source=TICKET_MEDIA_SOURCE)
+        .first()
+    )
     if upload is None:
         raise ValidationError({"file_pk": "附件不存在或无权使用"})
     mime = str(upload.mime_type or "").lower()
@@ -165,15 +168,19 @@ def serve_media_response(upload: UploadFile | None, request: Request, *, kind: s
                 if cached_file.is_file():
                     resp = FileResponse(cached_file.open("rb"), content_type="image/jpeg")
                     resp["Cache-Control"] = "private, max-age=300"
+                    resp["X-Content-Type-Options"] = "nosniff"
                     return resp
         mime = str(upload.mime_type or "image/png").split(";")[0].strip().lower()
         if not mime.startswith("image/") or "svg" in mime:
             mime = "application/octet-stream"
         resp = FileResponse(storage_open(upload.filepath.name, "rb"), content_type=mime)
         resp["Cache-Control"] = "private, max-age=300"
-        resp["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(upload.filename)}"
+        resp["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(upload.filename, safe='')}"
+        resp["X-Content-Type-Options"] = "nosniff"
         return resp
     mime = str(upload.mime_type or "video/mp4").split(";")[0].strip().lower()
     if mime not in ("video/mp4", "video/webm"):
         raise NotFound("不支持的视频格式")
-    return _video_response(upload, request, mime)
+    video = _video_response(upload, request, mime)
+    video["X-Content-Type-Options"] = "nosniff"
+    return video

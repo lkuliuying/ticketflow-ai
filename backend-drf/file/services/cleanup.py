@@ -12,6 +12,8 @@ import datetime
 from typing import Any
 
 from celery.utils.log import get_task_logger
+from django.db import transaction
+from django.db.models import ProtectedError
 from django.utils import timezone
 
 from common.storage import clean_storage_cache
@@ -21,17 +23,27 @@ from file.utils.preview import clean_preview_cache
 logger = get_task_logger(__name__)
 
 
+def _delete_expired_upload(record: UploadFile, *, is_tmp: bool) -> bool:
+    try:
+        with transaction.atomic():
+            locked = UploadFile.all_objects.select_for_update().filter(pk=record.pk, is_tmp=is_tmp).first()
+            if locked is None or locked.has_business_reference():
+                return False
+            locked.hard_delete()
+    except ProtectedError:
+        return False
+    return True
+
+
 def auto_clean_tmp_file(clean_day: int = 1) -> None:
     clean_time = timezone.now() - datetime.timedelta(days=clean_day)
     _rows_count = 0
     for instance in UploadFile.all_objects.filter(created_time__lte=clean_time, is_tmp=True):
-        if instance.has_business_reference():
-            # is_tmp 可能被历史数据误置 True：仍被业务引用时不能硬删（外键 SET_NULL 会断链）
+        if not _delete_expired_upload(instance, is_tmp=True):
             logger.warning("skip business-referenced tmp upload: %s", instance.pk)
             continue
         # 临时文件无回收价值，必须物理删除（含底层文件清理），
         # 否则软删除标记会导致磁盘泄漏
-        instance.hard_delete()
         _rows_count += 1
     logger.info(f"clean {_rows_count} upload tmp file")
 
@@ -62,10 +74,9 @@ def auto_clean_upload_file(keep_days: int | None = None, batch_size: int = 2000)
         if not records:
             break
         for record in records:
-            if record.has_business_reference():
+            if not _delete_expired_upload(record, is_tmp=False):
                 skipped.add(record.pk)
                 continue
-            record.hard_delete()
             removed += 1
     logger.info(f"clean {removed} upload file, keep_days {days}")
     return removed

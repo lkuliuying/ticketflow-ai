@@ -1,29 +1,27 @@
+from itertools import batched
+
 from django.db import migrations
 
 
 def migrate_public_comments(apps, schema_editor):
     TicketComment = apps.get_model("tickets", "TicketComment")
     TicketChatMessage = apps.get_model("tickets", "TicketChatMessage")
-    comments = TicketComment.objects.filter(visibility="PUBLIC").order_by("created_time", "id")
-    existing_ids = set(TicketChatMessage.objects.values_list("id", flat=True))
-    to_create = [
-        TicketChatMessage(
-            id=comment.id,
-            ticket_id=comment.ticket_id,
-            sender_id=comment.author_id,
-            kind="TEXT",
-            content=comment.body,
-            created_time=comment.created_time,
+    alias = schema_editor.connection.alias
+    comments = TicketComment.objects.using(alias).filter(visibility="PUBLIC").order_by("id")
+    messages = TicketChatMessage.objects.using(alias)
+    for batch in batched(comments.iterator(chunk_size=500), 500, strict=False):
+        existing = set(messages.filter(pk__in=[row.pk for row in batch]).values_list("pk", flat=True))
+        pending = [row for row in batch if row.pk not in existing]
+        created = messages.bulk_create(
+            TicketChatMessage(
+                id=row.pk, ticket_id=row.ticket_id, sender_id=row.author_id, kind="TEXT", content=row.body
+            )
+            for row in pending
         )
-        for comment in comments
-        if comment.id not in existing_ids
-    ]
-    if to_create:
-        TicketChatMessage.objects.bulk_create(to_create, batch_size=500)
-        # auto_now_add overwrites created_time on bulk_create; restore exact timestamps.
-        for item, comment in zip(to_create, [c for c in comments if c.id not in existing_ids], strict=True):
+        # auto_now_add assigns the migration time on insert.
+        for item, comment in zip(created, pending, strict=True):
             item.created_time = comment.created_time
-        TicketChatMessage.objects.bulk_update(to_create, ["created_time"], batch_size=500)
+        messages.bulk_update(created, ["created_time"])
 
 
 class Migration(migrations.Migration):

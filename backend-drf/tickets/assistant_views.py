@@ -10,9 +10,9 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
+from common.core.auth import CookieJWTAuthentication
 from common.core.modelset.base import BaseViewSet
 from common.core.response import ApiResponse
 from tickets import assistant_schema as schema
@@ -35,7 +35,10 @@ from tickets.internal_auth import InternalServiceUserAuthentication, verify_inte
 from tickets.models import AssistantFeedback, AssistantSession
 from tickets.policy import TicketAccess
 
-internal_headers = [OpenApiParameter("Retry-After", int, OpenApiParameter.HEADER, response=[429])]
+internal_headers = [
+    OpenApiParameter("X-Internal-Token", str, OpenApiParameter.HEADER, required=True),
+    OpenApiParameter("Retry-After", int, OpenApiParameter.HEADER, response=[429]),
+]
 session_id_parameter = OpenApiParameter("id", UUID, OpenApiParameter.PATH, description="会话 UUID")
 
 
@@ -130,11 +133,11 @@ class AssistantSessionViewSet(EmployeeAssistantViewSet):
 class AssistantInternalViewSet(EmployeeAssistantViewSet):
     """助手内网调用"""
 
-    authentication_classes = (InternalServiceUserAuthentication, *api_settings.DEFAULT_AUTHENTICATION_CLASSES)
+    authentication_classes = (CookieJWTAuthentication,)
 
     def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
-        verify_internal_request(request)
         super().initial(request, *args, **kwargs)
+        verify_internal_request(request)
 
     @extend_schema(
         description=(
@@ -156,12 +159,20 @@ class AssistantInternalViewSet(EmployeeAssistantViewSet):
         )
 
     @extend_schema(
-        description="仅供 FastAPI 内网调用。转人工后仍可写回已有提问的回答，重放返回首次保存的回答 ID。",
+        description="FastAPI 可使用内部令牌与用户 ID 写回已有提问的回答。用户 JWT 若提供须通过认证。重放返回首次保存的回答 ID。",
         request=AnswerInputSerializer,
-        parameters=[session_id_parameter, *internal_headers],
+        parameters=[
+            session_id_parameter,
+            *internal_headers,
+            OpenApiParameter("X-Internal-User-Id", int, OpenApiParameter.HEADER),
+        ],
         responses={200: schema.answer_result, **schema.internal_errors},
     )
-    @action(detail=True, methods=["post"])
+    @action(
+        detail=True,
+        methods=["post"],
+        authentication_classes=[CookieJWTAuthentication, InternalServiceUserAuthentication],
+    )
     def answer(self, request: Request, pk: UUID) -> ApiResponse:
         """记录助手回答"""
         serializer = AnswerInputSerializer(data=request.data)

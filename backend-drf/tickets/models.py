@@ -272,7 +272,7 @@ class AssistantFeedback(DbBaseModel, DbUuidModel):
 
 class TicketAttachment(DbUuidModel):
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="attachments")
-    file = models.ForeignKey("file.UploadFile", on_delete=models.PROTECT, related_name="+")
+    file = models.ForeignKey("file.UploadFile", on_delete=models.PROTECT, related_name="ticket_attachments")
     uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     sort_order = models.PositiveSmallIntegerField(default=0)
     created_time = models.DateTimeField(auto_now_add=True)
@@ -297,7 +297,7 @@ class TicketChatMessage(DbUuidModel):
     kind = models.CharField(max_length=8, choices=Kind.choices, default=Kind.TEXT)
     content = models.TextField(blank=True, default="")
     attachment = models.ForeignKey(
-        "file.UploadFile", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+        "file.UploadFile", on_delete=models.PROTECT, null=True, blank=True, related_name="ticket_chat_messages"
     )
     media_meta = models.JSONField(default=dict, blank=True)
     media_expired = models.BooleanField(default=False)

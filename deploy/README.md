@@ -18,6 +18,8 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps -a
 
 首条命令按 `.env.example` 生成 `deploy/.env`，并填入随机密钥。已有 `.env` 时直接使用它。保留这份文件，以便重启后继续访问数据库和现有会话。`SECRET_KEY` 与 `JWT_SIGNING_KEY` 分开，DRF 和 FastAPI 共用 `JWT_SIGNING_KEY`。自定义 `REDIS_PASSWORD` 时使用字母、数字、下划线和连字符，以便在 Redis 连接 URL 中使用。
 
+已有 `deploy/.env` 升级时应填入独立生成的 `INTERNAL_API_SECRET`，可用 `python -c "import secrets; print(secrets.token_urlsafe(48))"` 生成。Compose 将它同时传给两服务，DRF 用 `TICKETFLOW_INTERNAL_API_SECRET` 校验。直接启动 DRF 时，空密钥会拒绝所有工单和助手内网接口。
+
 交付栈也为 DRF 和 FastAPI 共用 `JWT_LEEWAY_SECONDS`，默认 30 秒。签发时间的超前量和到期时间的宽限期都受此值限制。可在 `deploy/.env` 中设置为非负整数，设为 0 时严格按当前时钟验证。
 
 `LOGIN_THROTTLE_RATE` 控制登录与登录能力查询共用的每 IP 额度。新生成的 `.env` 将该项留空，演示模式使用 `1000/h`，生产模式使用 `50/h`。填写明确的速率可覆盖默认值，修改后执行 `up -d` 重建服务。
@@ -84,6 +86,16 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env down
 `down` 保留数据卷。仅在确认要清除整个交付栈数据时运行 `docker compose -f deploy/docker-compose.yml --env-file deploy/.env down -v`。它会删除该项目的 PostgreSQL、Redis 和上传文件卷。
 
 升级前备份 PostgreSQL、上传文件以及 `.env`，然后在新的代码版本下执行 `down` 和 `up -d --build`。启动依赖保证 `init` 跑完迁移并补齐种子后才启动应用。检查 `init` 退出码和健康接口，再开放流量。
+
+降级前停止业务写入并备份 PostgreSQL 与上传文件卷。降级至工单迁移 `0010` 之前会删除建单附件关联、排查会话和已读状态，降级至知识库迁移 `0004` 之前会删除知识分块及向量。再次升级只会重新复制旧公开回复。需要恢复升级后写入的会话时，应使用降级前备份与匹配的应用版本恢复。回退平铺菜单迁移会恢复 TicketFlow 目录、页面顺序及当前页面授权对应的目录授权。
+
+知识库分块迁移要求 PostgreSQL 安装 pgvector，交付镜像已包含该扩展。外部 PostgreSQL 实例可由数据库管理员预先执行 `CREATE EXTENSION vector`。应用在文章保存提交后由 Celery worker 重建分块。升级后可在维护窗口回填存量文章，配置或更换 embedding 模型后也可重复运行。
+
+```sh
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec drf-web python manage.py rebuild_knowledge_chunks
+```
+
+未绑定且在升级前从工单媒体入口上传的临时文件需要重新上传。已绑定的媒体保留原引用。
 
 ## 常见故障
 

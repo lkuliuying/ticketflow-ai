@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
+from django.db.models import Count, F, OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
@@ -12,7 +12,7 @@ from tickets.cache import check_rate
 from tickets.media import mark_media_permanent, resolve_owned_media
 from tickets.models import Status, Ticket, TicketChatMessage, TicketChatReadState
 from tickets.notify import broadcast_chat_event, notify_users
-from tickets.policy import TicketAccess
+from tickets.policy import TicketAccess, has_permission
 
 MAX_CHAT_TEXT = 4000
 MEDIA_PLACEHOLDER = {
@@ -21,7 +21,10 @@ MEDIA_PLACEHOLDER = {
 }
 
 
-def chat_state(ticket: Ticket, access: TicketAccess) -> dict[str, Any]:
+CHAT_SEND_PERMISSION = "chatSend:TicketFlowTickets"
+
+
+def chat_state(ticket: Ticket, access: TicketAccess, *, can_send: bool = True) -> dict[str, Any]:
     if ticket.status == Status.CLOSED:
         return {"can_send": False, "lock_reason": "CLOSED"}
     if ticket.status == Status.OPEN:
@@ -30,7 +33,7 @@ def chat_state(ticket: Ticket, access: TicketAccess) -> dict[str, Any]:
         return {"can_send": False, "lock_reason": "WAITING_RESUME"}
     if ticket.assignee_id is None:
         return {"can_send": False, "lock_reason": "UNASSIGNED"}
-    if access.user_id != ticket.submitter_id and not access.can_handle(ticket):
+    if not can_send or not access.can_reply(ticket):
         return {"can_send": False, "lock_reason": "READ_ONLY"}
     return {"can_send": True, "lock_reason": ""}
 
@@ -71,10 +74,7 @@ def unread_counts(ticket_ids: list[UUID], user_id: int) -> dict[UUID, int]:
         TicketChatMessage.objects.filter(ticket_id__in=ticket_ids)
         .exclude(sender_id=user_id)
         .annotate(last_read=last_read)
-        .filter(Q(last_read__isnull=True) | Q(created_time__gt=OuterRef("last_read")) if False else Q())
     )
-    # Use F expression cleanly against the annotated subquery.
-    from django.db.models import F
 
     counts = (
         rows.filter(Q(last_read__isnull=True) | Q(created_time__gt=F("last_read")))
@@ -92,34 +92,26 @@ def list_chat_messages(
     limit: int = 50,
     before_id: UUID | None = None,
     after_id: UUID | None = None,
+    can_send: bool = True,
 ) -> dict[str, Any]:
-    limit = max(1, min(limit, 100))
     queryset = ticket.chat_messages.select_related("sender")
-    if before_id is not None:
-        pivot = ticket.chat_messages.filter(pk=before_id).values("created_time", "pk").first()
-        if pivot is not None:
-            queryset = queryset.filter(
-                Q(created_time__lt=pivot["created_time"]) | Q(created_time=pivot["created_time"], pk__lt=pivot["pk"])
-            )
-    if after_id is not None:
-        pivot = ticket.chat_messages.filter(pk=after_id).values("created_time", "pk").first()
-        if pivot is not None:
-            queryset = queryset.filter(
-                Q(created_time__gt=pivot["created_time"]) | Q(created_time=pivot["created_time"], pk__gt=pivot["pk"])
-            )
-            items = list(queryset.order_by("created_time", "id")[:limit])
-            return {
-                "results": [serialize_chat_message(row, ticket.pk) for row in items],
-                "has_more": False,
-                "chat_state": chat_state(ticket, access),
-            }
-    rows = list(queryset.order_by("-created_time", "-id")[: limit + 1])
-    has_more = len(rows) > limit
-    items = list(reversed(rows[:limit]))
+    cursor_id = after_id or before_id
+    if cursor_id is not None:
+        pivot = ticket.chat_messages.filter(pk=cursor_id).values("created_time", "pk").first()
+        if pivot is None:
+            raise ValidationError({"after_id" if after_id else "before_id": "游标不属于当前工单"})
+        timestamp, pk = pivot["created_time"], pivot["pk"]
+        if after_id is not None:
+            queryset = queryset.filter(Q(created_time__gt=timestamp) | Q(created_time=timestamp, pk__gt=pk))
+        else:
+            queryset = queryset.filter(Q(created_time__lt=timestamp) | Q(created_time=timestamp, pk__lt=pk))
+    order = ("created_time", "pk") if after_id is not None else ("-created_time", "-pk")
+    rows = list(queryset.order_by(*order)[: limit + 1])
+    items = rows[:limit] if after_id is not None else reversed(rows[:limit])
     return {
         "results": [serialize_chat_message(row, ticket.pk) for row in items],
-        "has_more": has_more,
-        "chat_state": chat_state(ticket, access),
+        "has_more": len(rows) > limit,
+        "chat_state": chat_state(ticket, access, can_send=can_send),
     }
 
 
@@ -140,7 +132,7 @@ def send_chat_message(
     ticket = Ticket.objects.select_for_update().filter(pk=ticket_id, pk__in=visible_ids).first()
     if ticket is None:
         raise NotFound("工单不存在")
-    state = chat_state(ticket, access)
+    state = chat_state(ticket, access, can_send=has_permission(user, CHAT_SEND_PERMISSION))
     if not state["can_send"]:
         raise PermissionDenied("当前工单会话不可发送消息")
     cleaned_client_id = client_msg_id.strip()[:64]
@@ -183,9 +175,15 @@ def send_chat_message(
                 client_msg_id=cleaned_client_id,
             )
     except IntegrityError:
-        existing = TicketChatMessage.objects.select_related("sender").get(
-            ticket=ticket, sender=user, client_msg_id=cleaned_client_id
+        if not cleaned_client_id:
+            raise
+        existing = (
+            TicketChatMessage.objects.select_related("sender")
+            .filter(ticket=ticket, sender=user, client_msg_id=cleaned_client_id)
+            .first()
         )
+        if existing is None:
+            raise
         return existing, False
     if access.can_handle(ticket) and user.pk != ticket.submitter_id and ticket.first_response_at is None:
         ticket.first_response_at = msg.created_time
@@ -196,12 +194,12 @@ def send_chat_message(
     payload = serialize_chat_message(msg, ticket.pk)
     transaction.on_commit(partial(broadcast_chat_event, ticket.pk, "chat_message", payload), robust=True)
     preview_text = cleaned_content[:120] if cleaned_content else MEDIA_PLACEHOLDER.get(kind, "[媒体消息]")
-    recipient_id = ticket.assignee_id if user.pk == ticket.submitter_id else ticket.submitter_id
-    if recipient_id and recipient_id != user.pk:
+    recipients = sorted(pk for pk in {ticket.submitter_id, ticket.assignee_id} if pk is not None and pk != user.pk)
+    if recipients:
         transaction.on_commit(
             partial(
                 notify_users,
-                [recipient_id],
+                recipients,
                 f"工单 {ticket.number} 收到新消息",
                 f"{user.username}：{preview_text}",
             ),

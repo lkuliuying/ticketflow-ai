@@ -58,9 +58,11 @@ def users(seeded_module, db) -> dict[str, UserInfo]:
 
 
 @pytest.fixture
-def client_for():
+def client_for(settings):
     def authenticate(user: UserInfo) -> APIClient:
-        client = APIClient(HTTP_USER_AGENT="pytest-agent")
+        client = APIClient(
+            HTTP_USER_AGENT="pytest-agent", HTTP_X_INTERNAL_TOKEN=settings.TICKETFLOW_INTERNAL_API_SECRET
+        )
         client.force_authenticate(user=user)
         return client
 

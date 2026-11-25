@@ -28,12 +28,14 @@ ASSISTANT_ERRORS = {
 
 
 def _request_headers(resources: Resources, raw_token: str, *, user_id: str | int | None = None) -> dict[str, str]:
-    headers: dict[str, str] = {"Authorization": f"Bearer {raw_token}"}
+    headers: dict[str, str] = {}
     secret = resources.settings.internal_api_secret
     if secret is not None and secret.get_secret_value().strip():
         headers["X-Internal-Token"] = secret.get_secret_value()
         if user_id is not None:
             headers["X-Internal-User-Id"] = str(user_id)
+    if "X-Internal-User-Id" not in headers:
+        headers["Authorization"] = f"Bearer {raw_token}"
     request_id = get_request_id()
     if request_id:
         headers["X-Request-ID"] = request_id

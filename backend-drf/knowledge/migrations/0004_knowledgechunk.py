@@ -1,11 +1,8 @@
-import logging
 import uuid
 
 import django.db.models.deletion
 import pgvector.django.vector
 from django.db import DatabaseError, migrations, models, transaction
-
-logger = logging.getLogger(__name__)
 
 
 def create_vector_extension(apps, schema_editor):
@@ -15,8 +12,10 @@ def create_vector_extension(apps, schema_editor):
     try:
         with transaction.atomic(using=connection.alias), connection.cursor() as cursor:
             cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    except DatabaseError:
-        logger.warning("无法创建 vector 扩展，知识库检索将回退到关键词与 trigram 通道。", exc_info=True)
+    except DatabaseError as exc:
+        raise RuntimeError(
+            "知识库迁移需要 PostgreSQL pgvector。请安装 pgvector，并让数据库管理员执行 CREATE EXTENSION vector。"
+        ) from exc
 
 
 class Migration(migrations.Migration):

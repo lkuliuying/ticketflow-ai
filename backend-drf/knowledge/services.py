@@ -1,4 +1,5 @@
 import re
+from functools import partial
 from uuid import UUID
 
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
@@ -8,8 +9,9 @@ from django.db.models import Case, Expression, F, IntegerField, Q, Value, When
 from rest_framework.exceptions import NotFound, PermissionDenied
 
 from identity.models import UserInfo
-from knowledge.embeddings import embedding_configured, sync_article_chunks, vector_candidates
+from knowledge.embeddings import embedding_configured, vector_candidates
 from knowledge.models import ArticleStatus, KnowledgeArticle
+from knowledge.tasks import rebuild_article_chunks
 from tickets.models import Status, Ticket
 from tickets.policy import TicketAccess
 from tickets.services import TicketConflict
@@ -42,7 +44,7 @@ CJK_STOP_WORDS = (
     "看看",
     "进行",
 )
-CJK_SPLIT_RE = re.compile(r"[的了吗呢啊吧是在我你他这那和与或都也就还要会到给把被让从对向于把]+")
+CJK_SPLIT_RE = re.compile(r"[的了吗呢啊吧是在我你他这那和与或都也就还要会到给把被让从对向于]+")
 TOKEN_RE = re.compile(r"[\u3400-\u9fff]{2,}|[A-Za-z0-9][A-Za-z0-9._-]{1,31}")
 
 
@@ -84,8 +86,12 @@ def create_article(
     article = KnowledgeArticle.objects.create(
         creator=user, modifier=user, dept_belong_id=user.dept_id, source_ticket_id=source_ticket_id, **values
     )
-    sync_article_chunks(article)
+    schedule_article_chunks(article)
     return article
+
+
+def schedule_article_chunks(article: KnowledgeArticle) -> None:
+    transaction.on_commit(partial(rebuild_article_chunks.delay, str(article.pk)), robust=True)
 
 
 def extract_search_terms(text: str, *, max_terms: int = 16) -> list[str]:
@@ -173,7 +179,7 @@ def references_for_text(text: str, *, category: str | None = None, limit: int = 
     keyword_hits = _keyword_references(text, category=category, limit=limit)
     if not embedding_configured():
         return keyword_hits
-    vec_hits = vector_candidates(text, category=category, limit=limit)
+    vec_hits = vector_candidates(text, limit=limit)
     if not vec_hits:
         return keyword_hits
     scores: dict[str, float] = {}
