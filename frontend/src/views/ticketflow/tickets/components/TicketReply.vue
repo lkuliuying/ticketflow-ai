@@ -2,15 +2,11 @@
 import type { TicketRun } from "../utils/useTicketDetail";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-  ticketApi,
-  type CommentVisibility,
-  type TicketDetail
-} from "@/api/ticketflow/tickets";
+import { ticketApi, type TicketDetail } from "@/api/ticketflow/tickets";
 
 /**
- * 回复框：处理人可选“对外回复 / 内部备注”，提交人只能对外回复。
- * 回复只追加、不需要版本号；客服的首条对外回复会写入首次响应时间。
+ * 内部备注框：仅技术员与管理员可见，用于记录内部排查进展。
+ * 对外实时沟通统一由工单排查会话（TicketChatPanel）承接。
  */
 defineOptions({ name: "TicketFlowTicketReply" });
 
@@ -22,7 +18,6 @@ const props = defineProps<{
 
 const { t } = useI18n();
 const body = ref("");
-const visibility = ref<CommentVisibility>("PUBLIC");
 const sending = ref(false);
 
 async function send() {
@@ -33,53 +28,33 @@ async function send() {
     () =>
       ticketApi.comments(props.ticket.pk, {
         body: text,
-        visibility: props.ticket.viewer.can_comment_internal
-          ? visibility.value
-          : "PUBLIC"
+        visibility: "INTERNAL"
       }),
-    t("ticketflow.detail.replied")
+    t("ticketflow.detail.internalNoteSent")
   );
   sending.value = false;
   if (ok) body.value = "";
 }
-
-/** 外部填入建议回复（如 AI 生成）：始终回到对外回复，避免误以内部备注发出 */
-defineExpose({
-  fill: (text: string) => {
-    body.value = text;
-    visibility.value = "PUBLIC";
-  }
-});
 </script>
 
 <template>
-  <div class="flex flex-col gap-2" data-testid="ticket-reply">
+  <div class="flex flex-col gap-2" data-testid="ticket-internal-note">
     <el-input
       v-model="body"
       type="textarea"
-      :rows="4"
+      :rows="3"
       maxlength="20000"
       show-word-limit
-      :placeholder="t('ticketflow.detail.replyPlaceholder')"
+      :placeholder="t('ticketflow.detail.internalNotePlaceholder')"
     />
     <div class="flex-bc">
-      <el-radio-group
-        v-if="ticket.viewer.can_comment_internal"
-        v-model="visibility"
-        size="small"
-      >
-        <el-radio-button value="PUBLIC">
-          {{ t("ticketflow.visibility.PUBLIC") }}
-        </el-radio-button>
-        <el-radio-button value="INTERNAL">
-          {{ t("ticketflow.visibility.INTERNAL") }}
-        </el-radio-button>
-      </el-radio-group>
-      <span v-else class="text-sm text-(--el-text-color-secondary)">
-        {{ t("ticketflow.visibility.PUBLIC") }}
+      <span class="text-sm text-(--el-text-color-secondary)">
+        {{ t("ticketflow.detail.internalNote") }}
       </span>
       <el-button
-        type="primary"
+        type="warning"
+        plain
+        size="small"
         :loading="sending"
         :disabled="!body.trim() || busy"
         @click="send"

@@ -11,6 +11,7 @@ commonLabels:
   updated_time: 更新时间
   descending: 降序
   ascending: 升序
+  accountSwitched: 当前浏览器已切换登录账号，页面将自动刷新同步
 
 fileAccess:
   download: 下载
@@ -4529,6 +4530,10 @@ ticketflow:
     created_time: 评价时间
     created_from: 评价时间起
     created_to: 评价时间止
+    detailTitle: 评价详情
+    noTags: 未选择标签
+    noComment: 未填写文字评价
+    selectHandler: 请选择处理人
     summary:
       count: 评价数
       avgSatisfaction: 平均满意度
@@ -4579,6 +4584,9 @@ ticketflow:
     archived: 已转存为知识库草稿，等待知识维护人员审阅发布
     problem: 问题描述
     solution: 解决方案
+    aiGenerateDraft: AI 提炼草稿
+    aiDraftLoaded: 已根据工单与排查会话提炼草稿
+    aiDraftFailed: AI 提炼草稿失败，请手动编辑
     views: 浏览 {count} 次
     fromTicket: 来源工单 {id}
     titleRequired: 请填写标题
@@ -4646,6 +4654,33 @@ ticketflow:
     returned: 已退回，等待管理员重新分配
     readOnly: 只读：这张工单已转交他人处理
     readOnlyHint: 你曾经处理过这张工单，可以查看完整记录，但不能再操作
+    attachments: 附带图片
+    tabChat: 实时排查会话
+    tabTimeline: 内部备注与流转日志
+    internalNote: 内部备注
+    internalNotePlaceholder: 仅技术员与管理员可见的排查备注
+    internalNoteSent: 内部备注已保存
+    createTitle: 新建工单
+    created: 工单已创建
+    uploadImages: 上传必要图片（最多 5 张）
+    uploadImagesHint: 支持 JPG/PNG/WEBP/GIF，单张 ≤ 10MB，可直接 Ctrl+V 粘贴截图
+    imageLimitReached: 最多上传 5 张图片
+    uploadFailed: 上传失败，请检查文件格式与大小
+    unreadCount: "{count} 条未读"
+  chat:
+    empty: 暂无会话消息，接单后可发送文字、图片或视频排查问题
+    placeholder: 输入消息，Enter 发送，Shift + Enter 换行，支持粘贴截图
+    send: 发送
+    uploadImage: 图片
+    uploadVideo: 视频
+    loadMore: 加载更早消息
+    mediaExpired: 视频附件已超过保留期并归档清理
+    locked:
+      WAITING_ACCEPT: 等待技术员接单后开启实时排查会话
+      WAITING_RESUME: 工单已重开，等待技术员恢复处理后继续会话
+      UNASSIGNED: 工单当前待分配，等待管理员重新指派处理人
+      CLOSED: 工单已关闭，排查会话已归档为只读
+      READ_ONLY: 您当前为只读查看权限，无法发送消息
   number: 工单号
   title: 标题
   description: 描述

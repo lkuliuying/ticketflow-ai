@@ -34,6 +34,7 @@ export type TicketItem = {
   department_name: string;
   sla_due_at: string;
   sla_state: TicketSlaState;
+  unread_chat_count?: number;
   first_response_at: string | null;
   resolved_at: string | null;
   ai_summary: string;
@@ -75,12 +76,61 @@ export type TicketViewer = {
 /** 指派维度：管理员看待分配，技术员看当前处理与历史处理 */
 export type TicketAssignmentScope = "unassigned" | "current" | "history";
 
+export type TicketAttachment = {
+  id: string;
+  filename: string;
+  filesize: number;
+  mime_type: string;
+  thumb_url: string;
+  url: string;
+};
+
+export type TicketChatLockReason =
+  | ""
+  | "CLOSED"
+  | "WAITING_ACCEPT"
+  | "WAITING_RESUME"
+  | "UNASSIGNED"
+  | "READ_ONLY";
+
+export type TicketChatState = {
+  can_send: boolean;
+  lock_reason: TicketChatLockReason;
+};
+
+export type TicketChatMessageKind = "TEXT" | "IMAGE" | "VIDEO" | "SYSTEM";
+
+export type TicketChatMessage = {
+  id: string;
+  ticket_id: string;
+  sender_id: number | null;
+  sender_name: string;
+  kind: TicketChatMessageKind;
+  content: string;
+  media_meta: { filename?: string; filesize?: number; mime_type?: string };
+  media_expired: boolean;
+  file_url: string | null;
+  thumb_url: string | null;
+  client_msg_id: string;
+  created_time: string;
+};
+
+export type TicketMediaUploadResult = {
+  file_pk: string;
+  kind: "IMAGE" | "VIDEO";
+  filename: string;
+  filesize: number;
+  mime_type: string;
+};
+
 export type TicketDetail = TicketItem & {
   viewer: TicketViewer;
   /** 评价人、被评处理人与管理员可见，其他人或未评价时为 null */
   rating?: TicketRating | null;
   /** 由 AI 助手转人工创建且当前用户可查看时为会话 ID，否则为 null */
   assistant_session_id?: string | null;
+  attachments?: TicketAttachment[];
+  chat_state?: TicketChatState;
   available_transitions: TicketStatus[];
   timeline: { total: number; results: TimelineEntry[] };
 };
@@ -92,6 +142,8 @@ export type TicketCreatePayload = {
   priority: TicketPriority;
   /** AI 助手转人工：本人会话，建单后关联到工单 */
   assistant_session_id?: string;
+  /** 建单时附加的必要图片 ID（最多 5 张） */
+  attachment_ids?: string[];
 };
 
 export type TicketDashboard = {
@@ -284,6 +336,74 @@ class TicketApi extends BaseApi {
       {},
       `${this.baseApi}/dashboard`
     );
+  };
+
+  uploadAttachment = (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request<DetailResult<TicketMediaUploadResult>>(
+      "post",
+      {},
+      form,
+      `${this.baseApi}/attachments/upload`,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+  };
+
+  chatMessages = (
+    pk: string,
+    params?: { limit?: number; before_id?: string; after_id?: string }
+  ) => {
+    return this.request<
+      DetailResult<{
+        results: TicketChatMessage[];
+        has_more: boolean;
+        chat_state: TicketChatState;
+      }>
+    >("get", params, {}, `${this.baseApi}/${pk}/chat/messages`);
+  };
+
+  chatSend = (
+    pk: string,
+    data: {
+      kind: "TEXT" | "IMAGE" | "VIDEO";
+      content?: string;
+      file_pk?: string;
+      client_msg_id?: string;
+    }
+  ) => {
+    return this.request<DetailResult<TicketChatMessage>>(
+      "post",
+      {},
+      data,
+      `${this.baseApi}/${pk}/chat/messages`
+    );
+  };
+
+  chatUpload = (pk: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request<DetailResult<TicketMediaUploadResult>>(
+      "post",
+      {},
+      form,
+      `${this.baseApi}/${pk}/chat/upload`,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+  };
+
+  chatRead = (pk: string) => {
+    return this.request<DetailResult<null>>(
+      "post",
+      {},
+      {},
+      `${this.baseApi}/${pk}/chat/read`
+    );
+  };
+
+  chatFileUrl = (pk: string, messageId: string, size?: "thumb" | "preview") => {
+    const base = `${this.baseApi}/${pk}/chat/messages/${messageId}/file`;
+    return size ? `${base}?size=${size}` : base;
   };
 }
 

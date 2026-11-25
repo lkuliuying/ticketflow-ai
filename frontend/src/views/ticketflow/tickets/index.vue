@@ -19,14 +19,21 @@ type PageExpose = {
 const tableRef = ref<PageExpose>();
 const dashboardRef = ref<InstanceType<typeof TicketDashboard>>();
 const activeFilter = ref<DashboardFilter | null>(null);
-const { api, auth, listColumnsFormat, operationButtonsProps } =
-  useTickets(tableRef);
+const {
+  api,
+  auth,
+  canCreate,
+  openCreate,
+  listColumnsFormat,
+  operationButtonsProps,
+  tableBarButtonsProps
+} = useTickets(tableRef);
 const listReady = ref(false);
 const { consume: consumeRouteIntent } = useRouteIntent({
   isReady: () => listReady.value,
   applyFilter: filter => applyDashboardFilter(filter),
   openCreate: () => {
-    if (auth.create) tableRef.value?.handleAddOrEdit?.(true);
+    if (canCreate) openCreate();
   }
 });
 
@@ -100,6 +107,7 @@ function onSearchComplete({
       :selection="false"
       :listColumnsFormat="listColumnsFormat"
       :operationButtonsProps="operationButtonsProps"
+      :tableBarButtonsProps="tableBarButtonsProps"
       @search-complete="onSearchComplete"
     />
   </div>

@@ -3,6 +3,8 @@ import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { FormInstance, FormRules } from "element-plus";
 import { renderMarkdown } from "@/utils/markdown";
+import { message } from "@/utils/message";
+import { generateKbDraft } from "@/api/ticketflow/ai";
 import type { ArticlePayload } from "@/api/ticketflow/knowledge";
 import { TICKET_CATEGORIES as CATEGORIES } from "@/api/ticketflow/tickets";
 
@@ -13,10 +15,14 @@ import { TICKET_CATEGORIES as CATEGORIES } from "@/api/ticketflow/tickets";
  */
 defineOptions({ name: "TicketFlowArticleEditor" });
 
-const props = defineProps<{ initial?: Partial<ArticlePayload> }>();
+const props = defineProps<{
+  initial?: Partial<ArticlePayload>;
+  sourceTicketId?: string;
+}>();
 const { t } = useI18n();
 const formRef = ref<FormInstance>();
 const tab = ref<"edit" | "preview">("edit");
+const generatingDraft = ref(false);
 const form = reactive<ArticlePayload>({
   title: props.initial?.title ?? "",
   category: props.initial?.category ?? "OTHER",
@@ -55,6 +61,23 @@ const rules: FormRules = {
 
 const preview = computed(() => renderMarkdown(form.body_markdown));
 
+async function generateFromTicket() {
+  if (!props.sourceTicketId || generatingDraft.value) return;
+  generatingDraft.value = true;
+  try {
+    const draft = await generateKbDraft(props.sourceTicketId);
+    form.title = draft.title;
+    form.category = draft.category;
+    form.tags = [...draft.tags];
+    form.body_markdown = draft.body_markdown;
+    message(t("ticketflow.kb.aiDraftLoaded"), { type: "success" });
+  } catch {
+    message(t("ticketflow.kb.aiDraftFailed"), { type: "warning" });
+  } finally {
+    generatingDraft.value = false;
+  }
+}
+
 async function getPayload(): Promise<ArticlePayload | null> {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return null;
@@ -71,6 +94,18 @@ defineExpose({ getPayload });
 
 <template>
   <el-form ref="formRef" :model="form" :rules="rules" label-width="72px">
+    <div v-if="sourceTicketId" class="flex justify-end mb-3">
+      <el-button
+        type="primary"
+        plain
+        size="small"
+        :loading="generatingDraft"
+        data-testid="kb-ai-draft"
+        @click="generateFromTicket"
+      >
+        {{ t("ticketflow.kb.aiGenerateDraft") }}
+      </el-button>
+    </div>
     <el-form-item :label="t('ticketflow.title')" prop="title">
       <el-input v-model="form.title" maxlength="200" show-word-limit />
     </el-form-item>

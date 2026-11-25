@@ -10,8 +10,10 @@ import {
 } from "@/api/ticketflow/tickets";
 import { openArticleEditor } from "../../knowledge/utils/articleEditorDialog";
 import { useTicketColumns } from "./ticketColumns";
+import { openTicketCreateDialog } from "./ticketCreateDialog";
 import { openTicketDetail } from "./ticketDetailDrawer";
 import View from "~icons/ep/view";
+import Plus from "~icons/ep/plus";
 
 type PageRef = Ref<{ handleGetData?: () => void } | undefined>;
 
@@ -26,10 +28,19 @@ type PageRef = Ref<{ handleGetData?: () => void } | undefined>;
 export function useTickets(tableRef: PageRef) {
   const { t, te } = useI18n();
   const api = reactive(ticketApi);
-  const auth = usePageAuth("TicketFlowTickets");
+  const auth = usePageAuth("TicketFlowTickets", ["chatFile"]);
 
   const { listColumnsFormat } = useTicketColumns({ t, te });
   const reload = () => tableRef.value?.handleGetData?.();
+
+  function openCreate() {
+    if (!auth.create) return;
+    openTicketCreateDialog({
+      title: t("ticketflow.detail.createTitle"),
+      createdText: t("ticketflow.detail.created"),
+      onCreated: reload
+    });
+  }
 
   /** 已关闭工单转存知识库草稿：预填标题、分类与问题描述，保存后刷新详情 */
   function archive(ticket: TicketDetail, reloadDetail: () => void) {
@@ -75,5 +86,28 @@ export function useTickets(tableRef: PageRef) {
     ]
   });
 
-  return { api, auth, listColumnsFormat, operationButtonsProps };
+  const tableBarButtonsProps = shallowRef<OperationProps>({
+    buttons: [
+      {
+        code: "ticketCreate",
+        text: t("ticketflow.detail.createTitle"),
+        props: {
+          type: "primary",
+          icon: useRenderIcon(Plus)
+        },
+        onClick: openCreate,
+        show: Boolean(auth.create)
+      }
+    ]
+  });
+
+  return {
+    api,
+    auth: { ...auth, create: false },
+    canCreate: Boolean(auth.create),
+    openCreate,
+    listColumnsFormat,
+    operationButtonsProps,
+    tableBarButtonsProps
+  };
 }

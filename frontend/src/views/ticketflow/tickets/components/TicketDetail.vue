@@ -1,11 +1,17 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { TicketDetail, TicketStatus } from "@/api/ticketflow/tickets";
+import type {
+  TicketChatState,
+  TicketDetail,
+  TicketStatus
+} from "@/api/ticketflow/tickets";
+import { useAuthorizedMedia } from "../utils/useAuthorizedMedia";
 import { useTicketDetail } from "../utils/useTicketDetail";
 import { PRIORITY_TONE, SLA_TONE, STATUS_TONE } from "../utils/ticketColumns";
 import TicketActions from "./TicketActions.vue";
 import TicketAiPanel from "./TicketAiPanel.vue";
+import TicketChatPanel from "./TicketChatPanel.vue";
 import TicketReply from "./TicketReply.vue";
 import TicketTimeline from "./TicketTimeline.vue";
 import RatingCard from "../../ratings/components/RatingCard.vue";
@@ -13,8 +19,8 @@ import { openRatingDialog } from "../../ratings/utils/ratingDialog";
 import { openAssistantTranscript } from "../../assistant/utils/transcriptDrawer";
 
 /**
- * 工单详情抽屉：摘要与 SLA、可执行操作、回复框、时间线；处理人在右侧另有 AI 面板。
- * 操作与输入框的显隐全部依据后端返回的 `viewer` 与 `available_transitions`。
+ * 工单详情抽屉：摘要与附带图片、可执行操作、实时排查会话（替代对外回复）、
+ * 内部备注与流转日志；处理人在右侧另有 AI 面板。
  */
 defineOptions({ name: "TicketFlowTicketDetail" });
 
@@ -29,20 +35,38 @@ const { detail, loading, busy, notFound, load, run } = useTicketDetail(
   props.pk,
   props.onChanged
 );
+const { urls: mediaUrls, ensure: ensureMedia } = useAuthorizedMedia();
+const activeTab = ref<"chat" | "timeline">("chat");
+const chatRef = ref<InstanceType<typeof TicketChatPanel>>();
+const chatCanSend = ref(false);
 
 onMounted(load);
 
-/**
- * 只读（已转交）时处理人类操作全部关闭，但同时是提交人时仍可验收、重开，
- * 经手过的已关闭工单仍可转存：操作区按能力位决定是否出现，不只看 read_only。
- */
+watch(
+  () => detail.value?.attachments,
+  items => {
+    for (const att of items ?? []) {
+      void ensureMedia(att.thumb_url);
+      void ensureMedia(att.url);
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => detail.value?.chat_state,
+  state => {
+    if (state) chatCanSend.value = state.can_send;
+  },
+  { immediate: true }
+);
+
 const showActions = computed(() => {
   const ticket = detail.value;
   if (!ticket) return false;
   return showTicketActions.value || canArchive.value;
 });
 
-/** 只读且没有可用流转时不挂操作组件，避免出现“没有可执行的流转”空态 */
 const showTicketActions = computed(() => {
   const ticket = detail.value;
   return Boolean(
@@ -53,6 +77,16 @@ const showTicketActions = computed(() => {
 
 const canArchive = computed(() =>
   Boolean(detail.value?.viewer.can_archive && props.onArchive)
+);
+
+const canCommentInternal = computed(() =>
+  Boolean(detail.value?.viewer.can_comment_internal)
+);
+
+const attachmentPreviewList = computed(() =>
+  (detail.value?.attachments ?? [])
+    .map(att => mediaUrls[att.url])
+    .filter(Boolean)
 );
 
 function rate(afterClose = false) {
@@ -66,19 +100,18 @@ function rate(afterClose = false) {
   });
 }
 
-/** 提交人确认解决后（流转到已关闭且后端允许评价）自动弹出评价，可跳过稍后补评 */
 function onTransitioned(to: TicketStatus) {
+  void chatRef.value?.refresh?.();
   if (to === "CLOSED" && detail.value?.viewer.can_rate) rate(true);
 }
 
-/** 能否回复完全由后端 viewer 给出（处理人或提交人，且有评论权限） */
-const canReply = computed(() => Boolean(detail.value?.viewer.can_reply));
+function onChatStateChange(state: TicketChatState) {
+  chatCanSend.value = state.can_send;
+}
 
-const replyRef = ref<InstanceType<typeof TicketReply>>();
-
-/** AI 生成的回复只填入回复框（对外回复），发送仍由用户点击 */
-function fillReply(text: string) {
-  replyRef.value?.fill(text);
+function fillChat(text: string) {
+  activeTab.value = "chat";
+  chatRef.value?.fill(text);
 }
 
 function label(group: string, value: string | null | undefined) {
@@ -177,6 +210,26 @@ function time(value: string | null | undefined) {
             </div>
           </el-descriptions-item>
           <el-descriptions-item
+            v-if="detail.attachments?.length"
+            :label="t('ticketflow.detail.attachments')"
+            :span="2"
+          >
+            <div
+              class="flex flex-wrap gap-2"
+              data-testid="ticket-attachments-gallery"
+            >
+              <el-image
+                v-for="(att, idx) in detail.attachments"
+                :key="att.id"
+                :src="mediaUrls[att.thumb_url] || mediaUrls[att.url]"
+                :preview-src-list="attachmentPreviewList"
+                :initial-index="idx"
+                fit="cover"
+                class="size-20 rounded border border-(--el-border-color) cursor-pointer"
+              />
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item
             v-if="detail.ai_summary || detail.ai_tags?.length"
             :label="t('ticketflow.ai_summary')"
             :span="2"
@@ -241,33 +294,37 @@ function time(value: string | null | undefined) {
           </div>
         </section>
 
-        <section v-if="canReply" class="flex flex-col gap-2">
-          <h4 class="m-0">{{ t("ticketflow.detail.reply") }}</h4>
-          <TicketReply
-            ref="replyRef"
-            :ticket="detail"
-            :run="run"
-            :busy="busy"
-          />
-        </section>
-
-        <section class="flex flex-col gap-2">
-          <h4 class="m-0">
-            {{ t("ticketflow.detail.timeline") }}
-            <span class="text-sm text-(--el-text-color-secondary)">
-              （{{ detail.timeline.total }}）
-            </span>
-          </h4>
-          <TicketTimeline :ticket="detail" />
-        </section>
+        <el-tabs v-model="activeTab" data-testid="ticket-detail-tabs">
+          <el-tab-pane :label="t('ticketflow.detail.tabChat')" name="chat">
+            <TicketChatPanel
+              ref="chatRef"
+              :ticket="detail"
+              @state-change="onChatStateChange"
+            />
+          </el-tab-pane>
+          <el-tab-pane
+            :label="`${t('ticketflow.detail.tabTimeline')}（${detail.timeline.total}）`"
+            name="timeline"
+          >
+            <div class="flex flex-col gap-4">
+              <TicketReply
+                v-if="canCommentInternal"
+                :ticket="detail"
+                :run="run"
+                :busy="busy"
+              />
+              <TicketTimeline :ticket="detail" />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </div>
       <TicketAiPanel
         v-if="detail.viewer.can_handle"
         :ticket="detail"
         :run="run"
         :busy="busy"
-        :can-fill="canReply"
-        @fill="fillReply"
+        :can-fill="chatCanSend"
+        @fill="fillChat"
       />
     </div>
   </div>

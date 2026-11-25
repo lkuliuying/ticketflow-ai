@@ -11,6 +11,7 @@ commonLabels:
   updated_time: UpdatedTime
   descending: Descending
   ascending: Ascending
+  accountSwitched: Another account signed in on this browser. Reloading to sync session.
 
 fileAccess:
   download: Download
@@ -4531,6 +4532,10 @@ ticketflow:
     created_time: Rated at
     created_from: Rated from
     created_to: Rated to
+    detailTitle: Rating details
+    noTags: No tags selected
+    noComment: No written comment
+    selectHandler: Select technician
     summary:
       count: Ratings
       avgSatisfaction: Avg. satisfaction
@@ -4581,6 +4586,9 @@ ticketflow:
     archived: Saved as a knowledge draft, pending review and publishing
     problem: Problem
     solution: Solution
+    aiGenerateDraft: Generate draft with AI
+    aiDraftLoaded: Draft generated from ticket and troubleshooting chat
+    aiDraftFailed: Failed to generate draft with AI, please edit manually
     views: "{count} views"
     fromTicket: "Source ticket {id}"
     titleRequired: Please enter a title
@@ -4648,6 +4656,33 @@ ticketflow:
     returned: Returned, waiting for an admin to reassign
     readOnly: "Read-only: this ticket has been handed over"
     readOnlyHint: You handled this ticket before. You can view the full record but can no longer act on it
+    attachments: Attached Images
+    tabChat: Troubleshooting Chat
+    tabTimeline: Internal Notes & Timeline
+    internalNote: Internal Note
+    internalNotePlaceholder: Internal troubleshooting note visible only to technicians and admins
+    internalNoteSent: Internal note saved
+    createTitle: New Ticket
+    created: Ticket created
+    uploadImages: Attach images (up to 5)
+    uploadImagesHint: Supports JPG/PNG/WEBP/GIF up to 10MB each, or paste screenshots with Ctrl+V
+    imageLimitReached: Up to 5 images allowed
+    uploadFailed: Upload failed, please check file format and size
+    unreadCount: "{count} unread"
+  chat:
+    empty: No messages yet. Once accepted, exchange text, images, or videos here
+    placeholder: Type a message (Enter to send, Shift+Enter for newline, paste screenshots supported)
+    send: Send
+    uploadImage: Image
+    uploadVideo: Video
+    loadMore: Load earlier messages
+    mediaExpired: Video attachment has expired and been archived
+    locked:
+      WAITING_ACCEPT: Waiting for a technician to accept before starting live chat
+      WAITING_RESUME: Ticket reopened; waiting for technician to resume handling
+      UNASSIGNED: Ticket is unassigned; waiting for an administrator to reassign
+      CLOSED: Ticket is closed; troubleshooting chat is archived read-only
+      READ_ONLY: You have read-only access and cannot send messages
   number: Ticket No.
   title: Title
   description: Description
