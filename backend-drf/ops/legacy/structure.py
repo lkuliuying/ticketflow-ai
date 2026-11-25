@@ -135,6 +135,8 @@ PENDING_TICKET_DATA_MIGRATIONS = {
     ("tickets", "0003_backfill_ticket_assignments"),
     ("tickets", "0004_business_roles_and_registration"),
     ("tickets", "0007_import_category_routes"),
+    ("tickets", "0011_migrate_public_comments_to_chat"),
+    ("tickets", "0012_flatten_ticketflow_menus"),
 }
 
 #: 对齐器建表后可安全执行的数据迁移必须使用 schema_editor 的数据库别名。
@@ -145,6 +147,9 @@ DATA_CLEANUP_CALLABLES = (
     "migrate_roles",
     "close_registration",
     "import_category_routes",
+    # 会话表建好后才可复制公开评论。菜单平铺同样在结构就绪后执行，避免重排已迁移的库。
+    "migrate_public_comments",
+    "flatten_ticketflow_menus",
 )
 
 #: 明确「跳过」的数据迁移登记（仅用于白名单守护：新增数据迁移必须在这里表态，
