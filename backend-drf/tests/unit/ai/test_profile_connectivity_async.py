@@ -116,6 +116,8 @@ class TestResultEndpoint:
 
 class TestTaskNormalizesFailure:
     def test_provider_error_becomes_readable_result(self, profile, monkeypatch):
+        from celery.result import denied_join_result
+
         from ai.tasks import test_ai_profile_task
 
         class _Failing:
@@ -127,7 +129,8 @@ class TestTaskNormalizesFailure:
 
         monkeypatch.setattr("integrations.sdk.ai.chat.ChatCompletionsClient", _Failing)
 
-        result = test_ai_profile_task.apply(args=[str(profile.pk)]).get()
+        with denied_join_result():
+            result = test_ai_profile_task.apply(args=[str(profile.pk)], throw=True).result
 
         assert result["ok"] is False
         assert "connection refused" in result["detail"]

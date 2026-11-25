@@ -1,5 +1,6 @@
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 
@@ -59,7 +60,12 @@ class SiteMessageUtil:
             return notify_obj
         # 全量扇出交由 Celery 异步投递（数千年在线时逐人 group_send 会拖住请求线程）；
         # 参数经 JSON 清洗（UUID / gettext_lazy 等非原生类型转字符串）
-        push_messages_job.delay(json_safe(pending), json_safe(notice_message))
+        args = (json_safe(pending), json_safe(notice_message))
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            # Eager delay() 持有 Celery 进程级 join 标志，并发调用可能互相覆盖恢复值。
+            push_messages_job.apply(args=args)
+        else:
+            push_messages_job.delay(*args)
         return notify_obj
 
     @classmethod
