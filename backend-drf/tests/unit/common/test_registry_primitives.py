@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """内核 Registry 原语与三处扩展点（biz 渲染器 / AI 动作 / 通知渠道）的注册与重置。"""
 
+from functools import lru_cache
+
 import pytest
 
 from common.core.registry import Registry
@@ -62,6 +64,14 @@ class TestBizRendererRegistry:
 
 
 class TestAiActionRegistration:
+    @pytest.fixture(autouse=True)
+    def _isolated_action_registry(self, monkeypatch):
+        from ai.services.actions import ai_registry
+
+        # 框架层缓存了原始注册表对象。测试使用独立的发现缓存和登记字典。
+        monkeypatch.setattr(ai_registry, "action_specs", lru_cache(maxsize=1)(ai_registry.action_specs.__wrapped__))
+        monkeypatch.setattr(ai_registry, "_EXTRA_ACTIONS", {})
+
     def test_register_action_visible_and_resettable(self):
         from ai.services.actions.ai_registry import action_specs, register_action, reset_action_specs_cache
 
