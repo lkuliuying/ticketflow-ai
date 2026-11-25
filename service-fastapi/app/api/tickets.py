@@ -9,9 +9,10 @@ from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.resources import AppResources, upstream_slot
 from app.schemas.context import TicketContext
 from app.schemas.http import ErrorResponse
-from app.schemas.tickets import AnalysisResponse, TicketRequest
+from app.schemas.tickets import AnalysisResponse, KbDraftResponse, TicketRequest
 from app.services.analysis import analyze_ticket
 from app.services.drf import fetch_ticket_context
+from app.services.kb_draft import generate_kb_draft
 from app.services.reply import reply_events
 from app.services.stream import SSE_CONTENT, EventStreamResponse
 
@@ -26,6 +27,12 @@ ERRORS: dict[int | str, dict[str, Any]] = {
 async def analyze(body: TicketRequest, user: CurrentUser, resources: AppResources) -> AnalysisResponse:
     context = await fetch_ticket_context(resources, body.ticket_id, user.raw_token)
     return await analyze_ticket(resources, user.user_id, context)
+
+
+@router.post("/kb-draft", responses={**ERRORS, 502: {"model": ErrorResponse}})
+async def kb_draft(body: TicketRequest, user: CurrentUser, resources: AppResources) -> KbDraftResponse:
+    context = await fetch_ticket_context(resources, body.ticket_id, user.raw_token, purpose="kb-draft")
+    return await generate_kb_draft(resources, context)
 
 
 async def _reply_context(

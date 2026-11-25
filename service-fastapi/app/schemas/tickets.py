@@ -38,3 +38,18 @@ class StreamMeta(BaseModel):
     ticket_id: UUID
     ticket_version: Annotated[int, Field(ge=1)]
     references: list[Reference]
+
+
+class KbDraft(BaseModel):
+    model_config = ConfigDict(strict=True, revalidate_instances="always", hide_input_in_errors=True)
+
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    category: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    tags: Annotated[
+        list[Tag], AfterValidator(unique_tags), Field(max_length=12, json_schema_extra={"uniqueItems": True})
+    ]
+    body_markdown: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50000)]
+
+
+class KbDraftResponse(KbDraft):
+    ticket_id: UUID

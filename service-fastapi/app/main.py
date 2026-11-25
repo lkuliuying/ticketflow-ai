@@ -11,6 +11,7 @@ from redis.backoff import NoBackoff
 from app.api import assistant, health, tickets
 from app.core.config import Settings
 from app.core.errors import register_error_handlers
+from app.core.request_id import RequestIdMiddleware
 from app.core.resources import Resources
 from app.services.providers import build_provider
 
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="TicketFlow AI", lifespan=lifespan)
+    app.add_middleware(RequestIdMiddleware)
     register_error_handlers(app)
     app.include_router(health.router, prefix="/ai/v1")
     app.include_router(tickets.router, prefix="/ai/v1")

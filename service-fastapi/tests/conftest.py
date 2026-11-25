@@ -36,6 +36,7 @@ def context_response():
             },
             "categories": ["ACCOUNT", "NETWORK"],
             "references": [{"article_id": str(ARTICLE), "title": "VPN 排障", "excerpt": "检查入口地址"}],
+            "recent_messages": [],
         },
     }
 

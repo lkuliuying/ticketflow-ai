@@ -7,6 +7,7 @@ from uuid import UUID
 import httpx
 
 from app.core.errors import ServiceError
+from app.core.request_id import get_request_id
 from app.core.resources import Resources
 from app.schemas.assistant import AnswerInput, AnswerResult, AssistantContext, ChatRequest, QuestionContext
 from app.schemas.context import DrfResponse, TicketContext
@@ -26,10 +27,23 @@ ASSISTANT_ERRORS = {
 }
 
 
+def _request_headers(resources: Resources, raw_token: str, *, user_id: str | int | None = None) -> dict[str, str]:
+    headers: dict[str, str] = {"Authorization": f"Bearer {raw_token}"}
+    secret = resources.settings.internal_api_secret
+    if secret is not None and secret.get_secret_value().strip():
+        headers["X-Internal-Token"] = secret.get_secret_value()
+        if user_id is not None:
+            headers["X-Internal-User-Id"] = str(user_id)
+    request_id = get_request_id()
+    if request_id:
+        headers["X-Request-ID"] = request_id
+    return headers
+
+
 async def _request_with_retries(
     resources: Resources,
     url: str,
-    raw_token: str,
+    headers: dict[str, str],
     method: Literal["GET", "POST"],
     payload: dict[str, object] | None,
     retries_left: int,
@@ -37,9 +51,7 @@ async def _request_with_retries(
     backoff = 0.1
     while True:
         try:
-            response = await resources.drf_http.request(
-                method, url, headers={"Authorization": f"Bearer {raw_token}"}, json=payload
-            )
+            response = await resources.drf_http.request(method, url, headers=headers, json=payload)
         except httpx.ConnectError, httpx.ConnectTimeout:
             if not retries_left:
                 raise
@@ -81,12 +93,14 @@ async def _request(
     success: HTTPStatus = HTTPStatus.OK,
     retry: bool = True,
     errors: dict[int, tuple[str, str]] = FORWARDED_ERRORS,
+    user_id: str | int | None = None,
 ) -> httpx.Response:
     base_url = str(resources.settings.drf_base_url).rstrip("/")
     retries = resources.settings.drf_max_retries if retry else 0
+    headers = _request_headers(resources, raw_token, user_id=user_id)
     try:
         async with timeout(resources.settings.drf_total_timeout):
-            response = await _request_with_retries(resources, f"{base_url}{path}", raw_token, method, payload, retries)
+            response = await _request_with_retries(resources, f"{base_url}{path}", headers, method, payload, retries)
     except httpx.PoolTimeout as exc:
         raise ServiceError(503, "UPSTREAM_BUSY", "DRF 上下文连接池已用完") from exc
     except (httpx.TimeoutException, TimeoutError) as exc:
@@ -106,8 +120,13 @@ def _decode[T](response: httpx.Response, schema: type[DrfResponse[T]], detail: s
         raise ServiceError(503, "DRF_INVALID_CONTEXT", detail) from exc
 
 
-async def fetch_ticket_context(resources: Resources, ticket_id: UUID, raw_token: str) -> TicketContext:
-    response = await _request(resources, f"/api/tickets/{ticket_id}/ai-context", raw_token)
+async def fetch_ticket_context(
+    resources: Resources, ticket_id: UUID, raw_token: str, *, purpose: str | None = None
+) -> TicketContext:
+    path = f"/api/tickets/{ticket_id}/ai-context"
+    if purpose:
+        path = f"{path}?purpose={purpose}"
+    response = await _request(resources, path, raw_token)
     context = _decode(response, DrfResponse[TicketContext], "DRF 返回了无效的工单上下文")
     if context.ticket.id != ticket_id:
         raise ServiceError(503, "DRF_INVALID_CONTEXT", "DRF 返回了无效的工单上下文")
@@ -128,7 +147,14 @@ async def record_question(resources: Resources, body: ChatRequest, raw_token: st
     return _decode(response, DrfResponse[QuestionContext], "DRF 返回了无效的提问上下文")
 
 
-async def record_answer(resources: Resources, session_id: UUID, body: AnswerInput, raw_token: str) -> AnswerResult:
+async def record_answer(
+    resources: Resources,
+    session_id: UUID,
+    body: AnswerInput,
+    raw_token: str,
+    *,
+    user_id: str | int | None = None,
+) -> AnswerResult:
     response = await _request(
         resources,
         f"/api/assistant/internal/sessions/{session_id}/answer",
@@ -136,6 +162,7 @@ async def record_answer(resources: Resources, session_id: UUID, body: AnswerInpu
         method="POST",
         payload=body.model_dump(mode="json"),
         errors=ASSISTANT_ERRORS,
+        user_id=user_id,
     )
     return _decode(response, DrfResponse[AnswerResult], "DRF 返回了无效的回答标识")
 
