@@ -45,7 +45,8 @@ erDiagram
 | `Ticket` | `id`，唯一且服务端生成的 `number`，`title`（最长 200 字符），`description`，`category`，`priority`，`status`，`submitter_id`，可空 `assignee_id`，`department_id`，`sla_due_at`，`sla_cycle`（从 1 开始），可空 `first_response_at` / `resolved_at`，`ai_summary`，`ai_tags`（字符串数组），`version`（从 1 开始）。 |
 | `TicketLog` | `ticket_id`，`action`，可空 `from_status`，`to_status`，`operator_id`（系统操作为空），`note`，`created_time`。按时间和 ID 稳定排序。 |
 | `TicketAssignment` | `ticket_id`、`assignee_id`、可空 `assigned_by_id`、`started_at`、`ended_at`、`end_reason`、`note`。每张工单最多一段开放的指派记录。 |
-| `TicketComment` | `ticket_id`，`author_id`，`body`，`visibility`（`PUBLIC` 对外回复 / `INTERNAL` 内部备注），`created_time`。 |
+| `TicketComment` | `ticket_id`，`author_id`，`body`，`visibility`，`created_time`。新评论为内部备注，旧公开回复保留在时间线并复制到排查会话。 |
+| `TicketAttachment` / `TicketChatMessage` / `TicketChatReadState` | 建单图片、实时排查消息和每个用户的已读状态。排查会话支持文本、图片和视频。 |
 | `TicketRating` | 唯一 `ticket_id`，评价人 `rater_id`，关闭时的处理人 `handler_id`（可空），`resolved`，`satisfaction` 与 `handler_score`（均为 1–5），`tags`，可空 `comment`，`created_time`。 |
 | `KnowledgeArticle` | `title`，`body_markdown`，`category`，`tags`（字符串数组），`status`（`DRAFT` / `PUBLISHED` / `ARCHIVED`），`view_count`（非负整数），可空 `source_ticket_id`（每个来源工单最多一篇），`created_time` / `updated_time`。 |
 | `TicketCreateRequest` | `submitter_id`，`key_hash`，`request_hash`，`ticket_id`，`expires_at`。唯一约束 `(submitter_id, key_hash)`，与创建工单同事务写入。 |
@@ -57,6 +58,7 @@ erDiagram
 stateDiagram-v2
     [*] --> OPEN
     OPEN --> IN_PROGRESS: 接单
+    IN_PROGRESS --> OPEN: 退回重派
     IN_PROGRESS --> PENDING_VERIFY: 提交验收
     PENDING_VERIFY --> CLOSED: 确认解决
     PENDING_VERIFY --> IN_PROGRESS: 验收退回
@@ -66,7 +68,7 @@ stateDiagram-v2
 
 以进入 `PENDING_VERIFY` 的时间作为 `resolved_at`。验收退回清空 `resolved_at`，继续使用本轮 SLA。重开清空 `resolved_at`、递增 `sla_cycle`。每轮截止时间按该轮开始时的优先级计算。首次响应以第一条客服对外回复为准，保留整单首次响应时间。建单时由服务端按分类路由到部门，无配置时走默认支持部门。
 
-指派、流转、采纳 AI 建议必须提交读取时的 `version`。Service 在 `atomic()` 内对当前可见的主记录加 `select_for_update()`，比较版本、验证动作和角色，更新记录、递增版本并追加日志。版本过期或当前状态不允许该动作时返回 409。对外回复在事务内首次写入 `first_response_at`，只追加的评论无需提交版本。
+指派、流转、退回重派和采纳 AI 建议必须提交读取时的 `version`。Service 在 `atomic()` 内对当前可见的主记录加 `select_for_update()`，比较版本、验证动作和角色，更新记录、递增版本并追加日志。退回重派清空处理人，仅在状态为 `IN_PROGRESS` 时回到 `OPEN`。版本过期或当前状态不允许该动作时返回 409。当前处理人或管理员的首次对外会话消息在事务内写入 `first_response_at`。会话消息和内部备注无需提交版本。
 
 ### 角色与可见范围
 
@@ -94,15 +96,22 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 
 | 接口 | 请求 | 成功响应 |
 | --- | --- | --- |
-| `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`assignment`、`sla`、`q`、分页 | 200，工单分页，含 `version` 和 `sla_state` |
-| `POST /api/tickets` | `Idempotency-Key`，`{title, description, category, priority}` | 201，创建的工单。重放返回 200 和原工单 |
-| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive, can_return, can_rate, read_only}`、`rating`、可执行流转、时间线第一页 |
+| `GET /api/tickets` | `status`、`priority`、`category`、`assignee_id`、`department_id`、`assignment`、`sla`、`q`、分页 | 200，工单分页，含 `version`、`sla_state` 和 `unread_chat_count` |
+| `POST /api/tickets` | `Idempotency-Key`，`{title, description, category, priority, attachment_ids?}` | 201，创建的工单。重放返回 200 和原工单 |
+| `GET /api/tickets/{id}` | 工单 ID | 200，工单、`viewer: {can_handle, can_assign, can_reply, can_comment_internal, can_archive, can_return, can_rate, read_only}`、`rating`、可执行流转、时间线第一页、`attachments` 和 `chat_state` |
 | `GET /api/tickets/{id}/timeline` | 分页 | 200，合并排序的流转记录与评论分页 |
 | `POST /api/tickets/{id}/transition` | `{target_status, version, note?}` | 200，更新后的工单 |
 | `POST /api/tickets/{id}/assign` | `{assignee_id, version}` | 200，更新后的工单。已关闭工单返回 409 |
 | `GET /api/tickets/{id}/assignees` | 管理员可传 `q` 搜索用户名或昵称、`department_id` 筛选技能组。空值忽略，非法 UUID 返回 400 | 200，最多 20 条在职技术员 `{pk, username, nickname, department_name}`，按用户名和主键排序 |
-| `POST /api/tickets/{id}/return` | `{version, reason}`，原因长度 1–500 | 200，清空处理人、状态不变、版本递增 |
-| `POST /api/tickets/{id}/comments` | `{body, visibility}` | 201，新评论 |
+| `POST /api/tickets/{id}/return` | `{version, reason}`，原因长度 1–500 | 200，清空处理人，将 `IN_PROGRESS` 回退为 `OPEN`，版本递增 |
+| `POST /api/tickets/{id}/comments` | `{body, visibility: "INTERNAL"}` | 201，新备注。公开回复请用排查会话，提交 `PUBLIC` 返回 400 |
+| `POST /api/tickets/attachments/upload` | Multipart `file`，图片上限 10 MiB | 201，`{file_pk, kind, filename, filesize, mime_type}` |
+| `GET /api/tickets/{id}/attachments/{attachment_id}` | 可选 `size=thumb` 或 `size=preview` | 200，图片文件 |
+| `GET /api/tickets/{id}/chat/messages` | 互斥的 UUID 游标 `before_id` 或 `after_id`，`limit` 1–100，默认 50 | 200，`{results, has_more, chat_state}`，消息升序。游标须属于当前工单 |
+| `POST /api/tickets/{id}/chat/messages` | `{kind?, content?, file_pk?, client_msg_id?}` | 201，新消息。相同发送人和客户端消息 ID 的重放返回 200 |
+| `POST /api/tickets/{id}/chat/upload` | Multipart `file`，图片上限 10 MiB，视频上限 30 MiB | 201，`{file_pk, kind, filename, filesize, mime_type}` |
+| `POST /api/tickets/{id}/chat/read` | 无请求体 | 200，更新当前用户的已读时间 |
+| `GET /api/tickets/{id}/chat/messages/{message_id}/file` | 图片可选 `size`，视频支持单 `Range` | 200 文件或 206 视频分段。无法满足的 Range 返回 416，过期视频返回 404 |
 | `POST /api/tickets/{id}/rating` | `{resolved, satisfaction, handler_score, tags?, comment?}` | 201，新评价。工单未关闭或已有评价返回 409 |
 | `GET /api/ticket-ratings` | `handler_id`、`satisfaction`、`handler_score`、`resolved`、`created_from`、`created_to`、分页 | 200，评价分页，支持 `search-fields` 和 `search-columns` |
 | `GET /api/ticket-ratings/summary` | `created_from`、`created_to` | 200，技术员获本人指标，管理员获整体指标及 `by_handler` |
@@ -113,11 +122,15 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | `GET /api/knowledge/articles/{id}` | 文章 ID | 200，文章正文、浏览次数及 `viewer: {can_edit, can_publish}` |
 | `POST /api/knowledge/articles` | `{title, body_markdown, category, tags, source_ticket_id?}` | 201，文章草稿 |
 | `PATCH /api/knowledge/articles/{id}` | 可编辑内容或状态 | 200，更新后的文章 |
-| `GET /api/tickets/{id}/ai-context` | 内网接口，转发用户 Bearer token | 200，授权工单字段及已发布知识 Top-K 片段。网关拒绝该路径 |
+| `GET /api/tickets/{id}/ai-context` | 用户 Bearer token 和 `X-Internal-Token`。`purpose=kb-draft` 要求具备该已关闭工单的转存权限 | 200，工单字段、分类、已发布知识 Top-K 片段和 `recent_messages`。网关拒绝该路径 |
 
 工单可见范围外返回 404，可见但缺少动作权限返回 403。契约校验失败返回 400，状态或版本冲突返回 409。Top-K 默认 5，按工单标题、描述和分类在 DRF 中检索，使用 PostgreSQL 关键词排序并为中文子串提供匹配。片段包含 `article_id`、`title` 和有长度上限的 `excerpt`。模型输入只包含当前用户获准的工单文本和知识片段。
 
 历史技术员的 `viewer.read_only` 为 `true`。本人提交时，`can_reply` 和 `available_transitions` 仍反映提交人的能力。管理员或经手过该工单的技术员可用 `viewer.can_archive` 判断是否能将已关闭工单转存为草稿。
+
+媒体上传的 `file_pk`、建单的 `attachment_ids` 元素及消息的 `file_pk` 使用正整数的十进制字符串。建单和发消息只绑定本人经工单入口校验的媒体。工单媒体上传共用每用户每分钟 30 次的限额，并应用个人文件额度。前端按 `chat_state.can_send` 判断是否能发消息。新消息通知发言人以外的提交人和当前处理人。
+
+`/ws/tickets/{id}/chat/` 使用登录 JWT。连接返回 `chat.state`，服务端推送 `chat.message`，客户端可发送 `ping` 或 `mark_read`。服务端在投递前重新检查令牌撤销、在职状态、会话读取权限和工单范围，权限失效以 4403 关闭。重连用最后一条消息 ID 作为 `after_id`，按 `has_more` 补完分页。完整帧和字段见[工单契约](../schema/ticketflow.schema.json)。
 
 工单提交人可用 `viewer.can_rate` 判断能否评价。每张工单仅可评价一次，重开和重新关闭后保留原评价。详情仅向评价人、被评处理人及管理员返回评价。列表中员工看给出的评价，技术员看收到的评价，管理员看全部。汇总时间筛选按评价创建时间，两端含边界。解决率为 0–1 的比例，无评价时均分和解决率为空。标签编码及中英文名称见 [工单契约](../schema/ticketflow.schema.json)。
 
@@ -129,6 +142,7 @@ DRF 使用底座无尾斜杠路由、`ApiResponse` 信封和 `code=1000` 成功�
 | --- | --- | --- |
 | `POST /ai/v1/tickets/analyze` | `{ticket_id: UUID}` | 200，`{ticket_id, ticket_version, category, suggested_priority, summary, tags}`，Pydantic v2 校验类别、优先级和长度 |
 | `POST /ai/v1/tickets/suggest-reply/stream` | `{ticket_id: UUID}` | 200，`text/event-stream`，可取消 |
+| `POST /ai/v1/tickets/kb-draft` | `{ticket_id: UUID}` | 200，`{ticket_id, title, category, tags, body_markdown, references}`，草稿由调用方确认保存 |
 | `GET /ai/v1/health` | 无需 token | 200，`{status: "ok", redis: "ok"}`。Redis 不通返回 503 |
 
 FastAPI 建流前的错误响应统一为 `{code, error, detail}`。`code` 是与 HTTP 状态码一致的整数，`error` 是机器可读标识，`detail` 是可读说明。401 表示令牌失效，403 / 404 对应 DRF 资源授权结果，422 表示请求结构无效，上游繁忙或超时返回对应 503 / 504。SSE 事件顺序为 `meta`（`{ticket_id, ticket_version, references: [{article_id, title}]}`，无引用时为 `[]`）、零到多个 `delta`（`{text}`）、`done`（`{finish_reason}`）。建流后失败以 `error`（`{code, error, detail, retryable}`）结束，其中 `code` 取该错误对应的整数状态码。有等待但无增量时发送 `ping` 心跳。缺少 `done` 的流按中断处理，自动重试只发生在第一段正文发出之前。
@@ -146,6 +160,8 @@ FastAPI 读 DRF 同一个认证 Redis 逻辑库（由 `DEFAULT_CACHE_ID` 指定�
 | `session_token_revoked_{sid}` | 有 `sid` 且值为有效的撤销标记 |
 
 认证 Redis 超时或异常返回 503，拒绝进入业务。Refresh 轮换黑名单仍由 DRF 管理。签名和撤销检查通过后，FastAPI 转发同一用户 token 调用 DRF 取上下文，由 DRF 确认用户仍活跃、拥有 AI 动作权限且工单在可见范围内。AI 缓存命中也经过这一步。撤销影响所有新请求，已发送的流受生成超时和客户端取消控制。
+
+DRF 内网接口额外校验共享内部令牌，密钥为空时拒绝访问。助手的 `question` 和 `context` 要求用户 JWT。只有 `answer` 可以凭服务令牌和 `X-Internal-User-Id` 写回本人已有提问的回答，供 FastAPI 结束已开始的流。
 
 源码对应 [JWT 设置](../../server/settings/libs.py)、[撤销校验](../../packages/xadmin-common/common/core/auth/authentication.py)、[会话撤销键](../../packages/xadmin-common/common/cache/storage.py) 和 [Redis 配置](../../server/settings/cache_channel.py)。
 
