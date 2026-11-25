@@ -40,10 +40,10 @@ class TicketContextSerializer(serializers.Serializer):
 
 
 class TicketChatTurnSerializer(serializers.Serializer):
-    role = serializers.CharField()
+    role = serializers.ChoiceField(choices=("submitter", "handler", "system"))
     sender = serializers.CharField()
     content = serializers.CharField()
-    created_time = serializers.CharField()
+    created_time = serializers.DateTimeField()
 
 
 class AiContextSerializer(serializers.Serializer):

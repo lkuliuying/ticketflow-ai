@@ -4,7 +4,7 @@ from uuid import UUID
 
 import requests
 from django.conf import settings
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 from pgvector.django import CosineDistance
 
 from knowledge.models import ArticleStatus, KnowledgeArticle, KnowledgeChunk
@@ -78,13 +78,15 @@ def fetch_embeddings(texts: list[str]) -> list[list[float]] | None:
         return None
 
 
-def sync_article_chunks(article: KnowledgeArticle) -> int:
-    """Rebuild markdown chunks (and optional pgvector embeddings) for an article."""
-    full_text = f"{article.title}\n\n{article.body_markdown}".strip()
-    pieces = split_markdown_chunks(full_text)
+def sync_article_chunks(article_id: UUID) -> int:
+    """Build embeddings outside the row lock, then replace chunks for the current revision."""
+    article = KnowledgeArticle.objects.filter(pk=article_id).first()
+    if article is None:
+        return 0
+    revision = (article.title, article.body_markdown, article.status)
+    pieces = split_markdown_chunks(f"{article.title}\n\n{article.body_markdown}")
     _, _, model = embedding_config()
     vectors = fetch_embeddings(pieces) if article.status == ArticleStatus.PUBLISHED else None
-    article.chunks.all().delete()
     rows = [
         KnowledgeChunk(
             article=article,
@@ -95,12 +97,16 @@ def sync_article_chunks(article: KnowledgeArticle) -> int:
         )
         for idx, piece in enumerate(pieces)
     ]
-    if rows:
+    with transaction.atomic():
+        current = KnowledgeArticle.objects.select_for_update().filter(pk=article_id).first()
+        if current is None or (current.title, current.body_markdown, current.status) != revision:
+            return 0
+        current.chunks.all().delete()
         KnowledgeChunk.objects.bulk_create(rows)
     return len(rows)
 
 
-def vector_candidates(text: str, *, category: str | None = None, limit: int = 10) -> list[dict[str, Any]]:
+def vector_candidates(text: str, *, limit: int = 10) -> list[dict[str, Any]]:
     """Query pgvector cosine similarity across published chunks when configured."""
     if not embedding_configured():
         return []
@@ -120,9 +126,11 @@ def vector_candidates(text: str, *, category: str | None = None, limit: int = 10
             .annotate(distance=CosineDistance("embedding_vector", query_vec))
             .order_by("distance")[: limit * 2]
         )
+        with transaction.atomic():
+            rows = list(chunks)
         seen: set[UUID] = set()
         results: list[dict[str, Any]] = []
-        for chunk in chunks:
+        for chunk in rows:
             if chunk.article_id in seen:
                 continue
             seen.add(chunk.article_id)
@@ -131,7 +139,6 @@ def vector_candidates(text: str, *, category: str | None = None, limit: int = 10
                     "article_id": str(chunk.article_id),
                     "title": chunk.article.title,
                     "excerpt": chunk.content[:800],
-                    "same_category": int(category is not None and chunk.article.category == category),
                 }
             )
             if len(results) >= limit:
