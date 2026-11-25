@@ -523,6 +523,10 @@ class TestApprovalActions:
     def test_approver_roles_and_perms_union(self, superuser, normal_user, role, menu_factory):
         """角色清单与权限反取并集：任一命中即审批人；两者皆空回退超管。"""
         from common.core.config import SysConfig
+        from identity.models import UserInfo, UserRole
+
+        # 事务测试清库后 post_migrate 会按当前语言重建内置角色。
+        UserRole.objects.update_or_create(code="SystemAuditor", defaults={"name": "审计员", "builtin": True})
 
         other_perm = menu_factory("review:Report", path="api/system/report$", method="POST")
         SysConfig.set_value("APPROVAL_APPROVER_ROLES", ["common"])
@@ -534,14 +538,14 @@ class TestApprovalActions:
         assert not approvers.filter(pk=superuser.pk).exists()
 
         # 建第二个角色持权限码的用户 → 并集命中
-        from identity.models import UserInfo, UserRole
-
-        auditor_role = UserRole.objects.create(name="审计员", code="auditor")
-        auditor_role.menu.add(other_perm)
-        auditor = UserInfo.objects.create_user(username="auditor1", password="Audit@123456", nickname="审计员")
-        auditor.roles.add(auditor_role)
+        reviewer_role = UserRole.objects.create(name="报表复核员", code="report_reviewer")
+        reviewer_role.menu.add(other_perm)
+        reviewer = UserInfo.objects.create_user(
+            username="report-reviewer", password="Audit@123456", nickname="报表复核员"
+        )
+        reviewer.roles.add(reviewer_role)
         approvers = get_approver_queryset()
-        assert approvers.filter(pk=auditor.pk).exists()
+        assert approvers.filter(pk=reviewer.pk).exists()
         assert approvers.filter(pk=normal_user.pk).exists()
 
         # 皆空回退超管
@@ -871,11 +875,14 @@ class TestLifecycleJobs:
 
     def test_periodic_tasks_wired(self, superuser, normal_user):
         """三个周期任务可执行（crontab 由 register_as_period_task 登记）。"""
+        from celery.result import denied_join_result
+
         _enable_interception()
         _submit(normal_user)
-        assert auto_expire_approval_job.apply().get() == 0
-        assert auto_remind_approval_job.apply().get() == 0  # 刚建的单未超阈值
-        assert auto_clean_approval_job.apply().get() == 0
+        with denied_join_result():
+            assert auto_expire_approval_job.apply(throw=True).result == 0
+            assert auto_remind_approval_job.apply(throw=True).result == 0  # 刚建的单未超阈值
+            assert auto_clean_approval_job.apply(throw=True).result == 0
 
 
 class TestStateTransitionConcurrency:
