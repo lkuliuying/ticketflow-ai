@@ -104,7 +104,7 @@ describe("chatSocket", () => {
     expect(onReconnect).toHaveBeenCalledTimes(1);
   });
 
-  it("鉴权类关闭码停止重连并回调，其余关闭码交给底座重连", () => {
+  it("鉴权类关闭码只回调复查、不自行断开重连，其余关闭码不回调", () => {
     const onRevoked = vi.fn();
     openChatSocket("ticket-42", {
       onMessage: vi.fn(),
@@ -114,11 +114,10 @@ describe("chatSocket", () => {
 
     wsState.closeCallback?.({}, { code: 1011 });
     wsState.closeCallback?.({}, { code: 1006 });
-    expect(wsState.close).not.toHaveBeenCalled();
     expect(onRevoked).not.toHaveBeenCalled();
 
     wsState.closeCallback?.({}, { code: 4403 });
-    expect(wsState.close).toHaveBeenCalledTimes(1);
     expect(onRevoked).toHaveBeenCalledWith(4403);
+    expect(wsState.close).not.toHaveBeenCalled();
   });
 });

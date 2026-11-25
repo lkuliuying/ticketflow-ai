@@ -83,7 +83,7 @@ export async function fetchChatPage(
   return res && isSuccess(res) ? res.data : null;
 }
 
-/** 服务端鉴权类关闭码：4401 未登录、4403 失去权限、4404 工单不可见；1011 等其余关闭照常重连 */
+/** 服务端鉴权类关闭码：4401 未登录、4403 失去权限或令牌失效、4404 工单不可见 */
 const CHAT_REVOKED_CODES = new Set([4401, 4403, 4404]);
 
 const SYNC_PAGE_SIZE = 100;
@@ -118,6 +118,20 @@ export async function fetchMissedMessages(
   return chatState ? { results, chat_state: chatState } : null;
 }
 
+/** 复查失败（已失去权限）时采用的会话状态 */
+export const REVOKED_CHAT_STATE: TicketChatState = {
+  can_send: false,
+  lock_reason: "READ_ONLY"
+};
+
+/** 经 HTTP 复查会话权限（http 层会自动刷新过期 token）；失败返回 null */
+export async function recheckChatState(
+  ticketId: string
+): Promise<TicketChatState | null> {
+  const data = await fetchChatPage(ticketId, { limit: 1 });
+  return data?.chat_state ?? null;
+}
+
 export async function postChatText(
   ticketId: string,
   content: string
@@ -125,7 +139,7 @@ export async function postChatText(
   const res = await ticketApi
     .chatSend(ticketId, {
       kind: "TEXT",
-      content,
+      content: content.trim(),
       client_msg_id: newClientId()
     })
     .catch(() => null);
@@ -154,7 +168,10 @@ export function openChatSocket(
     onMessage: (msg: TicketChatMessage) => void;
     onState: (state: TicketChatState) => void;
     onReconnect?: () => void;
-    /** 服务端以鉴权类关闭码断开（未登录 / 失去权限 / 工单不可见）时回调，不再重连 */
+    /**
+     * 服务端以鉴权类关闭码断开时回调。access token 过期也会收到 4403，
+     * 因此这里不直接放弃重连，由调用方经 HTTP（会自动刷新 token）复查权限后决定是否关闭。
+     */
     onRevoked?: (code: number) => void;
   }
 ): WS | null {
@@ -182,9 +199,7 @@ export function openChatSocket(
     },
     closeCallback: (_socket, event) => {
       const code = event?.code ?? 0;
-      if (!CHAT_REVOKED_CODES.has(code)) return;
-      instance.close();
-      handlers.onRevoked?.(code);
+      if (CHAT_REVOKED_CODES.has(code)) handlers.onRevoked?.(code);
     }
   });
   return instance;

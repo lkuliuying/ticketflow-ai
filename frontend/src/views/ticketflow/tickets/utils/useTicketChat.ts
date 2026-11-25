@@ -56,6 +56,14 @@ export function useTicketChat(
     }
   }
 
+  /** 鉴权类断开后经 HTTP 复查：仍可访问则交给底座重连，否则停止重连并锁为只读 */
+  async function recheckAccess() {
+    const state = await chat.recheckChatState(ticketId());
+    if (disposed) return;
+    if (!state) socket?.close();
+    applyState(state ?? chat.REVOKED_CHAT_STATE);
+  }
+
   function connect() {
     socket?.close();
     socket = chat.openChatSocket(ticketId(), {
@@ -65,7 +73,7 @@ export function useTicketChat(
       },
       onState: applyState,
       onReconnect: () => void syncMissed(),
-      onRevoked: () => applyState({ can_send: false, lock_reason: "READ_ONLY" })
+      onRevoked: () => void recheckAccess()
     });
   }
 
@@ -84,9 +92,7 @@ export function useTicketChat(
 
   const sendText = (content: string) =>
     content.trim()
-      ? dispatchSend(sending, () =>
-          chat.postChatText(ticketId(), content.trim())
-        )
+      ? dispatchSend(sending, () => chat.postChatText(ticketId(), content))
       : Promise.resolve(false);
 
   const sendMedia = (file: File) =>
