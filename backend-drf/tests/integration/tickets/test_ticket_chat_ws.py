@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
-from channels.layers import get_channel_layer
+from channels.layers import DEFAULT_CHANNEL_LAYER, InMemoryChannelLayer, channel_layers, get_channel_layer
 from channels.testing import WebsocketCommunicator
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -18,6 +18,28 @@ from tickets.notify import chat_group_name
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture
+def ticket_chat_layer():
+    layer = InMemoryChannelLayer()
+    # 切换 Django 设置会清空 Channels 的注册表，消息模块仍持有旧 layer。
+    with pytest.MonkeyPatch.context() as patch_layer:
+        patch_layer.setitem(channel_layers.backends, DEFAULT_CHANNEL_LAYER, layer)
+        yield layer
+
+
+def test_ticket_chat_layer_restores_default_backend(request):
+    original_layer = get_channel_layer()
+
+    def check_default_backend():
+        assert get_channel_layer() is original_layer
+
+    # 先登记检查，再请求夹具，确保检查在夹具退出后执行。
+    request.addfinalizer(check_default_backend)
+    test_layer = request.getfixturevalue("ticket_chat_layer")
+    assert get_channel_layer() is test_layer
+    assert test_layer is not original_layer
+
+
 def _communicator(ticket_id, token=None) -> WebsocketCommunicator:
     headers = [(b"origin", b"http://testserver"), (b"host", b"testserver")]
     if token is not None:
@@ -25,8 +47,7 @@ def _communicator(ticket_id, token=None) -> WebsocketCommunicator:
     return WebsocketCommunicator(application, f"/ws/tickets/{ticket_id}/chat/", headers=headers)
 
 
-def test_ticket_chat_ws_auth_and_broadcast(users, make_ticket, settings):
-    settings.CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+def test_ticket_chat_ws_auth_and_broadcast(users, make_ticket, ticket_chat_layer):
     ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
     outsider_user = UserInfo.objects.create_user(username="ws-outsider")
     outsider_user.roles.set(users["requester"].roles.all())
@@ -55,8 +76,7 @@ def test_ticket_chat_ws_auth_and_broadcast(users, make_ticket, settings):
         await comm.send_json_to({"action": "ping"})
         assert await comm.receive_json_from() == {"event": "pong"}
 
-        layer = get_channel_layer()
-        await layer.group_send(
+        await ticket_chat_layer.group_send(
             chat_group_name(ticket.pk),
             {"type": "chat.message", "payload": {"id": "m1", "kind": "TEXT", "content": "实时推送"}},
         )
@@ -69,8 +89,7 @@ def test_ticket_chat_ws_auth_and_broadcast(users, make_ticket, settings):
 
 
 @pytest.mark.parametrize("revocation", ["inactive", "role", "menu", "scope", "logout"])
-def test_chat_closes_without_delivering_after_access_loss(users, make_ticket, settings, revocation):
-    settings.CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+def test_chat_closes_without_delivering_after_access_loss(users, make_ticket, ticket_chat_layer, revocation):
     agent = users["agent"]
     ticket = make_ticket(status=Status.IN_PROGRESS, assignee=agent)
     token = str(RefreshToken.for_user(agent).access_token)
@@ -95,7 +114,7 @@ def test_chat_closes_without_delivering_after_access_loss(users, make_ticket, se
         assert (await comm.connect())[0]
         assert (await comm.receive_json_from())["event"] == "chat.state"
         await revoke()
-        await get_channel_layer().group_send(chat_group_name(ticket.pk), {"type": "chat.message", "payload": {}})
+        await ticket_chat_layer.group_send(chat_group_name(ticket.pk), {"type": "chat.message", "payload": {}})
         frame = await comm.receive_output()
         assert frame == {"type": "websocket.close", "code": 4403}
         await comm.disconnect()
@@ -108,15 +127,14 @@ def test_chat_closes_without_delivering_after_access_loss(users, make_ticket, se
 
 
 @pytest.mark.parametrize("join_fails", [True, False], ids=["group-add", "group-discard"])
-def test_chat_handles_unavailable_channel_layer(users, make_ticket, settings, join_fails):
-    settings.CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+def test_chat_handles_unavailable_channel_layer(users, make_ticket, ticket_chat_layer, join_fails):
     ticket = make_ticket(status=Status.IN_PROGRESS, assignee=users["agent"])
     user = users["requester"]
     token = str(RefreshToken.for_user(user).access_token)
 
     async def scenario():
         comm = _communicator(ticket.pk, token)
-        layer = get_channel_layer()
+        layer = ticket_chat_layer
         error = ConnectionError("channel layer unavailable")
         add = AsyncMock(wraps=layer.group_add, side_effect=error if join_fails else None)
         discard = AsyncMock(side_effect=error)
