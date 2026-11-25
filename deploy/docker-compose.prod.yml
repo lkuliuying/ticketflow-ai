@@ -1,0 +1,82 @@
+# 生产部署叠加配置：
+# docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+#
+# 说明：
+# - 生产环境务必在 deploy/.env 中设置 TICKETFLOW_DEMO=false，并由前置 HTTPS 负载均衡/反代终止 TLS；
+# - 若对 ai 服务横向扩展多 worker/副本，请按副本数折算 UPSTREAM_CONCURRENCY（或改用外部网关限流）。
+
+services:
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  redis:
+    command:
+      - "redis-server"
+      - "--requirepass"
+      - "${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "512mb"
+      - "--maxmemory-policy"
+      - "noeviction"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+
+  drf-web:
+    command: ["gunicorn", "server.asgi:application", "-b", "0.0.0.0:8896", "-k", "uvicorn_worker.UvicornWorker", "-w", "${DRF_WORKERS:-2}"]
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  drf-worker:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  drf-beat:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  ai:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  gateway:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M

@@ -69,12 +69,12 @@ Claude 写任务书 (collab/tasks/)  →  执行者在分支上实现并自测
 | BE-08 | 三角色、技术员范围（当前 + 历史只读）、指派历史、自动派单、退回重派、关闭注册 | Codex | — | 评审通过，已集成 |
 | BE-09 | 工单评价 | Codex | BE-08 | 评审通过，已集成 |
 | BE-10 | 账号与技能组管理 | Codex | BE-08 | 评审通过，已集成 |
-| BE-11 | AI 知识问答（DRF：会话、消息、反馈、内网上下文） | Codex | BE-08 | 进行中 |
-| SV-05 | AI 知识问答（FastAPI：流式对话、转人工草稿） | Codex | BE-11 | 待开始 |
-| FE-12 | 角色界面适配 | Claude | BE-08 | 评审通过，已集成 |
-| FE-13 | 评价界面 | Claude | BE-09 | 评审通过，已集成 |
-| FE-14 | 账号与技能组管理页面 | Claude | BE-10 | 评审通过，已集成 |
-| FE-15 | AI 助手与 AI 反馈页面 | Claude | BE-11、SV-05 | 待开始 |
+| BE-11 | AI 知识问答（DRF：会话、消息、反馈、内网上下文） | Codex | BE-08 | 评审通过，已合入 main |
+| SV-05 | AI 知识问答（FastAPI：流式对话、转人工草稿） | Codex | BE-11 | 评审通过，已合入 main |
+| FE-12 | 角色界面适配 | Claude | BE-08 | 评审通过，已合入 main |
+| FE-13 | 评价界面 | Claude | BE-09 | 评审通过，已合入 main |
+| FE-14 | 账号与技能组管理页面 | Claude | BE-10 | 评审通过，已合入 main |
+| FE-15 | AI 助手与 AI 反馈页面 | Claude | BE-11、SV-05 | 评审通过，已合入 main |
 
 后端任务书见 [tasks/backend.md](tasks/backend.md)，前端任务书见 [tasks/frontend.md](tasks/frontend.md)，
 迭代 6 的任务在任务书末尾。集成分支 `integration/iter6`：各任务评审通过后合入，验收通过后由用户确认合并到 `main`。

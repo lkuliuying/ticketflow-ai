@@ -24,6 +24,10 @@ def write_config() -> None:
     config = {
         "SECRET_KEY": env["SECRET_KEY"],
         "JWT_SIGNING_KEY": env["JWT_SIGNING_KEY"],
+        "TICKETFLOW_INTERNAL_API_SECRET": env["INTERNAL_API_SECRET"],
+        "TICKETFLOW_EMBEDDING_BASE_URL": env.get("EMBEDDING_BASE_URL", ""),
+        "TICKETFLOW_EMBEDDING_API_KEY": env.get("EMBEDDING_API_KEY", ""),
+        "TICKETFLOW_EMBEDDING_MODEL": env.get("EMBEDDING_MODEL", ""),
         "CAPTCHA_TICKET_SECRET": env["CAPTCHA_TICKET_SECRET"],
         "CAPTCHA_TICKET_AUDIENCE": env["CAPTCHA_TICKET_AUDIENCE"],
         "ALLOWED_HOSTS": ["drf-web", "127.0.0.1", *hosts],
