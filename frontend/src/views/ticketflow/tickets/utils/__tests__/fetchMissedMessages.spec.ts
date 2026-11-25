@@ -46,6 +46,13 @@ describe("fetchMissedMessages 断线补拉", () => {
     expect(await fetchMissedMessages("t1", "m1")).toBeNull();
   });
 
+  it("游标未前进时立即停止，不空转", async () => {
+    apiMocks.chatMessages.mockResolvedValue(page(["m1"], true));
+    const data = await fetchMissedMessages("t1", "m1");
+    expect(apiMocks.chatMessages).toHaveBeenCalledTimes(1);
+    expect(data?.results.map(item => item.id)).toEqual(["m1"]);
+  });
+
   it("has_more 恒为 true 时在页数上限处停止", async () => {
     let n = 0;
     apiMocks.chatMessages.mockImplementation(async () =>

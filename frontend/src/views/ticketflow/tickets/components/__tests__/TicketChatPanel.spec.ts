@@ -33,9 +33,12 @@ vi.mock("@/api/ticketflow/tickets", () => ({
   ticketApi: apiMocks
 }));
 
-vi.mock("../../utils/useAuthorizedMedia", () => ({
-  useAuthorizedMedia: () => mediaMocks
-}));
+vi.mock("../../utils/useAuthorizedMedia", async () => {
+  // urls 需为响应式，才能在“加载成功”后驱动模板切换为 <video>
+  const { reactive } = await import("vue");
+  mediaMocks.urls = reactive({});
+  return { useAuthorizedMedia: () => mediaMocks };
+});
 
 import TicketChatPanel from "../TicketChatPanel.vue";
 import type { TicketDetail } from "@/api/ticketflow/tickets";
@@ -156,26 +159,27 @@ describe("TicketChatPanel 实时排查会话", () => {
     expect(wrapper.findAll('[data-testid="ticket-chat-item"]')).toHaveLength(1);
   });
 
-  it("视频消息不随会话预取，点击“加载视频”后才拉取，失败时提示", async () => {
+  const fileUrl = (id: string) =>
+    `/api/tickets/ticket-1/chat/messages/${id}/file`;
+  const media = (id: string, kind: "IMAGE" | "VIDEO") => ({
+    id,
+    ticket_id: "ticket-1",
+    sender_id: 20,
+    sender_name: "tech",
+    kind,
+    content: "",
+    media_meta: { filename: `${id}.bin` },
+    media_expired: false,
+    file_url: fileUrl(id),
+    thumb_url: kind === "IMAGE" ? `${fileUrl(id)}?size=thumb` : null,
+    client_msg_id: "",
+    created_time: "2026-11-25T10:00:00Z"
+  });
+
+  async function mountWithMedia() {
+    for (const key of Object.keys(mediaMocks.urls)) delete mediaMocks.urls[key];
     mediaMocks.ensure.mockReset();
-    mediaMocks.ensure.mockResolvedValue(false);
     messageMock.mockReset();
-    const fileUrl = (id: string) =>
-      `/api/tickets/ticket-1/chat/messages/${id}/file`;
-    const media = (id: string, kind: "IMAGE" | "VIDEO") => ({
-      id,
-      ticket_id: "ticket-1",
-      sender_id: 20,
-      sender_name: "tech",
-      kind,
-      content: "",
-      media_meta: { filename: `${id}.bin` },
-      media_expired: false,
-      file_url: fileUrl(id),
-      thumb_url: kind === "IMAGE" ? `${fileUrl(id)}?size=thumb` : null,
-      client_msg_id: "",
-      created_time: "2026-11-25T10:00:00Z"
-    });
     apiMocks.chatMessages.mockResolvedValueOnce({
       code: 1000,
       data: {
@@ -185,11 +189,45 @@ describe("TicketChatPanel 实时排查会话", () => {
       }
     });
     apiMocks.chatRead.mockResolvedValue({ code: 1000, data: null });
-
     const wrapper = mount(TicketChatPanel, {
       props: { ticket: makeTicket() }
     });
     await flushPromises();
+    return wrapper;
+  }
+
+  it("视频加载成功后渲染 <video>，不提示错误", async () => {
+    const wrapper = await mountWithMedia();
+    mediaMocks.ensure.mockImplementation(async (url: string) => {
+      mediaMocks.urls[url] = "blob:video";
+      return true;
+    });
+    await wrapper
+      .get('[data-testid="ticket-chat-load-video"]')
+      .trigger("click");
+    await flushPromises();
+    expect(wrapper.find("video").attributes("src")).toBe("blob:video");
+    expect(messageMock).not.toHaveBeenCalled();
+  });
+
+  it("视频下载途中组件卸载时不误报失败", async () => {
+    const wrapper = await mountWithMedia();
+    let finish!: (ok: boolean) => void;
+    mediaMocks.ensure.mockImplementation(
+      () => new Promise<boolean>(resolve => (finish = resolve))
+    );
+    await wrapper
+      .get('[data-testid="ticket-chat-load-video"]')
+      .trigger("click");
+    wrapper.unmount();
+    finish(false);
+    await flushPromises();
+    expect(messageMock).not.toHaveBeenCalled();
+  });
+
+  it("视频消息不随会话预取，点击“加载视频”后才拉取，失败时提示", async () => {
+    const wrapper = await mountWithMedia();
+    mediaMocks.ensure.mockResolvedValue(false);
 
     const fetched = mediaMocks.ensure.mock.calls.map(call => String(call[0]));
     expect(fetched).toContain(`${fileUrl("img1")}?size=thumb`);

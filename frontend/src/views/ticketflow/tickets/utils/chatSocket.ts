@@ -112,7 +112,8 @@ export async function fetchMissedMessages(
     chatState = data.chat_state;
     results.push(...data.results);
     const last = data.results[data.results.length - 1];
-    if (!data.has_more || !last) break;
+    // 游标未前进（异常响应）时停止，避免空转到页数上限
+    if (!data.has_more || !last || last.id === cursor) break;
     cursor = last.id;
   }
   return chatState ? { results, chat_state: chatState } : null;

@@ -77,7 +77,8 @@ describe("新建工单弹窗", () => {
 
   it("请求异常由拦截器提示，不重复弹错", async () => {
     apiMocks.create.mockRejectedValueOnce(new Error("500"));
-    const { done } = await submit();
+    const { done, closeLoading } = await submit();
+    expect(closeLoading).toHaveBeenCalled();
     expect(done).not.toHaveBeenCalled();
     expect(messageMock).not.toHaveBeenCalled();
   });

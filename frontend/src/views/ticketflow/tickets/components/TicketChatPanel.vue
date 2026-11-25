@@ -1,5 +1,12 @@
 <script lang="ts" setup>
-import { nextTick, onMounted, reactive, ref, watch } from "vue";
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { message } from "@/utils/message";
 import { useUserStoreHook } from "@/store/modules/user";
@@ -61,13 +68,22 @@ watch(
 );
 
 const videoLoading = reactive<Record<string, boolean>>({});
+let unmounted = false;
+onBeforeUnmount(() => {
+  unmounted = true;
+});
 
 async function loadVideo(url: string) {
   if (videoLoading[url]) return;
   videoLoading[url] = true;
-  const ok = await ensureMedia(url);
-  videoLoading[url] = false;
-  if (!ok && !mediaUrls[url]) {
+  let ok = false;
+  try {
+    ok = await ensureMedia(url);
+  } finally {
+    videoLoading[url] = false;
+  }
+  // 下载途中离开页面时 ensure 也会返回 false，此时不应在新页面误报失败
+  if (!ok && !mediaUrls[url] && !unmounted) {
     message(t("ticketflow.chat.videoLoadFailed"), { type: "error" });
   }
 }
