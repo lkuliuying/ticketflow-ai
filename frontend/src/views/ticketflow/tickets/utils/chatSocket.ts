@@ -83,6 +83,9 @@ export async function fetchChatPage(
   return res && isSuccess(res) ? res.data : null;
 }
 
+/** 服务端鉴权类关闭码：4401 未登录、4403 失去权限、4404 工单不可见；1011 等其余关闭照常重连 */
+const CHAT_REVOKED_CODES = new Set([4401, 4403, 4404]);
+
 const SYNC_PAGE_SIZE = 100;
 const SYNC_MAX_PAGES = 20;
 
@@ -151,6 +154,8 @@ export function openChatSocket(
     onMessage: (msg: TicketChatMessage) => void;
     onState: (state: TicketChatState) => void;
     onReconnect?: () => void;
+    /** 服务端以鉴权类关闭码断开（未登录 / 失去权限 / 工单不可见）时回调，不再重连 */
+    onRevoked?: (code: number) => void;
   }
 ): WS | null {
   if (typeof WebSocket === "undefined") return null;
@@ -174,6 +179,12 @@ export function openChatSocket(
       });
       if (connectedOnce) handlers.onReconnect?.();
       connectedOnce = true;
+    },
+    closeCallback: (_socket, event) => {
+      const code = event?.code ?? 0;
+      if (!CHAT_REVOKED_CODES.has(code)) return;
+      instance.close();
+      handlers.onRevoked?.(code);
     }
   });
   return instance;

@@ -64,7 +64,8 @@ export function useTicketChat(
         chat.markChatRead(ticketId());
       },
       onState: applyState,
-      onReconnect: () => void syncMissed()
+      onReconnect: () => void syncMissed(),
+      onRevoked: () => applyState({ can_send: false, lock_reason: "READ_ONLY" })
     });
   }
 
