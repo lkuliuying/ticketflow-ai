@@ -65,7 +65,8 @@ test("员工向 AI 提问、点赞并转人工提单", async ({ page }) => {
   await expect(ticketDrawer).toContainText(ticketTitle);
   ticketNumber =
     (await ticketDrawer.getByTestId("ticket-header").innerText()).match(
-      /TF-[0-9A-F]+/
+      // 工单号形如 TF-20261126-1A2B3C：带上日期后的随机段，同一天多张单也能唯一定位
+      /TF-\d{8}-[0-9A-Z]+/
     )?.[0] ?? "";
   expect(ticketNumber).not.toBe("");
   await closeDrawer(page);

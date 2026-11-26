@@ -24,12 +24,17 @@ test.describe.configure({ mode: "serial" });
 test("提交人建单", async ({ page }) => {
   await loginAs(page, "tf_requester");
   await openTickets(page);
-  await page.getByRole("button", { name: "新增" }).click();
-  const dialog = page.locator(".el-dialog", { hasText: "新增" }).last();
-  await dialog.getByPlaceholder("请输入标题").fill(title);
-  await dialog.getByPlaceholder("请输入描述").fill(description);
-  await choose(page, dialog.locator(".el-select").nth(0), "权限");
-  await choose(page, dialog.locator(".el-select").nth(1), "P2");
+  await page.getByRole("button", { name: "新建工单" }).click();
+  const dialog = page.locator(".el-dialog", { hasText: "新建工单" }).last();
+  await dialog.getByRole("textbox", { name: "标题" }).fill(title);
+  await dialog.getByRole("textbox", { name: "描述" }).fill(description);
+  const select = (label: string) =>
+    dialog
+      .locator(".el-form-item", { hasText: label })
+      .locator(".el-select")
+      .first();
+  await choose(page, select("分类"), "权限");
+  await choose(page, select("优先级"), "P2");
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog).toBeHidden();
   await expect(
@@ -61,10 +66,14 @@ test("技术员接单，AI 分析采纳并生成回复", async ({ page }) => {
   expect(suggestion.length).toBeGreaterThan(0);
   await fill.click();
 
-  const reply = drawer.getByTestId("ticket-reply");
-  await expect(reply.locator("textarea")).toHaveValue(/.+/);
-  await reply.getByRole("button", { name: "发送" }).click();
-  await expect(drawer.getByTestId("ticket-timeline")).toContainText(suggestion);
+  // AI 建议填入实时排查会话的输入框（对外回复已统一走会话），发送后出现在消息列表
+  // el-input 把 data-testid 透传到 textarea 本身
+  const input = drawer.getByTestId("ticket-chat-input");
+  await expect(input).toHaveValue(/.+/);
+  await drawer.getByTestId("ticket-chat-send").click();
+  await expect(drawer.getByTestId("ticket-chat-messages")).toContainText(
+    suggestion
+  );
 
   await transition(page, drawer, "提交验收");
   await expect(drawer.getByTestId("ticket-header")).toContainText("待验收");

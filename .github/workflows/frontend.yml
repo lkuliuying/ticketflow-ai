@@ -52,6 +52,10 @@ jobs:
           pnpm typecheck
           pnpm lint
 
+      # bundle-size 与 entry-closure 门禁读取 dist/ 产物，构建必须先于门禁
+      - name: Production build
+        run: pnpm build
+
       - name: Run repository gates
         run: |
           for g in bundle-size entry-closure success-code platform-config i18n as-unknown hook-length \
@@ -60,6 +64,3 @@ jobs:
             pnpm check:$g
           done
           node scripts/check-file-length.mjs
-
-      - name: Production build
-        run: pnpm build
